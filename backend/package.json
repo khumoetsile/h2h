@@ -1,0 +1,33 @@
+{
+  "name": "rivalis-backend",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Rivalis P2P competitive gaming platform API (DEMO MODE — simulated funds only)",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "migrate": "node scripts/migrate.js",
+    "seed": "node scripts/seed.js",
+    "db:reset": "node scripts/migrate.js --fresh && node scripts/seed.js",
+    "test": "node --test --test-concurrency=1 --test-reporter=spec test/*.test.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.6",
+    "dotenv": "^18.0.4",
+    "express": "^5.2.1",
+    "express-rate-limit": "^8.7.0",
+    "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.3",
+    "morgan": "^1.12.1",
+    "mysql2": "^3.24.4",
+    "socket.io": "^4.8.4",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.4",
+    "supertest": "^7.3.0"
+  }
+}
