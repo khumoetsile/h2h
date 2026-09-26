@@ -8,11 +8,25 @@
     <div class="lobby-head">
       <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="44" />
       <div class="grow">
-        <h2>{{ m.game.name }}</h2>
-        @if (m.source === 'CHALLENGE') { <div class="muted small">Direct challenge</div> }
+        @if (m.category === 'FOOTBALL' && m.football) {
+          <h2>{{ m.football.homeTeam }} vs {{ m.football.awayTeam }}</h2>
+          <div class="muted small">{{ competitionName(m.football.competition) }} · {{ m.football.challengeType?.question }}</div>
+        } @else {
+          <h2>{{ m.game.name }}</h2>
+          @if (m.source === 'CHALLENGE') { <div class="muted small">Direct challenge</div> }
+        }
       </div>
       <app-match-status [status]="m.status" />
     </div>
+
+    @if (m.category === 'FOOTBALL' && m.football) {
+      <div class="card football-summary">
+        <div class="fs-row"><span class="muted small">Your pick</span><strong>{{ myPickLabel(m) }}</strong></div>
+        @if (m.football.fixtureStatus === 'LIVE') {
+          <div class="fs-row"><span class="muted small">Score</span><strong>{{ m.football.homeScore }} – {{ m.football.awayScore }} @if (m.football.minute) { ({{ m.football.minute }}') }</strong></div>
+        }
+      </div>
+    }
 
     <div class="stake-bar card">
       <div><span class="muted tiny">YOUR ENTRY</span><strong class="money">{{ m.stake | money }}</strong></div>

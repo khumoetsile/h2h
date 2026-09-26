@@ -79,15 +79,15 @@ async function playerIds(tx, matchId) {
 // ---------------------------------------------------------------------------
 
 /** Insert a match row + lock the creator's stake. Must run inside `tx`. */
-export async function createMatchTx(tx, userId, gameId, stake, { source = 'MATCHMAKING', status = 'WAITING' } = {}) {
+export async function createMatchTx(tx, userId, gameId, stake, { source = 'MATCHMAKING', status = 'WAITING', category = 'SKILL_GAME' } = {}) {
   const game = await requireEnabledGame(tx, gameId);
   const { amount, feePercent } = await validateStake(stake);
   const { pool, fee, prize } = computePrize(amount, feePercent);
   const code = matchCode();
   const res = await tx.q(
-    `INSERT INTO matches (code, game_id, stake, pool, fee_percent, fee_amount, prize, status, source, created_by, seed)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [code, game.id, amount, pool, feePercent, fee, prize, status, source, userId, randomSeed()],
+    `INSERT INTO matches (code, game_id, category, stake, pool, fee_percent, fee_amount, prize, status, source, created_by, seed)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [code, game.id, category, amount, pool, feePercent, fee, prize, status, source, userId, randomSeed()],
   );
   const match = { id: res.insertId, code, stake: amount, prize, fee_percent: feePercent };
   await lockStake(tx, userId, match, game.name);
@@ -104,8 +104,8 @@ export async function createMatch(userId, gameId, stake) {
   });
 }
 
-/** Add `userId` as the second player of a WAITING match (row must be locked). */
-async function joinLockedMatch(tx, m, userId, { autoReady = false } = {}) {
+/** Add `userId` as the second player of a WAITING match (row must be locked). Exported for football matchmaking pairing. */
+export async function joinLockedMatch(tx, m, userId, { autoReady = false } = {}) {
   if (m.status !== 'WAITING') {
     if (m.status === 'CANCELLED') throw conflict('MATCH_CANCELLED', 'This match was cancelled.');
     if (m.status === 'COMPLETED') throw conflict('MATCH_COMPLETED', 'This match is already completed.');
@@ -219,6 +219,7 @@ async function lockMatchForPlayer(tx, userId, matchIdOrCode) {
 function assertNotFinished(m) {
   if (m.status === 'COMPLETED') throw conflict('MATCH_COMPLETED', 'This match is already completed.');
   if (m.status === 'CANCELLED') throw conflict('MATCH_CANCELLED', `This match was cancelled${m.cancel_reason ? `: ${m.cancel_reason}` : ''}.`);
+  if (m.status === 'VOID') throw conflict('MATCH_VOID', `This challenge could not be fairly completed${m.cancel_reason ? `: ${m.cancel_reason}` : ''}. Your entry was refunded.`);
 }
 
 export async function setReady(userId, matchIdOrCode) {
@@ -362,6 +363,11 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
     [winner ? winner.user_id : null, winner ? 0 : 1, resultReason, matchId],
   );
   if (upd.affectedRows !== 1) return false;
+  await tx.q(
+    `INSERT INTO settlements (match_id, reference, outcome, winner_id, pool, fee_percent, fee_amount, prize, reason)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [matchId, matchCode().replace('M-', 'S-'), winner ? 'WIN' : 'DRAW', winner ? winner.user_id : null, m.pool, m.fee_percent, winner ? m.fee_amount : 0, winner ? m.prize : 0, resultReason],
+  );
   const link = `/matches/${m.code}`;
   if (!winner) {
     for (const p of players) {
@@ -387,22 +393,40 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
 // Cancellation
 // ---------------------------------------------------------------------------
 
-export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true } = {}) {
+/**
+ * Cancel (never happened / no fair chance to start) or void (started fairly
+ * but could not be objectively settled afterwards, e.g. a football fixture
+ * abandoned mid-match) a match. Both refund every locked stake in full and
+ * charge zero platform fee — a technical or external-data failure must never
+ * cost a player their stake.
+ */
+export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true, toStatus = 'CANCELLED' } = {}) {
   const upd = await tx.q(
-    `UPDATE matches SET status = 'CANCELLED', cancelled_at = NOW(), cancel_reason = ?, settled_at = NOW()
+    `UPDATE matches SET status = ?, cancelled_at = NOW(), cancel_reason = ?, settled_at = NOW()
      WHERE id = ? AND status IN ('WAITING','MATCHED','READY','IN_PROGRESS') AND settled_at IS NULL`,
-    [reason, m.id],
+    [toStatus, reason, m.id],
   );
   if (upd.affectedRows !== 1) return false;
   const game = await tx.one('SELECT name FROM games WHERE id = ?', [m.game_id]);
   const players = await tx.q('SELECT mp.*, u.is_bot FROM match_players mp JOIN users u ON u.id = mp.user_id WHERE match_id = ?', [m.id]);
+  const isVoid = toStatus === 'VOID';
   for (const p of players) {
     if (p.stake_locked) await refundStake(tx, p.user_id, m, reason);
     await tx.q(`UPDATE match_players SET outcome = 'REFUNDED', payout = stake WHERE id = ?`, [p.id]);
     if (notifyPlayers && !p.is_bot) {
-      await notify(tx, p.user_id, { type: 'MATCH_CANCELLED', title: 'Match cancelled', message: `Your ${game.name} match was cancelled (${reason}). ${formatMoney(m.stake)} DEMO was returned to your balance.`, link: `/matches/${m.code}` });
+      await notify(tx, p.user_id, {
+        type: isVoid ? 'MATCH_VOID' : 'MATCH_CANCELLED',
+        title: isVoid ? 'Challenge voided' : 'Match cancelled',
+        message: `Your ${game.name} ${isVoid ? 'challenge could not be fairly completed' : 'match was cancelled'} (${reason}). ${formatMoney(m.stake)} DEMO was returned to your balance. No fee was charged.`,
+        link: `/matches/${m.code}`,
+      });
     }
   }
+  await tx.q(
+    `INSERT INTO settlements (match_id, reference, outcome, pool, fee_percent, fee_amount, prize, reason)
+     VALUES (?, ?, ?, ?, ?, 0, 0, ?)`,
+    [m.id, matchCode().replace('M-', 'S-'), isVoid ? 'VOID' : 'CANCELLED', m.pool, m.fee_percent, reason],
+  );
   emitMatch(tx, m.id, players.map((p) => p.user_id));
   tx.afterCommit(() => broadcastQueueCounts());
   return true;
@@ -427,12 +451,15 @@ export async function cancelMatch(userId, matchIdOrCode) {
 
 export async function sweepMatches() {
   const s = await getSettings();
+  // Football matches run on the fixture's own clock (kickoff, full time),
+  // which can be hours or days away — they are excluded here and instead
+  // managed by the football sync service (src/football/footballSyncService.js).
   const stale = await query(
-    `SELECT id, status FROM matches WHERE
+    `SELECT id, status FROM matches WHERE category = 'SKILL_GAME' AND (
        (status = 'WAITING' AND created_at < NOW() - INTERVAL ? MINUTE) OR
        (status IN ('MATCHED','READY') AND COALESCE(matched_at, created_at) < NOW() - INTERVAL ? MINUTE) OR
        (status = 'IN_PROGRESS' AND started_at < NOW() - INTERVAL ? MINUTE)
-     LIMIT 50`,
+     ) LIMIT 50`,
     [s.waiting_match_timeout_minutes, s.match_start_timeout_minutes, s.match_play_timeout_minutes + 1],
   );
   let handled = 0;
@@ -467,6 +494,40 @@ function parseJson(v) {
   return typeof v === 'string' ? JSON.parse(v) : v;
 }
 
+/** Football-specific detail attached to a match view/list row (null for skill games). */
+export async function loadFootballSummary(matchId) {
+  const row = await queryOne(
+    `SELECT fc.creator_pick, fc.opponent_pick, ct.slug AS type_slug, ct.name AS type_name, ct.question_template, ct.pick_type,
+            fx.id AS fixture_id, fx.kickoff_at, fx.status AS fixture_status, fx.minute, fx.home_score, fx.away_score,
+            comp.name AS competition_name, comp.code AS competition_code,
+            ht.name AS home_team, ht.short_name AS home_team_short, at.name AS away_team, at.short_name AS away_team_short
+     FROM football_challenges fc
+     JOIN football_challenge_types ct ON ct.id = fc.challenge_type_id
+     JOIN football_fixtures fx ON fx.id = fc.fixture_id
+     JOIN football_competitions comp ON comp.id = fx.competition_id
+     JOIN football_teams ht ON ht.id = fx.home_team_id
+     JOIN football_teams at ON at.id = fx.away_team_id
+     WHERE fc.match_id = ?`,
+    [matchId],
+  );
+  if (!row) return null;
+  const pickLabel = (pick) => {
+    if (pick === 'HOME') return row.home_team_short || row.home_team;
+    if (pick === 'AWAY') return row.away_team_short || row.away_team;
+    return pick;
+  };
+  return {
+    fixtureId: row.fixture_id,
+    competition: { name: row.competition_name, code: row.competition_code },
+    homeTeam: row.home_team, awayTeam: row.away_team,
+    kickoffAt: row.kickoff_at, fixtureStatus: row.fixture_status, minute: row.minute,
+    homeScore: row.home_score, awayScore: row.away_score,
+    challengeType: { slug: row.type_slug, name: row.type_name, question: row.question_template.replace('{home}', row.home_team_short || row.home_team).replace('{away}', row.away_team_short || row.away_team), pickType: row.pick_type },
+    creatorPick: row.creator_pick, creatorPickLabel: pickLabel(row.creator_pick),
+    opponentPick: row.opponent_pick, opponentPickLabel: row.opponent_pick ? pickLabel(row.opponent_pick) : null,
+  };
+}
+
 export async function getMatchView(matchIdOrCode, viewerId, { admin = false } = {}) {
   const m = await queryOne(
     `SELECT m.*, g.slug AS game_slug, g.name AS game_name, g.accent_color FROM matches m JOIN games g ON g.id = m.game_id
@@ -485,11 +546,14 @@ export async function getMatchView(matchIdOrCode, viewerId, { admin = false } = 
   const byUser = Object.fromEntries(results.map((r) => [r.user_id, r]));
   const settings = await getSettings();
   const deadline = (base, minutes) => (base ? new Date(new Date(base).getTime() + minutes * 60000) : null);
+  const football = m.category === 'FOOTBALL' ? await loadFootballSummary(m.id) : null;
   return {
     id: m.id,
     code: m.code,
     status: m.status,
     source: m.source,
+    category: m.category,
+    football,
     game: { id: m.game_id, slug: m.game_slug, name: m.game_name, accentColor: m.accent_color },
     stake: Number(m.stake),
     pool: Number(m.pool),
@@ -546,7 +610,7 @@ export async function listMatchesForUser(userId, { filter = 'all', page = 1, pag
   if (active) where.push(`m.status IN ('WAITING','MATCHED','READY','IN_PROGRESS')`);
   else if (filter === 'wins') where.push(`mp.outcome = 'WIN'`);
   else if (filter === 'losses') where.push(`mp.outcome = 'LOSS'`);
-  else if (filter === 'cancelled') where.push(`m.status = 'CANCELLED'`);
+  else if (filter === 'cancelled') where.push(`m.status IN ('CANCELLED','VOID')`);
   else if (filter === 'completed') where.push(`m.status = 'COMPLETED'`);
   const size = Math.min(Math.max(Number(pageSize) || 20, 1), 100);
   const pg = Math.max(Number(page) || 1, 1);
@@ -555,7 +619,8 @@ export async function listMatchesForUser(userId, { filter = 'all', page = 1, pag
   const rows = await query(
     `SELECT m.*, g.name AS game_name, g.slug AS game_slug, g.accent_color, mp.outcome, mp.payout,
             o.user_id AS opp_id, ou.username AS opp_username, ou.avatar_color AS opp_color, ou.is_bot AS opp_is_bot,
-            gr.score AS my_score, ogr.score AS opp_score
+            gr.score AS my_score, ogr.score AS opp_score,
+            comp.name AS fx_competition, ht.short_name AS fx_home, at.short_name AS fx_away, ct.name AS fx_type_name
      FROM match_players mp
      JOIN matches m ON m.id = mp.match_id
      JOIN games g ON g.id = m.game_id
@@ -563,6 +628,12 @@ export async function listMatchesForUser(userId, { filter = 'all', page = 1, pag
      LEFT JOIN users ou ON ou.id = o.user_id
      LEFT JOIN game_results gr ON gr.match_id = m.id AND gr.user_id = mp.user_id AND m.status = 'COMPLETED'
      LEFT JOIN game_results ogr ON ogr.match_id = m.id AND ogr.user_id = o.user_id AND m.status = 'COMPLETED'
+     LEFT JOIN football_challenges fc ON fc.match_id = m.id
+     LEFT JOIN football_fixtures fx ON fx.id = fc.fixture_id
+     LEFT JOIN football_competitions comp ON comp.id = fx.competition_id
+     LEFT JOIN football_teams ht ON ht.id = fx.home_team_id
+     LEFT JOIN football_teams at ON at.id = fx.away_team_id
+     LEFT JOIN football_challenge_types ct ON ct.id = fc.challenge_type_id
      WHERE ${whereSql}
      ORDER BY COALESCE(m.completed_at, m.cancelled_at, m.created_at) DESC, m.id DESC LIMIT ? OFFSET ?`,
     [...params, size, (pg - 1) * size],
@@ -576,6 +647,10 @@ export function mapMatchRow(r) {
     code: r.code,
     status: r.status,
     source: r.source,
+    category: r.category,
+    football: r.category === 'FOOTBALL' ? {
+      competition: r.fx_competition, homeTeam: r.fx_home, awayTeam: r.fx_away, questionName: r.fx_type_name,
+    } : null,
     game: { id: r.game_id, slug: r.game_slug, name: r.game_name, accentColor: r.accent_color },
     stake: Number(r.stake),
     prize: Number(r.prize),

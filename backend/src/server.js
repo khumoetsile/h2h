@@ -7,6 +7,7 @@ import { setIo } from './realtime.js';
 import { authenticateToken } from './middleware/auth.js';
 import { sweepMatches } from './services/matchService.js';
 import { expireChallenges } from './services/challengeService.js';
+import { startFootballSync } from './football/footballSyncService.js';
 
 export function createServer() {
   const app = createApp();
@@ -61,6 +62,7 @@ if (isMain) {
     process.exit(1);
   }
   startSweeper();
+  startFootballSync(config.football.syncIntervalSeconds);
   server.listen(config.port, () => {
     console.log(`\n  ${config.appName} API (DEMO MODE — simulated funds only)`);
     console.log(`  Listening on http://localhost:${config.port}/api\n`);

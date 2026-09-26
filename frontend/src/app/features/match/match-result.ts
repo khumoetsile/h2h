@@ -37,19 +37,34 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
             <p class="sub">{{ subline() }}</p>
           }
 
-          <div class="vs-row">
-            <div class="vs-side">
-              <app-avatar [name]="mine.username" [color]="mine.avatarColor" [size]="48" />
-              <span>You</span>
-              <strong class="num">{{ mine.result?.score ?? '—' }}</strong>
+          @if (isFootball() && m.football) {
+            <div class="football-recap">
+              <div class="fr-teams">
+                <span>{{ m.football.homeTeam }}</span>
+                @if (m.football.homeScore !== null && m.football.homeScore !== undefined) {
+                  <strong class="num">{{ m.football.homeScore }} – {{ m.football.awayScore }}</strong>
+                } @else {
+                  <span class="muted small">vs</span>
+                }
+                <span>{{ m.football.awayTeam }}</span>
+              </div>
+              <p class="muted small">{{ m.football.challengeType?.question }} — you picked <strong>{{ myPick() }}</strong></p>
             </div>
-            <div class="vs-mid">VS</div>
-            <div class="vs-side">
-              <app-avatar [name]="opponent()?.username ?? ''" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="48" />
-              <span>{{ opponent()?.username }}</span>
-              <strong class="num">{{ opponent()?.result?.score ?? '—' }}</strong>
+          } @else {
+            <div class="vs-row">
+              <div class="vs-side">
+                <app-avatar [name]="mine.username" [color]="mine.avatarColor" [size]="48" />
+                <span>You</span>
+                <strong class="num">{{ mine.result?.score ?? '—' }}</strong>
+              </div>
+              <div class="vs-mid">VS</div>
+              <div class="vs-side">
+                <app-avatar [name]="opponent()?.username ?? ''" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="48" />
+                <span>{{ opponent()?.username }}</span>
+                <strong class="num">{{ opponent()?.result?.score ?? '—' }}</strong>
+              </div>
             </div>
-          </div>
+          }
 
           <div class="actions">
             <button class="btn btn-primary btn-lg btn-block" (click)="playAgain()"><mat-icon>replay</mat-icon>Play again</button>
@@ -76,6 +91,9 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
     .vs-side { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; color: var(--muted);
       strong { font-family: var(--font-display); font-size: 22px; color: var(--text); } }
     .vs-mid { font-family: var(--font-display); font-weight: 700; color: var(--muted); font-size: 14px; }
+    .football-recap { margin: 22px 0 8px; width: 100%; }
+    .fr-teams { display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 700; font-family: var(--font-display); font-size: 18px;
+      .num { color: var(--accent); font-size: 22px; } }
     .actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 22px; }
   `],
 })
@@ -91,10 +109,19 @@ export class MatchResultPage implements OnInit {
   protected me = computed(() => this.match()?.players.find((p) => p.userId === this.match()?.viewerId) ?? null);
   protected opponent = computed(() => this.match()?.players.find((p) => p.userId !== this.match()?.viewerId) ?? null);
 
+  protected isFootball = computed(() => this.match()?.category === 'FOOTBALL');
+  protected myPick = computed(() => {
+    const m = this.match();
+    const f = m?.football;
+    if (!f) return '';
+    return m!.createdBy === m!.viewerId ? f.creatorPickLabel : (f.opponentPickLabel ?? f.creatorPickLabel);
+  });
+
   protected icon = computed(() => {
     const m = this.match();
     if (!m) return 'sports_esports';
     if (m.status === 'CANCELLED') return 'undo';
+    if (m.status === 'VOID') return 'block';
     if (m.isDraw) return 'balance';
     return this.me()?.outcome === 'WIN' ? 'emoji_events' : 'sentiment_dissatisfied';
   });
@@ -102,7 +129,8 @@ export class MatchResultPage implements OnInit {
   protected headline = computed(() => {
     const m = this.match();
     if (!m) return '';
-    if (m.status === 'CANCELLED') return 'Match cancelled';
+    if (m.status === 'CANCELLED') return this.isFootball() ? 'Challenge cancelled' : 'Match cancelled';
+    if (m.status === 'VOID') return "Result couldn't be verified";
     if (m.isDraw) return "IT'S A DRAW";
     return this.me()?.outcome === 'WIN' ? 'YOU WON!' : 'MATCH OVER';
   });
@@ -111,7 +139,8 @@ export class MatchResultPage implements OnInit {
     const m = this.match();
     if (!m) return '';
     if (m.status === 'CANCELLED') return 'Your entry was refunded.';
-    if (m.isDraw) return 'It was a tie — your entry was refunded.';
+    if (m.status === 'VOID') return 'We could not fairly determine a result, so your entry was refunded in full — no fee.';
+    if (m.isDraw) return this.isFootball() ? "The match ended in a draw — your entry was refunded." : 'It was a tie — your entry was refunded.';
     return 'You lost this round.';
   });
 
@@ -124,7 +153,7 @@ export class MatchResultPage implements OnInit {
     this.error.set('');
     try {
       const { match } = await this.api.get<{ match: MatchView }>(`/matches/${this.code()}`);
-      if (match.status !== 'COMPLETED' && match.status !== 'CANCELLED') {
+      if (match.status !== 'COMPLETED' && match.status !== 'CANCELLED' && match.status !== 'VOID') {
         this.router.navigate(['/match', match.code], { replaceUrl: true });
         return;
       }
@@ -135,7 +164,12 @@ export class MatchResultPage implements OnInit {
   }
 
   playAgain() {
-    const slug = this.match()?.game.slug;
+    const m = this.match();
+    if (m?.category === 'FOOTBALL' && m.football) {
+      this.router.navigate(['/football', m.football.fixtureId]);
+      return;
+    }
+    const slug = m?.game.slug;
     this.router.navigate(slug ? ['/games', slug] : ['/games']);
   }
 }

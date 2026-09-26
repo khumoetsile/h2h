@@ -20,8 +20,13 @@ export function mapGame(g) {
   };
 }
 
-export async function listGames({ includeDisabled = false } = {}) {
-  const rows = await query(`SELECT * FROM games ${includeDisabled ? '' : 'WHERE is_enabled = 1'} ORDER BY sort_order, id`);
+/** kind=null lists every row (used by admin); the player-facing "Play > Games" catalogue always passes kind='SKILL' so the Football pseudo-game never appears as a game card. */
+export async function listGames({ includeDisabled = false, kind = 'SKILL' } = {}) {
+  const where = [];
+  const params = [];
+  if (kind) { where.push('kind = ?'); params.push(kind); }
+  if (!includeDisabled) where.push('is_enabled = 1');
+  const rows = await query(`SELECT * FROM games ${where.length ? `WHERE ${where.join(' AND ')}` : ''} ORDER BY sort_order, id`, params);
   return rows.map(mapGame);
 }
 

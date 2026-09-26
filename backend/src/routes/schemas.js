@@ -62,11 +62,29 @@ export const resultSchema = z.object({
   clientElapsedMs: z.number().nonnegative().optional(),
 });
 
+const opponentField = z.union([z.string().trim().min(1, 'Choose an opponent.').max(21), z.number().int().positive()]);
+
 export const challengeSchema = z.object({
-  opponent: z.union([z.string().trim().min(1, 'Choose an opponent.').max(21), z.number().int().positive()]),
+  opponent: opponentField,
   gameId: z.coerce.number().int().positive('Choose a game.'),
   stake: money,
   message: z.string().trim().max(140).optional().nullable(),
+});
+
+export const footballChallengeSchema = z.object({
+  opponent: opponentField,
+  fixtureId: z.coerce.number().int().positive('Choose a match.'),
+  challengeTypeSlug: z.string().trim().min(1, 'Choose a challenge type.'),
+  pick: z.enum(['HOME', 'AWAY', 'YES', 'NO'], { error: 'Choose your pick.' }),
+  stake: money,
+  message: z.string().trim().max(140).optional().nullable(),
+});
+
+export const footballFindSchema = z.object({
+  fixtureId: z.coerce.number().int().positive('Choose a match.'),
+  challengeTypeSlug: z.string().trim().min(1, 'Choose a challenge type.'),
+  pick: z.enum(['HOME', 'AWAY', 'YES', 'NO'], { error: 'Choose your pick.' }),
+  stake: money,
 });
 
 export const paginationQuery = z.object({

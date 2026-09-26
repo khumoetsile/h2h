@@ -41,6 +41,14 @@ export class MatchLobbyPage implements OnInit {
     const s = Math.max(0, Math.floor((this.now() - new Date(m.createdAt).getTime()) / 1000));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   });
+  competitionName(c: { name: string; code: string } | string) {
+    return typeof c === 'string' ? c : c.name;
+  }
+  myPickLabel(m: MatchView) {
+    const f = m.football;
+    if (!f) return '';
+    return m.createdBy === m.viewerId ? f.creatorPickLabel : (f.opponentPickLabel ?? f.creatorPickLabel);
+  }
   protected countdownTo = (iso: string | null) => {
     if (!iso) return '';
     const s = Math.max(0, Math.floor((new Date(iso).getTime() - this.now()) / 1000));
@@ -67,7 +75,7 @@ export class MatchLobbyPage implements OnInit {
     const prev = this.match();
     this.match.set(m);
     if (prev && prev.status === 'WAITING' && m.status === 'MATCHED') this.toast.success(`Opponent found: ${this.opponent()?.username}`);
-    if (m.status === 'COMPLETED' || m.status === 'CANCELLED') {
+    if (m.status === 'COMPLETED' || m.status === 'CANCELLED' || m.status === 'VOID') {
       this.router.navigate(['/match', m.code, 'result'], { replaceUrl: true });
     }
   }

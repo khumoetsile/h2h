@@ -70,7 +70,31 @@ export interface Game {
   feePercent?: number;
 }
 
-export type MatchStatus = 'WAITING' | 'MATCHED' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+export type MatchStatus = 'WAITING' | 'MATCHED' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'VOID';
+export type MatchCategory = 'SKILL_GAME' | 'FOOTBALL';
+
+export interface FootballPick { HOME: string; AWAY: string; YES: string; NO: string }
+export type PickType = 'TEAM' | 'YES_NO';
+export type Pick = 'HOME' | 'AWAY' | 'YES' | 'NO';
+
+/** Attached to a match/challenge when category/source is football — null otherwise. */
+export interface FootballMatchInfo {
+  fixtureId: number;
+  competition: { name: string; code: string } | string;
+  homeTeam: string;
+  awayTeam: string;
+  kickoffAt: string;
+  fixtureStatus?: FixtureStatus;
+  minute?: number | null;
+  homeScore?: number | null;
+  awayScore?: number | null;
+  challengeType?: { slug: string; name: string; question: string; pickType: PickType };
+  questionName?: string;
+  creatorPick: Pick;
+  creatorPickLabel: string;
+  opponentPick: Pick | null;
+  opponentPickLabel: string | null;
+}
 export type Outcome = 'WIN' | 'LOSS' | 'DRAW' | 'REFUNDED' | null;
 
 export interface MatchPlayer {
@@ -100,6 +124,8 @@ export interface MatchView {
   code: string;
   status: MatchStatus;
   source: 'MATCHMAKING' | 'CHALLENGE' | 'DIRECT';
+  category: MatchCategory;
+  football: FootballMatchInfo | null;
   game: { id: number; slug: string; name: string; accentColor: string };
   stake: number;
   pool: number;
@@ -126,6 +152,8 @@ export interface MatchSummary {
   code: string;
   status: MatchStatus;
   source: string;
+  category: MatchCategory;
+  football: { competition: string; homeTeam: string; awayTeam: string; questionName: string } | null;
   game: { id: number; slug: string; name: string; accentColor: string };
   stake: number;
   prize: number;
@@ -174,6 +202,40 @@ export interface Challenge {
   expiresAt: string;
   respondedAt: string | null;
   createdAt: string;
+  football?: {
+    fixtureId: number; competition: string; homeTeam: string; awayTeam: string; kickoffAt: string;
+    question: string; creatorPick: Pick; creatorPickLabel: string;
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Football
+// ---------------------------------------------------------------------------
+
+export type FixtureStatus = 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED' | 'CANCELLED' | 'ABANDONED';
+
+export interface FootballCompetition { id: number; code: string; name: string; country: string | null; emblemUrl: string | null; }
+
+export interface FootballTeam { id: number; name: string; shortName: string | null; crestUrl: string | null; }
+
+export interface FootballChallengeType {
+  id: number; slug: string; name: string; question: string; pickType: PickType; settlementSummary: string;
+}
+
+export interface FootballFixture {
+  id: number;
+  competition: { id: number; code: string; name: string };
+  homeTeam: FootballTeam;
+  awayTeam: FootballTeam;
+  kickoffAt: string;
+  status: FixtureStatus;
+  minute: number | null;
+  homeScore: number | null;
+  awayScore: number | null;
+  isSimulated: boolean;
+  openChallenges: number;
+  challengeTypes?: FootballChallengeType[];
+  stakes?: number[];
 }
 
 export interface LeaderboardEntry {

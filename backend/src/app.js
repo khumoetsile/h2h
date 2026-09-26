@@ -14,6 +14,7 @@ import walletRoutes from './routes/wallet.js';
 import gameRoutes from './routes/games.js';
 import matchRoutes from './routes/matches.js';
 import challengeRoutes from './routes/challenges.js';
+import footballRoutes from './routes/football.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
@@ -54,6 +55,7 @@ export function createApp() {
   app.use('/api/games', requireAuth, gameRoutes);
   app.use('/api/matches', requireAuth, matchRoutes);
   app.use('/api/challenges', requireAuth, challengeRoutes);
+  app.use('/api/football', requireAuth, footballRoutes);
   app.use('/api/leaderboard', requireAuth, leaderboardRoutes);
   app.use('/api/notifications', requireAuth, notificationRoutes);
   app.use('/api/users', requireAuth, userRoutes);

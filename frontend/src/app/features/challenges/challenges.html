@@ -32,11 +32,20 @@
             <div class="grow">
               @if (c.direction === 'INCOMING') { <div class="t">{{ c.challenger.username }} challenged you</div> }
               @else { <div class="t">You challenged {{ c.opponent.username }}</div> }
-              <div class="meta small">
-                <app-game-icon [slug]="c.game.slug" [color]="c.game.accentColor" [size]="20" /> {{ c.game.name }}
-                · <span class="money">{{ c.stake | money }}</span> entry
-                · win <span class="money accent">{{ c.potentialPrize | money }}</span>
-              </div>
+              @if (c.football) {
+                <div class="meta small">
+                  <app-game-icon slug="football" color="#22C55E" [size]="20" /> {{ c.football.homeTeam }} vs {{ c.football.awayTeam }}
+                  · <span class="money">{{ c.stake | money }}</span> entry
+                  · win <span class="money accent">{{ c.potentialPrize | money }}</span>
+                </div>
+                <div class="muted small">{{ c.football.question }} — picked <strong>{{ c.football.creatorPickLabel }}</strong></div>
+              } @else {
+                <div class="meta small">
+                  <app-game-icon [slug]="c.game.slug" [color]="c.game.accentColor" [size]="20" /> {{ c.game.name }}
+                  · <span class="money">{{ c.stake | money }}</span> entry
+                  · win <span class="money accent">{{ c.potentialPrize | money }}</span>
+                </div>
+              }
               @if (c.message) { <div class="quote small">"{{ c.message }}"</div> }
               <div class="muted tiny">{{ c.status === 'PENDING' ? expiresIn(c) : (c.createdAt | ago) }}</div>
             </div>

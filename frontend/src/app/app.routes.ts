@@ -18,6 +18,8 @@ export const routes: Routes = [
       { path: 'dashboard', canActivate: [playerGuard], title: 'Home', loadComponent: () => import('./features/dashboard/dashboard').then((m) => m.DashboardPage) },
       { path: 'games', canActivate: [playerGuard], title: 'Games', loadComponent: () => import('./features/games/games-list').then((m) => m.GamesPage) },
       { path: 'games/:slug', canActivate: [playerGuard], title: 'Play', loadComponent: () => import('./features/games/game-detail').then((m) => m.GameDetailPage) },
+      { path: 'football', canActivate: [playerGuard], title: 'Football', loadComponent: () => import('./features/football/football-list').then((m) => m.FootballListPage) },
+      { path: 'football/:fixtureId', canActivate: [playerGuard], title: 'Fixture', loadComponent: () => import('./features/football/football-fixture').then((m) => m.FootballFixturePage) },
       { path: 'match/:code', canActivate: [playerGuard], title: 'Match', loadComponent: () => import('./features/match/match-lobby').then((m) => m.MatchLobbyPage) },
       { path: 'matches', canActivate: [playerGuard], title: 'My matches', loadComponent: () => import('./features/matches/match-history').then((m) => m.MatchHistoryPage) },
       { path: 'matches/:code', title: 'Match details', loadComponent: () => import('./features/matches/match-detail').then((m) => m.MatchDetailPage) },

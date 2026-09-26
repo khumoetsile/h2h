@@ -110,7 +110,7 @@ export class Spinner {
 }
 
 const STATUS_LABEL: Record<MatchStatus, string> = {
-  WAITING: 'Waiting', MATCHED: 'Matched', READY: 'Ready', IN_PROGRESS: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled',
+  WAITING: 'Waiting', MATCHED: 'Matched', READY: 'Ready', IN_PROGRESS: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled', VOID: 'Voided',
 };
 
 @Component({
@@ -176,5 +176,6 @@ export class GameIcon {
     'word-battle': 'spellcheck',
     'memory-battle': 'grid_view',
     'aim-challenge': 'my_location',
+    'football': 'sports_soccer',
   } as Record<string, string>)[this.slug()] ?? 'sports_esports');
 }

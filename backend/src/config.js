@@ -31,8 +31,21 @@ export const config = {
   demoBotsEnabled: (process.env.DEMO_BOTS_ENABLED || 'true') === 'true',
   sweeperIntervalSeconds: num('SWEEPER_INTERVAL_SECONDS', 15),
   // The platform is a prototype: money is ALWAYS simulated. There is intentionally
-  // no switch to turn this off.
+  // no runtime switch to turn this off — enabling real money is a deliberate
+  // future code change made only after the relevant Botswana regulatory and
+  // licensing review, not a config flag. See README "Path to real money".
   demoMode: true,
+  football: {
+    // 'mock' (default): a fully self-contained, clearly-labelled simulated
+    // provider — deterministic, needs no API key, safe for local dev/testing.
+    // 'football-data': a real implementation against api.football-data.org.
+    // Swap providers with zero code changes elsewhere in the app.
+    provider: process.env.FOOTBALL_PROVIDER || 'mock',
+    apiKey: process.env.FOOTBALL_API_KEY || '',
+    apiBaseUrl: process.env.FOOTBALL_API_BASE_URL || 'https://api.football-data.org/v4',
+    syncIntervalSeconds: num('FOOTBALL_SYNC_INTERVAL_SECONDS', 20),
+    fixtureWindowDays: num('FOOTBALL_FIXTURE_WINDOW_DAYS', 21),
+  },
 };
 
 if (!config.jwtSecret) throw new Error('JWT_SECRET must be set in production');

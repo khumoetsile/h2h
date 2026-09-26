@@ -22,8 +22,13 @@ import { EmptyState, GameIcon, LoadError } from '../../shared/ui';
       <div class="page-head">
         <div>
           <h1>Play</h1>
-          <p class="sub">Pick a game to challenge someone.</p>
+          <p class="sub">Pick a category to challenge someone.</p>
         </div>
+      </div>
+
+      <div class="segmented tabs play-tabs">
+        <button class="active"><mat-icon inline>sports_esports</mat-icon> Games</button>
+        <a routerLink="/football"><mat-icon inline>sports_soccer</mat-icon> Football</a>
       </div>
 
       @if (error()) {
@@ -57,6 +62,7 @@ import { EmptyState, GameIcon, LoadError } from '../../shared/ui';
     </div>
   `,
   styles: [`
+    .play-tabs { margin-bottom: 16px; }
     .games-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
     @media (min-width: 560px) { .games-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (min-width: 960px) { .games-grid { grid-template-columns: repeat(3, 1fr); } }

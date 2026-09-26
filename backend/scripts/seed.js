@@ -44,6 +44,20 @@ const GAMES = [
   },
 ];
 
+// Football challenge types — every row is a self-contained settlement rule.
+// requires_stats gates a type behind the active provider's declared
+// capabilities (see src/football/providerRegistry.js); the mock provider
+// (default in dev) supports all of them.
+const FOOTBALL_CHALLENGE_TYPES = [
+  { slug: 'match_winner', name: 'Who will win?', question: 'Who will win — {home} or {away}?', pickType: 'TEAM', requiresStats: false, noWinnerRule: 'DRAW', summary: 'Pick the match winner. If the match itself is a draw, both entries are refunded — no fee.' },
+  { slug: 'both_teams_score', name: 'Will both teams score?', question: 'Will both {home} and {away} score?', pickType: 'YES_NO', requiresStats: false, noWinnerRule: 'VOID', summary: 'Yes or no. Settled from the final score.' },
+  { slug: 'over_under_2_5', name: 'Over/under 2.5 goals?', question: 'Will there be over 2.5 total goals in {home} vs {away}?', pickType: 'YES_NO', requiresStats: false, noWinnerRule: 'VOID', summary: 'Yes (3+ goals) or no (2 or fewer). Settled from the final score.' },
+  { slug: 'first_to_score', name: 'Who scores first?', question: 'Who will score first — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'VOID', summary: 'Pick who scores the opening goal. If neither team scores, both entries are refunded — no fee.' },
+  { slug: 'more_shots', name: 'Who will have more shots?', question: 'Who will have more shots — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more shots. An equal count is a draw — full refund, no fee.' },
+  { slug: 'more_corners', name: 'Who will have more corners?', question: 'Who will win more corners — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more corners. An equal count is a draw — full refund, no fee.' },
+  { slug: 'more_cards', name: 'Who gets more cards?', question: 'Which team will receive more cards — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team shown more cards. An equal count is a draw — full refund, no fee.' },
+];
+
 const PASSWORD_PLAYER = 'Player123!';
 const PASSWORD_ADMIN = 'Admin123!';
 
@@ -95,6 +109,24 @@ export async function seed({ log = console.log } = {}) {
         [g.slug, g.name, g.tagline, g.description, g.how, g.duration, g.accent, i + 1],
       );
       gameIds[g.slug] = r.insertId;
+    }
+    // A single pseudo-game row for Football, so every football match still
+    // has a valid games.game_id (all the generic match/wallet/stats code
+    // keeps working unchanged) while the "Play" games catalogue — filtered
+    // by kind='SKILL' — never lists it as a card of its own.
+    const footballGame = await tx.q(
+      `INSERT INTO games (slug, name, kind, tagline, description, how_to_play, mode, estimated_duration_seconds, accent_color, sort_order, is_enabled)
+       VALUES ('football', 'Football', 'FOOTBALL', 'Challenge another player on real football matches.', 'Pick an outcome on a real upcoming football match and challenge another player to pick the other side.', 'Choose a match, choose a question (like "Who will win?"), and make your pick. Your opponent gets the other side. Once the real match finishes, we check the result and settle the challenge automatically.', '1v1', 5400, '#16A34A', 99, 1)`,
+    );
+    gameIds.football = footballGame.insertId;
+
+    // Football challenge types (settlement rules) — see src/football/settlementRules.js.
+    for (const [i, t] of FOOTBALL_CHALLENGE_TYPES.entries()) {
+      await tx.q(
+        `INSERT INTO football_challenge_types (slug, name, question_template, pick_type, requires_stats, no_winner_rule, settlement_summary, sort_order)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [t.slug, t.name, t.question, t.pickType, t.requiresStats ? 1 : 0, t.noWinnerRule, t.summary, i],
+      );
     }
     // Users + wallets. The whole history is backdated so the ledger reads naturally.
     const day = 86400000;
@@ -222,10 +254,36 @@ export async function seed({ log = console.log } = {}) {
       await tx.q('INSERT INTO notifications (user_id, type, title, message, link, is_read, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)', [users[user].id, type, title, message, link, read ? 1 : 0, new Date(Date.now() - minutesAgo * 60000)]);
     };
     await n('player', 'WELCOME', `Welcome to ${config.appName}!`, 'Your demo wallet has been funded with DEMO FUNDS. No real money is involved.', '/wallet', true, 20 * 1440);
-    await n('player', 'CHALLENGE_RECEIVED', 'Kabelo challenged you', '@Kabelo challenged you to Reaction Rush for P20.00 DEMO.', '/challenges', false, 5);
-    await n('player', 'CHALLENGE_RECEIVED', 'NeoStrike challenged you', '@NeoStrike challenged you to Penalty Shootout for P10.00 DEMO.', '/challenges', false, 12);
-    await n('player', 'CHALLENGE_DECLINED', 'Challenge declined', '@TumiFlash declined your Memory Battle challenge.', '/challenges', true, 590);
-    await n('Kabelo', 'CHALLENGE_RECEIVED', 'LesediK challenged you', '@LesediK challenged you to Aim Challenge for P20.00 DEMO.', '/challenges', false, 8);
+    await n('player', 'CHALLENGE_RECEIVED', 'Kabelo challenged you', 'Kabelo challenged you to Reaction Rush for P20.00 DEMO.', '/challenges', false, 5);
+    await n('player', 'CHALLENGE_RECEIVED', 'NeoStrike challenged you', 'NeoStrike challenged you to Penalty Shootout for P10.00 DEMO.', '/challenges', false, 12);
+    await n('player', 'CHALLENGE_DECLINED', 'Challenge declined', 'TumiFlash declined your Memory Battle challenge.', '/challenges', true, 590);
+    await n('Kabelo', 'CHALLENGE_RECEIVED', 'LesediK challenged you', 'LesediK challenged you to Aim Challenge for P20.00 DEMO.', '/challenges', false, 8);
+
+    // ---- Football: seed reference data so the Football tab has something to
+    // show immediately, without waiting for the first sync tick. One fixture
+    // is already FINISHED (for quick manual testing of settlement) and a few
+    // are upcoming (kicking off within the next two weeks).
+    const flCompetition = await tx.q(
+      `INSERT INTO football_competitions (provider, provider_competition_id, code, name, country, sort_order) VALUES ('mock', 'PL', 'PL', 'Premier League', 'England', 0)`,
+    );
+    const team = async (name) => {
+      const r = await tx.q(`INSERT INTO football_teams (provider, provider_team_id, name, short_name) VALUES ('mock', ?, ?, ?)`, [`PL:${name.toLowerCase()}`, name, name]);
+      return r.insertId;
+    };
+    const [arsenal, chelsea, liverpool, mancity] = await Promise.all([team('Arsenal'), team('Chelsea'), team('Liverpool'), team('Manchester City')]);
+    const finished = await tx.q(
+      `INSERT INTO football_fixtures
+         (provider, provider_fixture_id, competition_id, season, home_team_id, away_team_id, kickoff_at, status, minute,
+          home_score, away_score, home_shots, away_shots, home_corners, away_corners, home_cards, away_cards, first_goal_team, stats_available, is_simulated, last_synced_at)
+       VALUES ('mock', 'seed-demo-finished-1', ?, ?, ?, ?, NOW() - INTERVAL 2 HOUR, 'FINISHED', 90, 2, 1, 14, 9, 7, 4, 1, 2, 'HOME', 1, 1, NOW())`,
+      [flCompetition.insertId, `${new Date().getUTCFullYear()}`, arsenal, chelsea],
+    );
+    await tx.q(`INSERT INTO football_events (fixture_id, minute, type, team) VALUES (?, 23, 'GOAL', 'HOME'), (?, 61, 'GOAL', 'AWAY'), (?, 78, 'GOAL', 'HOME')`, [finished.insertId, finished.insertId, finished.insertId]);
+    await tx.q(
+      `INSERT INTO football_fixtures (provider, provider_fixture_id, competition_id, season, home_team_id, away_team_id, kickoff_at, status, is_simulated)
+       VALUES ('mock', 'seed-demo-upcoming-1', ?, ?, ?, ?, NOW() + INTERVAL 3 DAY, 'SCHEDULED', 1)`,
+      [flCompetition.insertId, `${new Date().getUTCFullYear()}`, liverpool, mancity],
+    );
   });
 
   log('Seed complete (DEMO DATA).');

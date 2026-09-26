@@ -13,6 +13,7 @@ export const SETTING_DEFAULTS = {
   waiting_match_timeout_minutes: 30,
   match_start_timeout_minutes: 10,
   match_play_timeout_minutes: 10,
+  football_supported_competitions: ['PL', 'PD', 'SA', 'BL1', 'FL1', 'CL'],
 };
 
 export const SETTING_DESCRIPTIONS = {
@@ -25,7 +26,8 @@ export const SETTING_DESCRIPTIONS = {
   challenge_expiry_minutes: 'Minutes before a pending challenge expires.',
   waiting_match_timeout_minutes: 'Minutes a match waits for an opponent before auto-cancel + refund.',
   match_start_timeout_minutes: 'Minutes a matched game may sit un-started before auto-cancel + refund.',
-  match_play_timeout_minutes: 'Minutes a player has to finish once the game has started.',
+  match_play_timeout_minutes: 'Minutes a player has to finish once the game has started (also the reconnection window used to decide a disconnected skill-game match fairly).',
+  football_supported_competitions: 'Football competitions synced and offered to players (provider competition codes).',
 };
 
 let cache = null;
@@ -66,6 +68,12 @@ function validate(key, value) {
     case 'min_withdrawal':
       if (!isPosNum(value) || value > 1000000) throw badRequest('INVALID_SETTING', `${key} must be a positive number.`);
       return Math.round(value * 100) / 100;
+    case 'football_supported_competitions': {
+      if (!Array.isArray(value) || value.length === 0 || value.length > 20 || !value.every((v) => typeof v === 'string' && /^[A-Z0-9]{2,10}$/.test(v))) {
+        throw badRequest('INVALID_SETTING', 'Provide 1–20 competition codes (letters/numbers only), e.g. PL, PD, SA.');
+      }
+      return [...new Set(value.map((v) => v.toUpperCase()))];
+    }
     default:
       if (!Number.isInteger(value) || value < 1 || value > 10080) throw badRequest('INVALID_SETTING', `${key} must be a whole number of minutes (1 – 10080).`);
       return value;

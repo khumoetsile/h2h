@@ -1,0 +1,148 @@
+<div class="page">
+  <a class="back muted small" routerLink="/football"><mat-icon>arrow_back</mat-icon>All fixtures</a>
+  @if (error()) {
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (!fixture()) {
+    <app-spinner />
+  } @else {
+    @let f = fixture()!;
+    <div class="layout fade-in">
+      <section class="intro">
+        <div class="fixture-head card">
+          <div class="fh-top">
+            <span class="muted small">{{ f.competition.name }}</span>
+            @if (f.status === 'LIVE') {
+              <span class="chip chip-win"><span class="live-dot"></span>LIVE @if (f.minute) { {{ f.minute }}' }</span>
+            } @else if (f.status === 'SCHEDULED') {
+              <span class="muted small">{{ kickoffLabel(f.kickoffAt) }}</span>
+            } @else {
+              <span class="chip">{{ f.status }}</span>
+            }
+          </div>
+          <div class="fh-teams">
+            <span class="team">{{ f.homeTeam.name }}</span>
+            @if (f.status === 'LIVE' || f.status === 'FINISHED') {
+              <span class="score">{{ f.homeScore }} – {{ f.awayScore }}</span>
+            } @else {
+              <span class="vs-sep">vs</span>
+            }
+            <span class="team">{{ f.awayTeam.name }}</span>
+          </div>
+          @if (f.isSimulated) { <p class="muted tiny">Simulated demo fixture — for testing only.</p> }
+        </div>
+
+        @if (closed()) {
+          <div class="card notice">
+            <mat-icon>lock_clock</mat-icon>
+            <div>
+              <strong>Challenges are closed for this match</strong>
+              <p class="text-2">This match has already kicked off, so new challenges are no longer available for it.</p>
+            </div>
+          </div>
+        } @else {
+          <div class="card how">
+            <h3><mat-icon>quiz</mat-icon> Choose a question</h3>
+            <div class="type-list">
+              @for (t of f.challengeTypes ?? []; track t.id) {
+                <button class="type-row" [class.selected]="type()?.id === t.id" (click)="chooseType(t)">
+                  <span class="grow">{{ t.question }}</span>
+                  <mat-icon class="chev">chevron_right</mat-icon>
+                </button>
+              }
+            </div>
+          </div>
+        }
+      </section>
+
+      @if (!closed()) {
+        <aside class="screen entry">
+          @if (!type()) {
+            <div class="screen-body">
+              <p class="muted small center-note">Choose a question on the left to get started.</p>
+            </div>
+          } @else {
+            @let t = type()!;
+            <div class="screen-body">
+              <h2>{{ t.question }}</h2>
+
+              <div class="tiles pick-tiles">
+                @if (t.pickType === 'TEAM') {
+                  <button class="tile" [class.selected]="pick() === 'HOME'" (click)="choosePick('HOME')">{{ f.homeTeam.name }}</button>
+                  <button class="tile" [class.selected]="pick() === 'AWAY'" (click)="choosePick('AWAY')">{{ f.awayTeam.name }}</button>
+                } @else {
+                  <button class="tile" [class.selected]="pick() === 'YES'" (click)="choosePick('YES')">Yes</button>
+                  <button class="tile" [class.selected]="pick() === 'NO'" (click)="choosePick('NO')">No</button>
+                }
+              </div>
+
+              @if (pick()) {
+                <h2 class="stake-h">Choose your entry</h2>
+                <div class="tiles stake-tiles">
+                  @for (s of f.stakes ?? []; track s) {
+                    <button class="tile" [class.selected]="stake() === s" [disabled]="s > available()" (click)="stake.set(s)">{{ s | money }}</button>
+                  }
+                </div>
+
+                @if (stake() && potentialPrize() !== null) {
+                  <div class="prize-box">
+                    <div class="pb-row"><span>You pay</span><strong class="money">{{ stake() | money }}</strong></div>
+                    <div class="pb-row win-row"><span>You could win</span><strong class="money accent">{{ potentialPrize() | money }}</strong></div>
+                    <p class="muted tiny">If the result is a draw or can't be fairly decided, you both get a full refund — no fee either way.</p>
+                  </div>
+                }
+
+                <div class="mode-tabs">
+                  <button class="btn" [class.btn-primary]="mode() === 'find'" (click)="chooseMode('find')"><mat-icon>search</mat-icon>Find an opponent</button>
+                  <button class="btn" [class.btn-primary]="mode() === 'direct'" (click)="chooseMode('direct')"><mat-icon>swords</mat-icon>Challenge someone</button>
+                </div>
+
+                @if (mode() === 'direct') {
+                  <div class="search-box">
+                    <mat-icon>search</mat-icon>
+                    <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" autocomplete="off" />
+                    @if (searching()) { <mat-spinner diameter="18" /> }
+                  </div>
+                  @if (results().length > 0) {
+                    <div class="result-list">
+                      @for (u of results(); track u.id) {
+                        <button class="result-row" (click)="pickOpponent(u)">
+                          <app-avatar [name]="u.username" [color]="u.avatarColor" [size]="36" />
+                          <span class="grow">{{ u.username }}</span>
+                        </button>
+                      }
+                    </div>
+                  }
+                  @if (opponent()) {
+                    <label class="msg-label" for="msg">Add a message (optional)</label>
+                    <textarea id="msg" class="msg-box" [(ngModel)]="message" maxlength="140" rows="2" placeholder="Think Chelsea's got this?"></textarea>
+                  }
+                }
+
+                @if (readyToConfirm && pick()) {
+                  <div class="review-line">
+                    <span class="muted small">Your pick</span>
+                    <strong>{{ pickLabel() }}</strong>
+                    @if (mode() === 'direct' && opponent()) { <span class="muted small">vs {{ opponent()!.username }}</span> }
+                  </div>
+                }
+
+                @if (formError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ formError() }}</div> }
+              }
+            </div>
+
+            <div class="screen-actions">
+              @if (available() < (f.stakes?.[0] ?? 0)) {
+                <a class="btn btn-primary btn-lg btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add money to play</a>
+              } @else if (pick() && stake()) {
+                <button class="btn btn-primary btn-lg btn-block" [disabled]="!readyToConfirm || busy()" (click)="confirm()">
+                  @if (busy()) { <mat-spinner diameter="20" /> } @else { <mat-icon>check</mat-icon> }
+                  {{ mode() === 'direct' ? 'Send challenge' : mode() === 'find' ? 'Find an opponent' : 'Choose how to play' }}
+                </button>
+              }
+            </div>
+          }
+        </aside>
+      }
+    </div>
+  }
+</div>

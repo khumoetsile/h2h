@@ -38,12 +38,19 @@ router.get('/stats', ah(async (_req, res) => {
       SUM(created_at >= NOW() - INTERVAL 7 DAY) AS new7d
     FROM users WHERE role = 'PLAYER' AND is_bot = 0`);
   const matches = await queryOne(`
-    SELECT COUNT(*) AS total, SUM(status = 'COMPLETED') AS completed, SUM(status = 'CANCELLED') AS cancelled,
+    SELECT COUNT(*) AS total, SUM(status = 'COMPLETED') AS completed, SUM(status = 'CANCELLED') AS cancelled, SUM(status = 'VOID') AS voided,
       SUM(status IN ('WAITING','MATCHED','READY','IN_PROGRESS')) AS active, SUM(status = 'WAITING') AS waiting,
       COALESCE(SUM(CASE WHEN status = 'COMPLETED' THEN pool END), 0) AS volume,
       COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_draw = 0 THEN fee_amount END), 0) AS fees,
       COALESCE(SUM(CASE WHEN status = 'COMPLETED' AND is_draw = 0 THEN prize END), 0) AS paidOut
     FROM matches`);
+  const football = await queryOne(`
+    SELECT
+      (SELECT COUNT(*) FROM football_fixtures) AS fixtures,
+      (SELECT COUNT(*) FROM football_fixtures WHERE status = 'LIVE') AS live,
+      (SELECT COUNT(*) FROM football_fixtures WHERE status = 'SCHEDULED') AS upcoming,
+      (SELECT COUNT(*) FROM matches WHERE category = 'FOOTBALL' AND status IN ('WAITING','MATCHED','READY','IN_PROGRESS')) AS activeChallenges,
+      (SELECT COUNT(*) FROM system_errors WHERE source LIKE 'football%' AND created_at >= NOW() - INTERVAL 1 DAY) AS recentErrors`);
   const tx = await query(`SELECT type, COUNT(*) AS n, COALESCE(SUM(amount), 0) AS total FROM transactions GROUP BY type`);
   const txMap = Object.fromEntries(tx.map((t) => [t.type, { count: t.n, total: Number(t.total) }]));
   const challenges = await queryOne(`SELECT SUM(status = 'PENDING' AND expires_at > NOW()) AS active, COUNT(*) AS total, SUM(status = 'ACCEPTED') AS accepted FROM challenges`);
@@ -65,7 +72,8 @@ router.get('/stats', ah(async (_req, res) => {
   res.json({
     demoMode: true,
     users: { total: n(users.total), enabled: n(users.enabled), disabled: n(users.disabled), active24h: n(users.active24h), active7d: n(users.active7d), new7d: n(users.new7d) },
-    matches: { total: n(matches.total), completed: n(matches.completed), cancelled: n(matches.cancelled), active: n(matches.active), waiting: n(matches.waiting) },
+    matches: { total: n(matches.total), completed: n(matches.completed), cancelled: n(matches.cancelled), voided: n(matches.voided), active: n(matches.active), waiting: n(matches.waiting) },
+    football: { fixtures: n(football.fixtures), live: n(football.live), upcoming: n(football.upcoming), activeChallenges: n(football.activeChallenges), recentErrors: n(football.recentErrors) },
     finance: {
       demoDeposits: txMap.DEPOSIT || { count: 0, total: 0 },
       demoWithdrawals: txMap.WITHDRAWAL || { count: 0, total: 0 },
@@ -244,7 +252,7 @@ router.put('/settings', validate(z.record(z.string(), z.unknown())), ah(async (r
 }));
 
 // ---- Games ------------------------------------------------------------------
-router.get('/games', ah(async (_req, res) => res.json({ games: await listGames({ includeDisabled: true }) })));
+router.get('/games', ah(async (_req, res) => res.json({ games: await listGames({ includeDisabled: true, kind: null }) })));
 
 router.patch('/games/:id', validate(z.object({ isEnabled: z.boolean() })), ah(async (req, res) => {
   const id = Number(req.params.id) || 0;
@@ -254,6 +262,84 @@ router.patch('/games/:id', validate(z.object({ isEnabled: z.boolean() })), ah(as
   await audit(req.user.id, req.body.isEnabled ? 'GAME_ENABLED' : 'GAME_DISABLED', 'game', id, { name: g.name });
   emitAll('config:update', {});
   res.json({ game: mapGame(await queryOne('SELECT * FROM games WHERE id = ?', [id])) });
+}));
+
+// ---- Football -----------------------------------------------------------
+router.get('/football/competitions', ah(async (_req, res) => {
+  res.json({ competitions: await query('SELECT * FROM football_competitions ORDER BY sort_order, name') });
+}));
+router.patch('/football/competitions/:id', validate(z.object({ isEnabled: z.boolean() })), ah(async (req, res) => {
+  const id = Number(req.params.id) || 0;
+  const c = await queryOne('SELECT * FROM football_competitions WHERE id = ?', [id]);
+  if (!c) throw notFound('Competition not found.');
+  await query('UPDATE football_competitions SET is_enabled = ? WHERE id = ?', [req.body.isEnabled ? 1 : 0, id]);
+  await audit(req.user.id, req.body.isEnabled ? 'FOOTBALL_COMPETITION_ENABLED' : 'FOOTBALL_COMPETITION_DISABLED', 'football_competition', id, { name: c.name });
+  res.json({ competition: await queryOne('SELECT * FROM football_competitions WHERE id = ?', [id]) });
+}));
+
+router.get('/football/challenge-types', ah(async (_req, res) => {
+  res.json({ challengeTypes: await query('SELECT * FROM football_challenge_types ORDER BY sort_order') });
+}));
+router.patch('/football/challenge-types/:id', validate(z.object({ isEnabled: z.boolean() })), ah(async (req, res) => {
+  const id = Number(req.params.id) || 0;
+  const t = await queryOne('SELECT * FROM football_challenge_types WHERE id = ?', [id]);
+  if (!t) throw notFound('Challenge type not found.');
+  await query('UPDATE football_challenge_types SET is_enabled = ? WHERE id = ?', [req.body.isEnabled ? 1 : 0, id]);
+  await audit(req.user.id, req.body.isEnabled ? 'FOOTBALL_TYPE_ENABLED' : 'FOOTBALL_TYPE_DISABLED', 'football_challenge_type', id, { name: t.name });
+  res.json({ challengeType: await queryOne('SELECT * FROM football_challenge_types WHERE id = ?', [id]) });
+}));
+
+const fixturesAdminQuery = z.object({
+  status: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
+});
+router.get('/football/fixtures', validate(fixturesAdminQuery, 'query'), ah(async (req, res) => {
+  const { status, page = 1, pageSize = 25 } = req.validatedQuery;
+  const where = [];
+  const params = [];
+  if (status) { where.push('fx.status = ?'); params.push(status); }
+  const whereSql = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const size = Math.min(Math.max(pageSize, 1), 100);
+  const pg = Math.max(page, 1);
+  const [{ total }] = await query(`SELECT COUNT(*) AS total FROM football_fixtures fx ${whereSql}`, params);
+  const rows = await query(
+    `SELECT fx.*, comp.name AS competition_name, ht.name AS home_name, at.name AS away_name,
+       (SELECT COUNT(*) FROM football_challenges fc WHERE fc.fixture_id = fx.id) AS challenge_count
+     FROM football_fixtures fx JOIN football_competitions comp ON comp.id = fx.competition_id
+     JOIN football_teams ht ON ht.id = fx.home_team_id JOIN football_teams at ON at.id = fx.away_team_id
+     ${whereSql} ORDER BY fx.kickoff_at DESC LIMIT ? OFFSET ?`,
+    [...params, size, (pg - 1) * size],
+  );
+  res.json({
+    items: rows.map((r) => ({
+      id: r.id, competition: r.competition_name, homeTeam: r.home_name, awayTeam: r.away_name,
+      kickoffAt: r.kickoff_at, status: r.status, homeScore: r.home_score, awayScore: r.away_score,
+      statsAvailable: !!r.stats_available, isSimulated: !!r.is_simulated, lastSyncedAt: r.last_synced_at,
+      challengeCount: r.challenge_count,
+    })),
+    total, page: pg, pageSize: size,
+  });
+}));
+
+router.get('/football/settlements', ah(async (_req, res) => {
+  const rows = await query(
+    `SELECT s.*, m.code AS match_code, wu.username AS winner_username FROM settlements s
+     JOIN matches m ON m.id = s.match_id LEFT JOIN users wu ON wu.id = s.winner_id
+     ORDER BY s.settled_at DESC LIMIT 100`,
+  );
+  res.json({
+    settlements: rows.map((r) => ({
+      id: r.id, matchCode: r.match_code, outcome: r.outcome, winner: r.winner_username,
+      pool: Number(r.pool), feePercent: Number(r.fee_percent), fee: Number(r.fee_amount), prize: Number(r.prize),
+      reason: r.reason, settledAt: r.settled_at,
+    })),
+  });
+}));
+
+router.get('/system-errors', ah(async (_req, res) => {
+  const rows = await query('SELECT * FROM system_errors ORDER BY created_at DESC LIMIT 100');
+  res.json({ errors: rows.map((r) => ({ id: r.id, source: r.source, message: r.message, detail: r.detail, createdAt: r.created_at })) });
 }));
 
 // ---- Audit ------------------------------------------------------------------

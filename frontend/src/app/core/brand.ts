@@ -3,7 +3,7 @@
  * backend/.env) — everything in the UI reads from this constant.
  */
 export const BRAND = {
-  name: 'Rivalis',
-  tagline: 'Skill-based 1v1. Winner takes the pool.',
+  name: 'Head2Head',
+  tagline: 'Play against real people. Pick a game. Pick an opponent. Put your skill to the test.',
   currencySymbol: 'P',
 } as const;

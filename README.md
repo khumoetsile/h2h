@@ -1,15 +1,30 @@
-# Rivalis — peer-to-peer skill gaming (prototype)
+# Head2Head — peer-to-peer competitive gaming (prototype)
 
 > ⚠️ **DEMO MODE — ALL MONEY IS SIMULATED.**
 > Deposits, stakes, winnings, fees and withdrawals use **demo funds only**. No payment
 > provider (DPO, Orange Money, MyZaka, Mascom, FNB, Visa, Mastercard, PayPal, Stripe or any
-> other) is connected, and no real money can enter or leave the platform.
+> other) is connected, and no real money can enter or leave the platform. All real-money
+> functionality remains disabled until the Botswana regulatory/licensing requirements for a
+> peer-to-peer competitive gaming platform have been reviewed and addressed — activating it is
+> a future code change, not a runtime setting.
 
-Rivalis (temporary product name) is a 1v1 competitive gaming platform: two players stake
-(demo) money, play the same skill challenge, and the winner receives the pool minus a
-configurable platform fee. The prototype is complete end-to-end — accounts, a ledgered demo
-wallet, matchmaking, direct challenges, five playable games with server-side scoring,
-leaderboards, notifications and an admin panel.
+Head2Head is a 1v1 competitive gaming platform: two players stake (demo) money, compete —
+never against the platform itself, always against each other — and the winner receives the
+pool minus a configurable platform fee. There are two competition categories:
+
+- **Head2Head Games** — five playable skill games with server-side scoring (see
+  [How the games work](#how-the-games-work)).
+- **Head2Head Football** — challenge another player on a real football fixture ("Who will
+  win?", "Will both teams score?", …); Head2Head does not create the match, it retrieves
+  fixture data from an external provider and settles the challenge once the real match is
+  decided (see [Football](#football)).
+
+Every outcome besides a clean win/loss is a **full refund with zero platform fee** — a draw, a
+cancellation, or a competition that can no longer be fairly decided (a disconnect, a postponed
+or abandoned fixture, missing provider data) never costs a player their stake and never earns
+the platform a fee. The prototype is complete end-to-end — accounts, a ledgered demo wallet,
+matchmaking, direct challenges, football fixture browsing and settlement, leaderboards,
+notifications and an admin panel.
 
 ---
 
@@ -24,11 +39,13 @@ leaderboards, notifications and an admin panel.
 - [How matchmaking & the match lifecycle work](#how-matchmaking--the-match-lifecycle-work)
 - [How the games work (Reaction Rush and others)](#how-the-games-work)
 - [Challenges](#challenges)
+- [Football](#football)
 - [Changing the platform fee](#changing-the-platform-fee)
 - [API overview](#api-overview)
 - [Security](#security)
 - [Testing](#testing)
 - [Renaming the product](#renaming-the-product)
+- [Path to real money](#path-to-real-money)
 
 ---
 
@@ -113,7 +130,7 @@ Open **http://localhost:4200** and log in with a [development account](#developm
 
 | Variable | Default | Purpose |
 |---|---|---|
-| `APP_NAME` | `Rivalis` | Product name used in API messages/notifications |
+| `APP_NAME` | `Head2Head` | Product name used in API messages/notifications |
 | `NODE_ENV` | `development` | `production` requires `JWT_SECRET` |
 | `PORT` | `3000` | API port |
 | `CORS_ORIGINS` | `http://localhost:4200` | Comma-separated allowed origins |
@@ -127,6 +144,11 @@ Open **http://localhost:4200** and log in with a [development account](#developm
 | `CURRENCY_SYMBOL` / `CURRENCY_CODE` | `P` / `BWP` | Display currency (Botswana Pula) |
 | `DEMO_BOTS_ENABLED` | `true` | Lets a waiting player call in a house-bot opponent |
 | `SWEEPER_INTERVAL_SECONDS` | `15` | How often timeouts / challenge expiry are processed |
+| `FOOTBALL_PROVIDER` | `mock` | `mock` (deterministic simulated fixtures, no API key needed) or `football-data` (real data from football-data.org) |
+| `FOOTBALL_API_KEY` | — | Required when `FOOTBALL_PROVIDER=football-data`; never sent to the browser — the backend is the only thing that ever calls the provider |
+| `FOOTBALL_API_BASE_URL` | `https://api.football-data.org/v4` | Provider base URL |
+| `FOOTBALL_SYNC_INTERVAL_SECONDS` | `20` | How often the background job pulls competitions/fixtures and checks for results |
+| `FOOTBALL_FIXTURE_WINDOW_DAYS` | `21` | How far ahead upcoming fixtures are synced |
 
 Business settings (fee, stakes, bonus, limits, timeouts) live in the `admin_settings` table and
 are edited in the admin panel — see [Changing the platform fee](#changing-the-platform-fee).
@@ -265,6 +287,59 @@ single transaction and a real match is created in `MATCHED`. If either player ca
 stake, nothing is locked. Duplicate pending challenges (same pair + game) are rejected;
 challenges expire after 60 minutes (configurable); the sender can cancel while pending.
 
+## Football
+
+Head2Head Football never creates or predicts the football match — it retrieves fixture data
+from an external provider through the backend and lets two players stake demo money on a
+question about that real match. The frontend never talks to the football provider directly,
+and a provider API key is never exposed to the browser:
+
+```
+Football data provider ──▶ Head2Head backend ──▶ Head2Head database ──▶ Competition engine ──▶ Frontend
+```
+
+- **Providers** (`backend/src/football/providers/`) implement one small interface —
+  `capabilities()`, `listCompetitions()`, `listUpcomingFixtures()`, `getFixture()` — selected at
+  runtime via `FOOTBALL_PROVIDER`:
+  - `mock` (default) — a fully-featured, deterministic simulated provider. Fixtures, scores,
+    shots, corners, cards and goal events are derived from a seeded hash, not stored mutable
+    state, so the same fixture always "plays out" the same way and no timers are needed. Every
+    mock fixture is flagged `isSimulated: true` in the API and UI.
+  - `football-data` — a real implementation against api.football-data.org. Its free tier does
+    not provide shot/corner/card/event data, so it honestly reports
+    `capabilities() = { statistics: false, events: false }`.
+- **Challenge types are capability-gated**: each football challenge type
+  (`football_challenge_types.requires_stats`) is only offered to players when the configured
+  provider's `capabilities()` can actually supply what settling it requires. A provider that
+  can't reliably supply shot/card/corner data never offers "Who will have more corners?" — the
+  question simply isn't in `GET /api/football/challenge-types`.
+- **A football challenge is a normal Head2Head match underneath** — the same `matches` /
+  `match_players` / `wallets` / `transactions` tables as skill games, distinguished by
+  `matches.category = 'FOOTBALL'` and a linked `football_challenges` row (fixture, question,
+  each player's pick). This means the same wallet locking, idempotent settlement, and refund
+  logic already used by skill games applies unchanged.
+- **Settlement rules** (`backend/src/football/settlementRules.js`) are explicit per question
+  type — e.g. "Who will win?" is a `DRAW` (full refund, no fee) if the real match is level;
+  "Who scores first?" is `VOID` (full refund, no fee) if neither team ever scores. The backend
+  is the only thing that ever decides an outcome; the frontend never guesses or shows a result
+  before the backend has settled it.
+- **Cutoff enforcement**: once a fixture is no longer `SCHEDULED`, or its kickoff time has
+  passed, the backend rejects new challenges and late acceptances (`CHALLENGE_CLOSED`) — a
+  player can never create or join a pick after information relevant to the outcome (a goal, a
+  card) is already known.
+- **If a result can never be reliably verified** — the fixture is postponed, cancelled or
+  abandoned, or a required statistic never arrives from the provider — the match is voided
+  with a full refund and zero fee rather than guessed. A background safety net
+  (`voidUnresolvedFixtures`, `backend/src/football/footballSyncService.js`) voids any football
+  match still unresolved 4 hours after its kickoff, so a stake can never be left in limbo
+  forever because of a provider outage.
+- **Supported competitions** are configurable (`football_supported_competitions` in
+  `admin_settings`; defaults to Premier League, La Liga, Serie A, Bundesliga, Ligue 1 and the
+  Champions League), not hardcoded to every league a provider offers.
+- **Provider failures never cause an incorrect settlement**: every provider call is wrapped and
+  logged to the `system_errors` table (visible at `GET /api/admin/system-errors`) instead of
+  silently producing a wrong result.
+
 ## Changing the platform fee
 
 The fee is **not hard-coded** — it's the `platform_fee_percent` row in `admin_settings`
@@ -301,8 +376,12 @@ All endpoints are under `/api`, JSON in/out. Authenticated endpoints need
 | `GET /matches/queue` | Waiting counts per game/stake |
 | `GET /matches/:id` | Match details (id or code) |
 | `POST /matches/:id/join` · `/ready` · `/start` · `/result` · `/cancel` · `/demo-opponent` | Lifecycle |
-| `GET /challenges?box&status` · `POST /challenges` · `GET /challenges/:id` | Challenges |
-| `POST /challenges/:id/accept` · `/decline` · `/cancel` | Respond / withdraw |
+| `GET /challenges?box&status` · `POST /challenges` · `GET /challenges/:id` | Challenges (skill games and football, dispatched automatically) |
+| `POST /challenges/:id/accept` · `/decline` (alias `/reject`) · `/cancel` | Respond / withdraw |
+| `GET /football/competitions` · `GET /football/challenge-types` | Enabled leagues; question types the current provider can settle |
+| `GET /football/fixtures?competitionId&status` · `GET /football/fixtures/:id` | Upcoming/live fixtures; one fixture with its challenge questions |
+| `POST /football/find` | Matchmaking `{ fixtureId, challengeTypeSlug, pick, stake }` |
+| `POST /football/challenges` | Direct challenge `{ opponent, fixtureId, challengeTypeSlug, pick, stake, message }` |
 | `GET /leaderboard?period=daily\|weekly\|all&gameId` | Leaderboard from real results |
 | `GET /users/search?q=` · `GET /users/:username` | Player search, public profile |
 | `GET /notifications` · `POST /notifications/:id/read` · `POST /notifications/read-all` | Notifications |
@@ -310,6 +389,8 @@ All endpoints are under `/api`, JSON in/out. Authenticated endpoints need
 | `GET /admin/users?q&status` · `GET /admin/users/:id` · `POST /admin/users/:id/status` · `POST /admin/users/:id/notify` | Users |
 | `GET /admin/transactions` · `GET /admin/matches` · `GET /admin/matches/:id` · `POST /admin/matches/:id/cancel` · `GET /admin/challenges` | Oversight |
 | `GET /admin/settings` · `PUT /admin/settings` · `GET /admin/games` · `PATCH /admin/games/:id` · `GET /admin/audit` | Configuration & audit log |
+| `GET/PATCH /admin/football/competitions[/:id]` · `GET/PATCH /admin/football/challenge-types[/:id]` | Enable/disable leagues and question types |
+| `GET /admin/football/fixtures` · `GET /admin/football/settlements` · `GET /admin/system-errors` | Fixture status, settlement history, provider/job errors |
 
 Socket.IO events (authenticated with the same token): `wallet:update`, `notification`,
 `match:update`, `challenge:update`, `queue:update`, `leaderboard:update`, `config:update`,
@@ -332,12 +413,13 @@ Socket.IO events (authenticated with the same token): `wallet:update`, `notifica
 ## Testing
 
 ```bash
-cd backend && npm test      # 33 end-to-end API tests on a real MySQL test database
+cd backend && npm test      # 45 end-to-end API tests on a real MySQL test database (33 skill-game/wallet/admin + 12 football)
 cd frontend && npm test -- --watch=false
 cd frontend && npm run build
 ```
 
-The backend suite (`backend/test/api.test.js`) rebuilds `rivalis_test` and covers
+The backend suite (`backend/test/api.test.js`, `backend/test/football.test.js`) rebuilds
+the test database and covers
 registration/validation/duplicates, login/logout/session revocation, dashboard, demo
 deposits & withdrawals (including concurrent withdrawals and parallel match entries that try
 to overspend), game catalogue, matchmaking, lifecycle states, the identical spec for both
@@ -346,7 +428,11 @@ and settlement, single settlement, too-fast submissions, cancellation refunds, t
 forfeits, house bots, challenges (accept/decline/cancel/expiry/duplicates/permissions),
 leaderboard periods, notifications, profile, admin access control, disabling users, fee and
 stake configuration, game toggles, admin match cancellation, and a ledger-integrity check
-that every wallet equals the sum of its ledger.
+that every wallet equals the sum of its ledger. The football suite additionally covers fixture
+browsing and capability-gated challenge types, win/draw/void settlement with exact wallet math,
+cutoff enforcement, matchmaking on opposite picks, postponed/abandoned-fixture refunds, a
+required-stats challenge type that correctly waits (never guesses) until the provider's data
+arrives or the unresolved-fixture grace period voids it, and duplicate/validation protection.
 
 The full user journey was also exercised in a real browser (Playwright): register → deposit
 → withdraw → two players matched via matchmaking → Reaction Rush played → winner decided →
@@ -355,6 +441,16 @@ profile → admin dashboard, disabling a user, fee change.
 
 ## Renaming the product
 
-"Rivalis" is a placeholder. To rename: change `BRAND.name` in
-`frontend/src/app/core/brand.ts`, `APP_NAME` in `backend/.env`, and the `<title>` in
-`frontend/src/index.html`.
+To change the product name: update `BRAND.name` in `frontend/src/app/core/brand.ts`,
+`APP_NAME` in `backend/.env`, and the `<title>` in `frontend/src/index.html`.
+
+## Path to real money
+
+This prototype is intentionally demo-only. Turning on real money is a **future code change**,
+not a configuration flag, and should only happen after: Botswana gambling/gaming regulatory
+and licensing review is complete; a licensed payment provider is integrated behind
+`walletService.demoDeposit` / `demoWithdrawal`; age verification/KYC is implemented against the
+forward-compatible `users.date_of_birth` / `users.kyc_status` columns and the `player_limits`
+table already in the schema (currently unenforced); and responsible-gambling controls
+(self-exclusion, deposit/loss limits) are built out. None of this is enabled today — every
+balance in this codebase is simulated.
