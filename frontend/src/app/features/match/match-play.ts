@@ -1,5 +1,5 @@
 import { Component, inject, input, OnInit, signal } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
+import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Api } from '../../core/api.service';
@@ -12,42 +12,56 @@ import { AimChallengeGame } from '../../games/aim-challenge';
 import { MemoryBattleGame } from '../../games/memory-battle';
 import { WordBattleGame } from '../../games/word-battle';
 import { PenaltyShootoutGame } from '../../games/penalty-shootout';
-import { MoneyPipe } from '../../shared/pipes';
 import { GameIcon, Spinner } from '../../shared/ui';
 
 interface StartResponse { matchId: number; code: string; game: string; spec: any; startedAt: string; deadline: string; resumed: boolean; }
 
+const MAX_AUTO_RETRIES = 3;
+
+/**
+ * The actual game screen. Standalone route — no header, no bottom nav, no
+ * balance shown. This screen has one job: let the player focus on the game.
+ * A network hiccup while submitting is retried quietly in the background
+ * with plain-language status; the match itself can never be lost just
+ * because a connection blipped — only the server's own timeout can do that.
+ */
 @Component({
   selector: 'app-match-play',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, GameIcon, Spinner,
+  imports: [MatIconModule, MatProgressSpinnerModule, GameIcon, Spinner,
     ReactionRushGame, AimChallengeGame, MemoryBattleGame, WordBattleGame, PenaltyShootoutGame],
   template: `
-    <div class="page play-page">
+    <div class="play-screen">
       @if (error()) {
-        <div class="card state">
-          <mat-icon class="loss">error</mat-icon>
-          <h2>Can't start this game</h2>
+        <div class="state fade-in">
+          <mat-icon class="loss big-icon">error</mat-icon>
+          <h2>We couldn't start this game</h2>
           <p class="text-2">{{ error() }}</p>
-          <a class="btn" [routerLink]="['/match', code()]">Back to match</a>
+          <button class="btn btn-primary" (click)="exit()">Back to match</button>
         </div>
       } @else if (!start()) {
         <app-spinner />
       } @else {
         <div class="play-head">
-          <app-game-icon [slug]="start()!.game" [color]="match()?.game?.accentColor ?? '#22D3EE'" [size]="36" />
+          <button class="exit-btn" (click)="confirmExit()" aria-label="Exit game"><mat-icon>close</mat-icon></button>
           <div class="grow">
             <strong>{{ match()?.game?.name }}</strong>
-            <div class="muted tiny">{{ code() }} · vs &#64;{{ opponentName() }} · prize {{ match()?.prize | money:'demo' }}</div>
+            <div class="muted tiny">vs {{ opponentName() }}</div>
           </div>
-          @if (start()!.resumed) { <span class="chip chip-demo">Resumed</span> }
+          <app-game-icon [slug]="start()!.game" [color]="match()?.game?.accentColor ?? '#22D3EE'" [size]="32" />
         </div>
 
         @if (submitting() || submitted() || submitError()) {
-          <div class="card state">
-            @if (submitting()) { <mat-spinner diameter="32" /><h2>Submitting your run…</h2><p class="muted">The server is scoring your moves.</p> }
+          <div class="state fade-in">
+            @if (submitting() && !submitError()) {
+              <mat-spinner diameter="32" />
+              <h2>{{ retryAttempt() > 0 ? "Reconnecting…" : "Sending your result…" }}</h2>
+              <p class="muted">{{ retryAttempt() > 0 ? "We're trying again — this won't cost you the match." : "Just a moment." }}</p>
+            }
             @if (submitError()) {
-              <p class="loss">{{ submitError() }}</p>
-              <button class="btn btn-primary" (click)="retrySubmit()">Retry submit</button>
+              <mat-icon class="loss big-icon">wifi_off</mat-icon>
+              <h2>Connection interrupted</h2>
+              <p class="text-2">{{ submitError() }}</p>
+              <button class="btn btn-primary" (click)="retrySubmit()">Try again</button>
             }
           </div>
         } @else {
@@ -58,16 +72,20 @@ interface StartResponse { matchId: number; code: string; game: string; spec: any
             @case ('word-battle') { <app-word-battle [spec]="start()!.spec" (finished)="submit($event)" /> }
             @case ('penalty-shootout') { <app-penalty-shootout [spec]="start()!.spec" (finished)="submit($event)" /> }
           }
-          <p class="muted tiny center">Scores are calculated on the server from your moves. Leaving now forfeits if you don't return before the deadline.</p>
         }
       }
     </div>
   `,
   styles: [`
-    .play-page { max-width: 900px; }
-    .play-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; .grow { flex: 1; min-width: 0; } }
-    .state { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 40px 20px; }
-    .center { text-align: center; margin-top: 12px; }
+    .play-screen { max-width: 900px; margin: 0 auto; padding: 14px 16px calc(20px + env(safe-area-inset-bottom)); min-height: 100vh; }
+    .play-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; .grow { flex: 1; min-width: 0; text-align: center; } strong { font-size: 15px; } }
+    .exit-btn {
+      width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); color: var(--text-2);
+      display: flex; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+      &:hover { background: var(--surface-2); color: var(--text); }
+    }
+    .state { display: flex; flex-direction: column; align-items: center; gap: 12px; text-align: center; padding: 60px 20px; }
+    .big-icon { font-size: 40px; width: 40px; height: 40px; }
   `],
 })
 export class MatchPlayPage implements OnInit {
@@ -82,11 +100,15 @@ export class MatchPlayPage implements OnInit {
   protected submitting = signal(false);
   protected submitted = signal(false);
   protected submitError = signal('');
+  protected retryAttempt = signal(0);
   private pending: GameFinish | null = null;
 
   protected opponentName = () => this.match()?.players.find((p) => p.userId !== this.match()?.viewerId)?.username ?? '';
 
   async ngOnInit() {
+    // A toast from the lobby (e.g. "Opponent found") can still be on screen
+    // when we land here — clear it so the game gets a completely clean start.
+    this.toast.dismiss();
     try {
       const [start, view] = await Promise.all([
         this.api.post<StartResponse>(`/matches/${this.code()}/start`),
@@ -97,14 +119,20 @@ export class MatchPlayPage implements OnInit {
     } catch (err) {
       const e = apiError(err);
       if (e.code === 'ALREADY_SUBMITTED' || e.code === 'MATCH_COMPLETED') {
-        this.router.navigate(['/match', this.code()], { replaceUrl: true });
+        this.exit();
         return;
       }
       this.error.set(e.message);
     }
   }
 
-  async submit(result: GameFinish) {
+  exit() { this.router.navigate(['/match', this.code()], { replaceUrl: true }); }
+
+  confirmExit() {
+    if (confirm("Leave this game? If you don't come back in time, you may lose by forfeit.")) this.exit();
+  }
+
+  async submit(result: GameFinish, isRetry = false) {
     this.pending = result;
     this.submitting.set(true);
     this.submitError.set('');
@@ -113,20 +141,35 @@ export class MatchPlayPage implements OnInit {
         `/matches/${this.code()}/result`, result,
       );
       this.submitted.set(true);
-      if (!r.result.valid) this.toast.error(`Your run was flagged: ${r.result.invalidReason}`);
-      const target = r.match.status === 'COMPLETED' ? ['/matches', this.code()] : ['/match', this.code()];
+      const target = r.match.status === 'COMPLETED' || r.match.status === 'CANCELLED'
+        ? ['/match', this.code(), 'result']
+        : ['/match', this.code()];
       await this.router.navigate(target, { replaceUrl: true });
     } catch (err) {
       const e = apiError(err);
       if (e.code === 'ALREADY_SUBMITTED' || e.code === 'MATCH_COMPLETED') {
-        await this.router.navigate(['/match', this.code()], { replaceUrl: true });
+        this.exit();
         return;
       }
-      this.submitError.set(e.message);
-    } finally {
+      // A network blip should not cost the player the match: retry quietly a
+      // few times in the background before ever bothering them.
+      if (e.code === 'NETWORK' && this.retryAttempt() < MAX_AUTO_RETRIES) {
+        this.retryAttempt.update((n) => n + 1);
+        setTimeout(() => this.submit(result, true), 1500 * this.retryAttempt());
+        return;
+      }
+      this.submitError.set(
+        e.code === 'NETWORK'
+          ? "We couldn't reach the game server. Check your connection and try again — your result is safe on your device."
+          : e.message,
+      );
       this.submitting.set(false);
+      void isRetry;
     }
   }
 
-  retrySubmit() { if (this.pending) this.submit(this.pending); }
+  retrySubmit() {
+    this.retryAttempt.set(0);
+    if (this.pending) this.submit(this.pending);
+  }
 }

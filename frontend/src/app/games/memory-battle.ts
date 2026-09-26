@@ -21,7 +21,7 @@ interface RoundInput { input: number[]; timeMs: number; }
           @case ('show') { <span class="muted">Watch the sequence…</span> }
           @case ('input') { Your turn — repeat the sequence ({{ entered().length }}/{{ seqLen() }}) }
           @case ('feedback') { <span [class.win]="lastOk()" [class.loss]="!lastOk()">{{ lastOk() ? 'Correct!' : 'Not quite' }}</span> }
-          @case ('done') { Finished! Submitting… }
+          @case ('done') { Finished! Checking your result… }
         }
       </div>
       <div class="board" [style.grid-template-columns]="'repeat(' + spec().grid + ', 1fr)'">

@@ -2,164 +2,121 @@
   @if (error() && !data()) {
     <app-load-error [message]="error()" (retry)="load()" />
   } @else {
-    <section class="hero">
-      <div class="hero-text">
-        <p class="muted small">{{ greeting() }},</p>
-        <h1>{{ auth.user()?.firstName }} <span class="muted handle">&#64;{{ auth.user()?.username }}</span></h1>
-        <p class="text-2 hero-sub">Pick a game, lock in a demo stake and take on a real opponent.</p>
+    <!-- Greeting + balance: one clear number, not a finance dashboard. -->
+    <section class="top fade-in">
+      <div class="greet">
+        <p class="hello">{{ greeting() }}</p>
+        <h1>{{ auth.user()?.firstName }}</h1>
       </div>
-      <div class="hero-cta">
-        <a class="btn btn-primary btn-play" routerLink="/games">
-          <mat-icon>play_arrow</mat-icon> Play now
-        </a>
-        <a class="btn btn-lg" routerLink="/challenges"><mat-icon>swords</mat-icon>Challenge a player</a>
-      </div>
-    </section>
-
-    <section class="top-grid">
-      <a class="card wallet-card card-interactive" routerLink="/wallet">
-        <div class="row-between">
-          <span class="kpi-label">Demo wallet</span>
-          <app-demo-badge label="No real money" />
-        </div>
+      <a class="balance-card" routerLink="/wallet">
+        <span class="bal-label">Your balance</span>
         @if (data(); as d) {
-          <div class="wallet-main money">{{ d.wallet.available | money }}<span class="demo-suffix">DEMO</span></div>
-          <div class="wallet-sub">
-            <span>Locked <strong class="money">{{ d.wallet.locked | money }}</strong></span>
-            <span>Total <strong class="money">{{ d.wallet.total | money }}</strong></span>
-          </div>
+          <span class="bal-amount money">{{ d.wallet.available | money }}</span>
         } @else {
-          <div class="skeleton" style="height:34px;width:60%;margin:14px 0 10px"></div>
-          <div class="skeleton" style="height:12px;width:80%"></div>
+          <span class="skeleton" style="height:30px;width:110px;display:inline-block;margin-top:4px"></span>
         }
-        <div class="wallet-actions">
-          <span class="btn btn-sm" (click)="$event.preventDefault(); $event.stopPropagation(); router.navigateByUrl('/wallet/deposit')"><mat-icon>add</mat-icon>Add demo funds</span>
-        </div>
+        <span class="bal-link">Add money <mat-icon>chevron_right</mat-icon></span>
       </a>
-
-      <div class="stats-grid">
-        @if (data(); as d) {
-          <div class="card kpi"><div class="label">Wins</div><div class="value win">{{ d.stats.wins }}</div><div class="hint">{{ d.stats.played }} played</div></div>
-          <div class="card kpi"><div class="label">Losses</div><div class="value">{{ d.stats.losses }}</div><div class="hint">{{ d.stats.draws }} draws</div></div>
-          <div class="card kpi"><div class="label">Win rate</div><div class="value">{{ d.stats.winRate }}%</div><div class="hint">Best streak W{{ d.stats.bestWinStreak }}</div></div>
-          <div class="card kpi"><div class="label">Streak</div>
-            <div class="value" [class.win]="d.stats.streak.type === 'W'" [class.loss]="d.stats.streak.type === 'L'">{{ d.stats.streak.label }}</div>
-            <div class="hint">Current</div>
-          </div>
-          <a class="card kpi card-interactive" routerLink="/leaderboard"><div class="label">Rank</div>
-            <div class="value">{{ d.leaderboard.rank ? '#' + d.leaderboard.rank : '—' }}</div>
-            <div class="hint">{{ d.leaderboard.rank ? 'of ' + d.leaderboard.of + ' players' : 'Play to get ranked' }}</div>
-          </a>
-          <div class="card kpi"><div class="label">Winnings</div><div class="value money">{{ d.stats.totalWinnings | money }}</div><div class="hint">Demo, all time</div></div>
-        } @else {
-          @for (i of [1,2,3,4,5,6]; track i) { <div class="card kpi"><div class="skeleton" style="height:10px;width:50%"></div><div class="skeleton" style="height:26px;width:40%;margin-top:10px"></div></div> }
-        }
-      </div>
     </section>
 
+    <!-- One obvious primary action. -->
+    <section class="cta">
+      <a class="btn btn-primary btn-play btn-block" routerLink="/games">
+        <mat-icon>play_arrow</mat-icon> Play now
+      </a>
+      <a class="btn btn-block" routerLink="/challenges/new">
+        <mat-icon>swords</mat-icon> Challenge a friend
+      </a>
+    </section>
+
+    <!-- Anything mid-game takes priority over browsing. -->
     @if (data()?.activeMatches?.length) {
       <section class="block">
-        <div class="section-title"><h2>Active matches</h2></div>
-        <div class="card card-flush list">
-          @for (m of data()!.activeMatches; track m.id) {
-            <a class="list-item" [routerLink]="matchLink(m)">
-              <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="38" />
+        <h2 class="h-title">Your match</h2>
+        <div class="stack">
+          @for (m of data()!.activeMatches.slice(0, 2); track m.id) {
+            <a class="card card-interactive active-match" [routerLink]="matchLink(m)">
+              <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="44" />
               <div class="grow">
-                <div class="li-title">{{ m.game.name }} <span class="muted">·</span> <span class="money">{{ m.stake | money:'demo' }}</span></div>
-                <div class="muted small">{{ m.opponent ? 'vs @' + m.opponent.username : 'Searching for an opponent…' }} · {{ m.code }}</div>
+                <div class="am-title">{{ m.game.name }}</div>
+                <div class="muted small">{{ m.opponent ? 'vs ' + m.opponent.username : 'Waiting for an opponent…' }}</div>
               </div>
-              <app-match-status [status]="m.status" />
-              <mat-icon class="muted">chevron_right</mat-icon>
+              <span class="btn btn-primary btn-sm">Continue</span>
             </a>
           }
         </div>
       </section>
     }
 
-    <section class="two-col block">
-      <div>
-        <div class="section-title"><h2>Active challenges</h2><a routerLink="/challenges">View all</a></div>
-        <div class="card card-flush">
-          @if (!data()) { <app-skeleton-list [rows]="3" /> }
-          @else if (data()!.activeChallenges.length === 0) {
-            <app-empty icon="swords" title="No active challenges" text="Challenge a rival directly by username.">
-              <a class="btn btn-sm" routerLink="/challenges">New challenge</a>
-            </app-empty>
-          } @else {
-            <div class="list">
-              @for (c of data()!.activeChallenges.slice(0, 5); track c.id) {
-                <div class="list-item">
-                  <app-avatar [name]="c.direction === 'INCOMING' ? c.challenger.username : c.opponent.username" [color]="c.direction === 'INCOMING' ? c.challenger.avatarColor : c.opponent.avatarColor" [size]="34" />
-                  <div class="grow">
-                    @if (c.direction === 'INCOMING') {
-                      <div class="li-title">{{ c.challenger.username }} challenged you</div>
-                    } @else {
-                      <div class="li-title">You challenged &#64;{{ c.opponent.username }}</div>
-                    }
-                    <div class="muted small">{{ c.game.name }} · <span class="money">{{ c.stake | money:'demo' }}</span> · {{ c.createdAt | ago }}</div>
-                  </div>
-                  @if (c.direction === 'INCOMING') {
-                    <div class="row actions">
-                      <button class="btn btn-sm btn-ghost" [disabled]="busy() === c.id" (click)="respond(c, 'decline')">Decline</button>
-                      <button class="btn btn-sm btn-primary" [disabled]="busy() === c.id" (click)="respond(c, 'accept')">Accept</button>
-                    </div>
-                  } @else {
-                    <span class="chip">Pending</span>
-                  }
-                </div>
-              }
+    <!-- Pending challenges needing a response. -->
+    @if (incomingChallenges().length > 0) {
+      <section class="block">
+        <div class="section-title"><h2 class="h-title">Challenges waiting for you</h2></div>
+        <div class="stack">
+          @for (c of incomingChallenges().slice(0, 3); track c.id) {
+            <div class="card challenge-card">
+              <app-avatar [name]="c.challenger.username" [color]="c.challenger.avatarColor" [size]="40" />
+              <div class="grow">
+                <div class="am-title">{{ c.challenger.username }} challenged you</div>
+                <div class="muted small">{{ c.game.name }} · {{ c.stake | money }} to enter</div>
+              </div>
+              <div class="ch-actions">
+                <button class="btn btn-ghost btn-sm" [disabled]="busy() === c.id" (click)="respond(c, 'decline')">Decline</button>
+                <button class="btn btn-primary btn-sm" [disabled]="busy() === c.id" (click)="respond(c, 'accept')">Accept</button>
+              </div>
             </div>
           }
         </div>
-      </div>
+      </section>
+    }
 
-      <div>
-        <div class="section-title"><h2>Recent matches</h2><a routerLink="/matches">History</a></div>
-        <div class="card card-flush">
-          @if (!data()) { <app-skeleton-list [rows]="3" /> }
-          @else if (data()!.recentMatches.length === 0) {
-            <app-empty icon="sports_esports" title="No matches yet" text="Your completed matches will appear here.">
-              <a class="btn btn-sm btn-primary" routerLink="/games">Find a match</a>
-            </app-empty>
-          } @else {
-            <div class="list">
-              @for (m of data()!.recentMatches; track m.id) {
-                <a class="list-item" [routerLink]="['/matches', m.code]">
-                  <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="34" />
-                  <div class="grow">
-                    <div class="li-title">{{ m.game.name }} <span class="muted small">vs &#64;{{ m.opponent?.username }}</span></div>
-                    <div class="muted small">{{ m.completedAt | ago }} · {{ m.myScore ?? '—' }} – {{ m.opponentScore ?? '—' }}</div>
-                  </div>
-                  <div class="right">
-                    <app-outcome [outcome]="m.outcome" [status]="m.status" />
-                    <div class="small money" [class.win]="m.outcome === 'WIN'" [class.loss]="m.outcome === 'LOSS'">
-                      {{ (m.outcome === 'WIN' ? m.prize - m.stake : m.outcome === 'LOSS' ? -m.stake : 0) | money:'sign' }}
-                    </div>
-                  </div>
-                </a>
-              }
-            </div>
+    <!-- Games: simple, visual, low information density. -->
+    <section class="block">
+      <div class="section-title"><h2 class="h-title">Choose a game</h2><a routerLink="/games">See all</a></div>
+      @if (!data()) {
+        <div class="games-row">
+          @for (i of [1,2,3]; track i) { <div class="card game-mini"><div class="skeleton" style="height:44px;width:44px;border-radius:10px"></div><div class="skeleton" style="height:14px;width:70%;margin-top:14px"></div></div> }
+        </div>
+      } @else {
+        <div class="games-row">
+          @for (g of data()!.games.slice(0, 4); track g.id) {
+            <a class="card game-mini card-interactive" [routerLink]="['/games', g.slug]">
+              <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="48" />
+              <h3>{{ g.name }}</h3>
+              <p class="muted small">{{ g.tagline }}</p>
+            </a>
           }
         </div>
-      </div>
+      }
     </section>
 
+    <!-- Recent activity: plain W/L, no jargon. -->
     <section class="block">
-      <div class="section-title"><h2>Games available</h2><a routerLink="/games">All games</a></div>
-      <div class="games-row">
+      <div class="section-title"><h2 class="h-title">Recent activity</h2><a routerLink="/matches">See all</a></div>
+      <div class="card card-flush">
         @if (!data()) {
-          @for (i of [1,2,3]; track i) { <div class="card game-mini"><div class="skeleton" style="height:44px;width:44px"></div><div class="skeleton" style="height:12px;width:60%;margin-top:14px"></div></div> }
-        }
-        @for (g of data()?.games ?? []; track g.id) {
-          <a class="card game-mini card-interactive" [routerLink]="['/games', g.slug]">
-            <div class="row-between">
-              <app-game-icon [slug]="g.slug" [color]="g.accentColor" />
-              @if ((g.waiting ?? 0) > 0) { <span class="chip chip-win"><span class="live-dot"></span>{{ g.waiting }} waiting</span> }
-            </div>
-            <h3>{{ g.name }}</h3>
-            <p class="muted small">{{ g.tagline }}</p>
-            <div class="gm-foot muted tiny"><span>1v1</span><span>{{ duration(g.estimatedDurationSeconds) }}</span></div>
-          </a>
+          <div class="skeleton" style="height:180px"></div>
+        } @else if (data()!.recentMatches.length === 0) {
+          <app-empty icon="sports_esports" title="No games played yet" text="Play your first match to see your activity here.">
+            <a class="btn btn-sm btn-primary" routerLink="/games">Play now</a>
+          </app-empty>
+        } @else {
+          <div class="list">
+            @for (m of data()!.recentMatches.slice(0, 4); track m.id) {
+              <a class="list-item" [routerLink]="['/matches', m.code]">
+                <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="36" />
+                <div class="grow">
+                  <div class="li-title">{{ m.game.name }} <span class="muted small">vs {{ m.opponent?.username }}</span></div>
+                  <div class="muted small">{{ m.completedAt | ago }}</div>
+                </div>
+                <div class="right">
+                  <app-outcome [outcome]="m.outcome" [status]="m.status" />
+                  @if (m.outcome === 'WIN') { <div class="small win money">+{{ (m.prize - m.stake) | money }}</div> }
+                  @else if (m.outcome === 'LOSS') { <div class="small loss money">−{{ m.stake | money }}</div> }
+                </div>
+              </a>
+            }
+          </div>
         }
       </div>
     </section>

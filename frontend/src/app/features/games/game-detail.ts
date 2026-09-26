@@ -11,11 +11,17 @@ import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { durationLabel } from '../../core/format';
 import { MoneyPipe } from '../../shared/pipes';
-import { DemoBadge, GameIcon, LoadError, Spinner } from '../../shared/ui';
+import { GameIcon, LoadError, Spinner } from '../../shared/ui';
 
+/**
+ * Game detail + stake selection. One screen, one job: pick how much to play
+ * for, then find an opponent. The prize is always shown before the player
+ * confirms; the fee/pool breakdown is there for anyone curious but tucked
+ * behind a small toggle rather than shown by default.
+ */
 @Component({
   selector: 'app-game-detail',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, DemoBadge, GameIcon, LoadError, Spinner],
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, GameIcon, LoadError, Spinner],
   template: `
     <div class="page">
       <a class="back muted small" routerLink="/games"><mat-icon>arrow_back</mat-icon>All games</a>
@@ -26,7 +32,7 @@ import { DemoBadge, GameIcon, LoadError, Spinner } from '../../shared/ui';
       } @else {
         @let g = game()!;
         <div class="layout fade-in">
-          <section>
+          <section class="intro">
             <div class="head">
               <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="60" />
               <div>
@@ -35,85 +41,94 @@ import { DemoBadge, GameIcon, LoadError, Spinner } from '../../shared/ui';
               </div>
             </div>
             <div class="meta">
-              <span class="chip">1v1</span>
-              <span class="chip">{{ duration(g.estimatedDurationSeconds) }}</span>
-              <span class="chip" [class.chip-win]="(g.waiting ?? 0) > 0">{{ g.waiting ?? 0 }} players waiting</span>
-              @if (!g.isEnabled) { <span class="chip chip-loss">Unavailable</span> }
+              <span class="chip"><mat-icon inline>schedule</mat-icon>{{ duration(g.estimatedDurationSeconds) }}</span>
+              @if ((g.waiting ?? 0) > 0) { <span class="chip chip-win"><span class="live-dot"></span>{{ g.waiting }} playing now</span> }
+              @if (!g.isEnabled) { <span class="chip chip-loss">Unavailable right now</span> }
             </div>
-            <p class="desc">{{ g.description }}</p>
             <div class="card how">
               <h3><mat-icon>menu_book</mat-icon> How to play</h3>
               <p class="text-2">{{ g.howToPlay }}</p>
               <ul class="rules muted small">
-                <li>Both players receive exactly the same sequence.</li>
-                <li>Your moves are scored on the server — the highest valid score wins.</li>
-                <li>Exact ties are refunded in full.</li>
-                <li>Leaving before the game starts refunds both stakes.</li>
+                <li>Both players get exactly the same challenge — it's fair for everyone.</li>
+                <li>If it's an exact tie, you get your entry back.</li>
+                <li>Changed your mind? Leave before the game starts and get your entry back.</li>
               </ul>
             </div>
           </section>
 
-          <aside class="card entry">
-            <div class="row-between">
-              <h2>Choose your stake</h2>
-              <app-demo-badge />
-            </div>
-            <div class="tiles stake-tiles">
-              @for (s of g.stakes ?? []; track s.stake) {
-                <button class="tile" [class.selected]="stake()?.stake === s.stake" [disabled]="s.stake > available()" (click)="stake.set(s)">
-                  {{ s.stake | money }}
-                  <small>win {{ s.prize | money }}</small>
-                </button>
-              }
-            </div>
-            @if (stake(); as s) {
-              <div class="breakdown">
-                <div class="row-between"><span class="muted">Entry</span><strong class="money">{{ s.stake | money:'demo' }}</strong></div>
-                <div class="row-between"><span class="muted">Total pool</span><span class="money">{{ s.pool | money }}</span></div>
-                <div class="row-between"><span class="muted">Platform fee ({{ g.feePercent }}%)</span><span class="money">−{{ s.fee | money }}</span></div>
-                <div class="row-between prize"><span>Potential prize</span><strong class="money">{{ s.prize | money:'demo' }}</strong></div>
-                @if (waitingFor(s.stake) > 0) {
-                  <p class="win small"><mat-icon inline>bolt</mat-icon> {{ waitingFor(s.stake) }} player{{ waitingFor(s.stake) > 1 ? 's' : '' }} waiting at this stake — instant match.</p>
+          <aside class="screen entry">
+            <div class="screen-body">
+              <h2>Choose your entry</h2>
+              <div class="tiles stake-tiles">
+                @for (s of g.stakes ?? []; track s.stake) {
+                  <button class="tile" [class.selected]="stake()?.stake === s.stake" [disabled]="s.stake > available()" (click)="stake.set(s)">
+                    {{ s.stake | money }}
+                  </button>
                 }
               </div>
-            }
-            <div class="balance small">
-              <span class="muted">Available demo balance</span>
-              <strong class="money">{{ available() | money:'demo' }}</strong>
+
+              @if (stake(); as s) {
+                <div class="prize-box">
+                  <div class="pb-row"><span>You pay</span><strong class="money">{{ s.stake | money }}</strong></div>
+                  <div class="pb-row win-row"><span>You could win</span><strong class="money accent">{{ s.prize | money }}</strong></div>
+                  @if (waitingFor(s.stake) > 0) {
+                    <p class="win small instant"><mat-icon inline>bolt</mat-icon> Someone's ready to play now — you'll be matched instantly.</p>
+                  }
+                  <button type="button" class="link tiny how-link" (click)="showBreakdown.set(!showBreakdown())">
+                    {{ showBreakdown() ? 'Hide' : 'How is the prize worked out?' }}
+                  </button>
+                  @if (showBreakdown()) {
+                    <p class="muted tiny breakdown-note">Both entries go into one prize pool. A small platform fee ({{ g.feePercent }}%) is taken out, and the winner gets the rest — {{ s.pool | money }} pool − {{ s.fee | money }} fee = {{ s.prize | money }}.</p>
+                  }
+                </div>
+              }
+
+              <div class="balance-row small">
+                <span class="muted">Your balance</span>
+                <strong class="money">{{ available() | money }}</strong>
+              </div>
+              @if (stake() && stake()!.stake > available()) {
+                <div class="form-error"><mat-icon>account_balance_wallet</mat-icon>You don't have enough balance for this entry.</div>
+              }
+              @if (findError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ findError() }}</div> }
             </div>
-            @if (stake() && stake()!.stake > available()) {
-              <div class="form-error">Insufficient demo balance. <a class="link" routerLink="/wallet/deposit">Add demo funds</a></div>
-            }
-            @if (findError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ findError() }}</div> }
-            <button class="btn btn-primary btn-play btn-block" [disabled]="!stake() || searching() || !g.isEnabled || stake()!.stake > available()" (click)="find()">
-              @if (searching()) { <mat-spinner diameter="22" /> } @else { <mat-icon>radar</mat-icon> Find opponent }
-            </button>
-            <p class="muted tiny center">Your stake moves from available to <strong>locked</strong> while you wait. Cancel any time before an opponent joins for a full refund.</p>
-            @if (available() < (g.stakes?.[0]?.stake ?? 0)) {
-              <a class="btn btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add demo funds</a>
-            }
-            <a class="btn btn-ghost btn-block" routerLink="/challenges" [queryParams]="{ game: g.id, stake: stake()?.stake }"><mat-icon>swords</mat-icon>Challenge a specific player</a>
+
+            <div class="screen-actions">
+              @if (available() < (g.stakes?.[0]?.stake ?? 0)) {
+                <a class="btn btn-primary btn-lg btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add money to play</a>
+              } @else {
+                <button class="btn btn-primary btn-play btn-block" [disabled]="!stake() || searching() || !g.isEnabled || stake()!.stake > available()" (click)="find()">
+                  @if (searching()) { <mat-spinner diameter="22" /> Finding an opponent… } @else { <mat-icon>search</mat-icon> Find an opponent }
+                </button>
+              }
+              <a class="btn btn-ghost btn-block" [routerLink]="['/challenges/new']" [queryParams]="{ gameId: g.id, stake: stake()?.stake }"><mat-icon>swords</mat-icon>Challenge someone directly</a>
+            </div>
           </aside>
         </div>
       }
     </div>
   `,
   styles: [`
-    .back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 16px; mat-icon { font-size: 18px; width: 18px; height: 18px; } &:hover { color: var(--text); } }
-    .layout { display: grid; gap: 24px; grid-template-columns: 1fr; }
+    .back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 16px; min-height: 32px; mat-icon { font-size: 18px; width: 18px; height: 18px; } &:hover { color: var(--text); } }
+    .layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
     @media (min-width: 960px) { .layout { grid-template-columns: 1fr 400px; align-items: start; } .entry { position: sticky; top: 84px; } }
-    .head { display: flex; gap: 16px; align-items: center; h1 { font-size: 32px; } }
-    .meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 16px 0; }
-    .desc { font-size: 16px; color: var(--text-2); margin-bottom: 20px; max-width: 640px; }
+    .head { display: flex; gap: 16px; align-items: center; h1 { font-size: 28px; } }
+    @media (min-width: 640px) { .head h1 { font-size: 32px; } }
+    .meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; }
     .how h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; mat-icon { color: var(--muted); } }
-    .rules { margin: 12px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
-    .entry { display: flex; flex-direction: column; gap: 14px; }
-    .stake-tiles { grid-template-columns: repeat(3, 1fr); }
-    .breakdown { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px; display: flex; flex-direction: column; gap: 6px; font-size: 14px;
-      .prize { border-top: 1px dashed var(--border-strong); padding-top: 8px; margin-top: 2px; strong { color: var(--accent); font-size: 18px; font-family: var(--font-display); } }
-      p { display: flex; align-items: center; gap: 4px; margin-top: 4px; } }
-    .balance { display: flex; justify-content: space-between; }
-    .center { text-align: center; }
+    .rules { margin: 12px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.4; }
+    .entry { padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+    .entry h2 { font-size: 18px; margin-bottom: 4px; }
+    .stake-tiles { margin-top: 10px; }
+    .prize-box { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .pb-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--text-2); }
+    .win-row { border-top: 1px dashed var(--border-strong); padding-top: 8px; strong { font-size: 22px; font-family: var(--font-display); } }
+    .instant { display: flex; align-items: center; gap: 4px; }
+    .how-link { align-self: flex-start; margin-top: 2px; }
+    .breakdown-note { line-height: 1.5; }
+    .balance-row { display: flex; justify-content: space-between; margin-top: 4px; }
+    .live-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 1.4s infinite; }
+    @keyframes blink { 50% { opacity: .3; } }
   `],
 })
 export class GameDetailPage implements OnInit {
@@ -130,6 +145,7 @@ export class GameDetailPage implements OnInit {
   protected error = signal('');
   protected findError = signal('');
   protected searching = signal(false);
+  protected showBreakdown = signal(false);
   protected available = computed(() => this.auth.wallet()?.available ?? 0);
   protected duration = durationLabel;
 
@@ -138,6 +154,7 @@ export class GameDetailPage implements OnInit {
     this.realtime.queue$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((q) => {
       this.game.update((g) => (g ? { ...g, waiting: q[g.id]?.total ?? 0, waitingByStake: q[g.id]?.byStake ?? {} } : g));
     });
+    this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
   }
 
   waitingFor(stake: number) {
@@ -168,7 +185,7 @@ export class GameDetailPage implements OnInit {
     try {
       const r = await this.api.post<{ matched: boolean; alreadyQueued: boolean; match: MatchView }>('/matches/find', { gameId: g.id, stake: s.stake });
       if (r.matched) this.toast.success('Opponent found!');
-      else if (r.alreadyQueued) this.toast.info('You are already in the queue for this game and stake.');
+      else if (r.alreadyQueued) this.toast.info("You're already waiting for an opponent at this entry.");
       await this.router.navigate(['/match', r.match.code]);
     } catch (err) {
       this.findError.set(apiError(err).message);

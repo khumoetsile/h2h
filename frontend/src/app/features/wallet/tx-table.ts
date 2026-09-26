@@ -29,7 +29,7 @@ const TX_ICON: Record<TxType, string> = {
               <td class="desc">
                 {{ t.description }}
                 @if (t.matchCode) { <a class="link tiny" [routerLink]="['/matches', t.matchCode]">{{ t.matchCode }}</a> }
-                <div class="muted tiny">{{ t.reference }}</div>
+                @if (showUser()) { <div class="muted tiny">{{ t.reference }}</div> }
               </td>
               <td class="right money" [class.win]="t.signedAmount > 0">{{ t.signedAmount | money:'sign' }}</td>
               <td class="right money">{{ t.balanceAfter | money }}</td>

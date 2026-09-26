@@ -36,7 +36,7 @@ const pointsFor = (rt: number) => Math.min(1000, Math.max(100, Math.round(1100 -
         </div>
       }
       @if (phase() === 'done') {
-        <div class="overlay"><div class="msg">Finished!</div><div class="sub">Submitting your run to the server…</div></div>
+        <div class="overlay"><div class="msg">Finished!</div><div class="sub">Checking your result…</div></div>
       }
     </div>
     <div class="progress">

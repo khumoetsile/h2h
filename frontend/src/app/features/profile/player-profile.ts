@@ -28,7 +28,7 @@ interface PublicUser { id: number; username: string; displayName: string; avatar
             @if (u.bio) { <p class="text-2" style="margin-top:6px">{{ u.bio }}</p> }
           </div>
           @if (!auth.isAdmin() && u.id !== auth.user()?.id && !u.isBot) {
-            <a class="btn btn-primary" routerLink="/challenges" [queryParams]="{ opponent: u.username }"><mat-icon>swords</mat-icon>Challenge</a>
+            <a class="btn btn-primary" routerLink="/challenges/new" [queryParams]="{ opponent: u.username }"><mat-icon>swords</mat-icon>Challenge</a>
           }
         </section>
         <app-stats-panel [stats]="stats()!" />

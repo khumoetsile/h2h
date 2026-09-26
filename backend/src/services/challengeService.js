@@ -105,7 +105,7 @@ export async function createChallenge(challengerId, { opponent, gameId, stake, m
     await notify(tx, opp.id, {
       type: 'CHALLENGE_RECEIVED',
       title: `${me.username} challenged you`,
-      message: `@${me.username} challenged you to ${game.name} for ${formatMoney(stake)} DEMO.`,
+      message: `${me.username} challenged you to ${game.name} for ${formatMoney(stake)} DEMO.`,
       link: '/challenges',
     });
     tx.afterCommit(() => emitToUser(opp.id, 'challenge:update', { id: res.insertId }));
@@ -158,7 +158,7 @@ export async function acceptChallenge(userId, id) {
     await notify(tx, c.challenger_id, {
       type: 'CHALLENGE_ACCEPTED',
       title: 'Challenge accepted',
-      message: `@${me.username} accepted your ${game.name} challenge. Your match is ready to start.`,
+      message: `${me.username} accepted your ${game.name} challenge. Your match is ready to start.`,
       link: `/match/${match.code}`,
     });
     for (const uid of [c.challenger_id, userId]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));
@@ -177,7 +177,7 @@ export async function declineChallenge(userId, id) {
       tx.one('SELECT username FROM users WHERE id = ?', [userId]),
       tx.one('SELECT name FROM games WHERE id = ?', [c.game_id]),
     ]);
-    await notify(tx, c.challenger_id, { type: 'CHALLENGE_DECLINED', title: 'Challenge declined', message: `@${me.username} declined your ${game.name} challenge.`, link: '/challenges' });
+    await notify(tx, c.challenger_id, { type: 'CHALLENGE_DECLINED', title: 'Challenge declined', message: `${me.username} declined your ${game.name} challenge.`, link: '/challenges' });
     for (const uid of [c.challenger_id, userId]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));
   });
   return getChallenge(id, userId);
@@ -203,7 +203,7 @@ export async function expireChallenges() {
       const c = await tx.one(`SELECT c.*, g.name AS game_name, ou.username AS opp FROM challenges c JOIN games g ON g.id = c.game_id JOIN users ou ON ou.id = c.opponent_id WHERE c.id = ? FOR UPDATE`, [id]);
       if (!c || c.status !== 'PENDING') return;
       await tx.q(`UPDATE challenges SET status = 'EXPIRED' WHERE id = ?`, [id]);
-      await notify(tx, c.challenger_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `Your ${c.game_name} challenge to @${c.opp} expired without a response.`, link: '/challenges' });
+      await notify(tx, c.challenger_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `Your ${c.game_name} challenge to ${c.opp} expired without a response.`, link: '/challenges' });
     });
   }
   return rows.length;

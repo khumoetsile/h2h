@@ -11,11 +11,11 @@ import { MatchView } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { MoneyPipe } from '../../shared/pipes';
-import { Avatar, DemoBadge, GameIcon, LoadError, MatchStatusChip, Spinner } from '../../shared/ui';
+import { Avatar, GameIcon, LoadError, MatchStatusChip, Spinner } from '../../shared/ui';
 
 @Component({
   selector: 'app-match-lobby',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, DemoBadge, GameIcon, LoadError, MatchStatusChip, Spinner],
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, MatchStatusChip, Spinner],
   templateUrl: './match-lobby.html',
   styleUrl: './match-lobby.scss',
 })
@@ -52,6 +52,10 @@ export class MatchLobbyPage implements OnInit {
     this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((m) => {
       if (m.code === this.code()) this.apply(m);
     });
+    // If we drop offline and come back, re-sync straight away rather than
+    // waiting for the next poll tick — the match state on the server is
+    // authoritative, so this always shows the true, current position.
+    this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
     // Polling fallback + clock tick
     interval(1000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((i) => {
       this.now.set(Date.now());
@@ -62,9 +66,9 @@ export class MatchLobbyPage implements OnInit {
   private apply(m: MatchView) {
     const prev = this.match();
     this.match.set(m);
-    if (prev && prev.status === 'WAITING' && m.status === 'MATCHED') this.toast.success(`Opponent found: @${this.opponent()?.username}`);
+    if (prev && prev.status === 'WAITING' && m.status === 'MATCHED') this.toast.success(`Opponent found: ${this.opponent()?.username}`);
     if (m.status === 'COMPLETED' || m.status === 'CANCELLED') {
-      this.router.navigate(['/matches', m.code], { replaceUrl: true });
+      this.router.navigate(['/match', m.code, 'result'], { replaceUrl: true });
     }
   }
 
@@ -95,9 +99,9 @@ export class MatchLobbyPage implements OnInit {
   ready() { return this.act('ready', 'ready'); }
   cancel() {
     const m = this.match();
-    const msg = m?.status === 'WAITING' ? 'Stop searching? Your locked stake will be refunded.' : 'Leave this match? Both stakes will be refunded.';
+    const msg = m?.status === 'WAITING' ? "Stop looking for an opponent? You'll get your entry back." : "Leave this match? You'll both get your entry back.";
     if (!confirm(msg)) return;
-    return this.act('cancel', 'cancel', 'Match cancelled — your demo stake was refunded.');
+    return this.act('cancel', 'cancel', 'Match cancelled — your entry was refunded.');
   }
   demoOpponent() { return this.act('bot', 'demo-opponent'); }
   play() { this.router.navigate(['/match', this.code(), 'play']); }

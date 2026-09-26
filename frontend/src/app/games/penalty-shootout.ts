@@ -35,7 +35,7 @@ export function markerAt(periodMs: number, phase: number, t: number) {
           @case ('countdown') { <div class="count">{{ count() }}</div><div class="sub">Tap to shoot when the marker is where you want the ball</div> }
           @case ('aim') { <div class="hint">Tap anywhere to shoot</div> }
           @case ('shot') { <div class="msg" [class.loss]="lastWide()">{{ lastWide() ? 'Wide!' : 'Shot taken!' }}</div><div class="sub">{{ lastWide() ? 'Off target' : 'Result revealed at full time' }}</div> }
-          @case ('done') { <div class="msg">Full time!</div><div class="sub">The server is deciding each shot…</div> }
+          @case ('done') { <div class="msg">Full time!</div><div class="sub">Checking your shots…</div> }
         }
       </div>
     </div>

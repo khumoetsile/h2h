@@ -27,12 +27,12 @@
           <div class="winner-label">{{ me()?.outcome === 'WIN' ? 'Winner' : 'Defeat' }}</div>
           <h1 class="headline">
             @if (me()?.outcome === 'WIN') { You won <span class="money win">{{ m.prize | money }}</span> <span class="demo">DEMO</span> }
-            @else { &#64;{{ winner()?.username }} won this one }
+            @else { {{ winner()?.username }} won this one }
           </h1>
           <p class="text-2">{{ m.resultReason }}</p>
         } @else {
           <div class="winner-label">Winner</div>
-          <h1 class="headline">&#64;{{ winner()?.username }} <span class="muted">won</span> <span class="money win">{{ m.prize | money }}</span> <span class="demo">DEMO</span></h1>
+          <h1 class="headline">{{ winner()?.username }} <span class="muted">won</span> <span class="money win">{{ m.prize | money }}</span> <span class="demo">DEMO</span></h1>
           <p class="text-2">{{ m.resultReason }}</p>
         }
       } @else if (m.status === 'CANCELLED') {
@@ -59,7 +59,7 @@
             <div class="row">
               <app-avatar [name]="p.username" [color]="p.avatarColor" [size]="44" />
               <div class="grow">
-                <strong>&#64;{{ p.username }}</strong>@if (p.userId === m.viewerId) { <span class="muted small"> (you)</span> }
+                <strong>{{ p.username }}</strong>@if (p.userId === m.viewerId) { <span class="muted small"> (you)</span> }
                 <div class="muted tiny">{{ p.isBot ? 'Demo opponent (bot)' : p.displayName }}</div>
               </div>
               @if (p.outcome === 'WIN') { <span class="chip chip-win"><mat-icon inline>emoji_events</mat-icon> Winner</span> }
@@ -95,7 +95,7 @@
         <div class="card-head"><h3>Round by round</h3><span class="muted small">Identical sequence for both players</span></div>
         <div class="table-wrap">
           <table class="table">
-            <thead><tr><th>#</th><th>&#64;{{ left()?.username }}</th><th class="right">&#64;{{ right()?.username }}</th></tr></thead>
+            <thead><tr><th>#</th><th>{{ left()?.username }}</th><th class="right">{{ right()?.username }}</th></tr></thead>
             <tbody>
               @for (row of rounds(); track row.n) {
                 @let a = roundCell(row.l, m.game.slug);
@@ -116,7 +116,7 @@
       <div class="actions">
         <button class="btn btn-primary" (click)="playAgain()"><mat-icon>replay</mat-icon>Play again</button>
         @if (right() && !right()!.isBot) {
-          <button class="btn" [disabled]="rematching()" (click)="rematch()"><mat-icon>swords</mat-icon>Challenge &#64;{{ right()!.username }} to a rematch</button>
+          <button class="btn" [disabled]="rematching()" (click)="rematch()"><mat-icon>swords</mat-icon>Challenge {{ right()!.username }} to a rematch</button>
         }
         <a class="btn btn-ghost" routerLink="/wallet/transactions"><mat-icon>receipt_long</mat-icon>View transactions</a>
       </div>

@@ -13,31 +13,34 @@ import { createRng } from '../src/games/rng.js';
 import { computePrize, fromCents, toCents } from '../src/utils/money.js';
 import { matchCode, txReference } from '../src/utils/ids.js';
 
+// Copy here is player-facing: short, plain, jargon-free. Save the mechanical
+// detail (scoring formulas, "seed", "server") for the in-app "How to play"
+// panel only, and even there keep it in plain language.
 const GAMES = [
   {
-    slug: 'reaction-rush', name: 'Reaction Rush', tagline: 'Fastest finger wins.', accent: '#22D3EE', duration: 45,
-    description: 'Ten rounds. A target appears somewhere on screen after a random delay — hit it as fast as you can. Both players face the identical sequence.',
-    how: 'Wait for the target to appear, then tap it. Faster reactions earn more points (up to 1,000 per round). Missing a target or tapping too early scores 0. Highest total after 10 rounds wins.',
+    slug: 'reaction-rush', name: 'Reaction Rush', tagline: 'Test how fast you can react.', accent: '#22D3EE', duration: 45,
+    description: 'A target pops up on your screen — tap it before your opponent taps theirs. 10 rounds. Fastest total time wins.',
+    how: 'Wait for the target to appear, then tap it as fast as you can. The quicker you react, the more points you score. Tap too early or miss and you score nothing for that round. After 10 rounds, whoever scored the most wins.',
   },
   {
-    slug: 'penalty-shootout', name: 'Penalty Shootout', tagline: 'Five shots. Nerves of steel.', accent: '#10B981', duration: 40,
-    description: 'Time your shot as the aim marker sweeps across the goal. Read the keeper, pick your corner and beat them five times.',
-    how: 'The marker sweeps left and right. Tap to shoot. The keeper leans one way — they often (but not always) dive that way. Goals score 1,000 plus a placement bonus for shots near the posts. Shots outside the posts go wide.',
+    slug: 'penalty-shootout', name: 'Penalty Shootout', tagline: 'Score more goals than your opponent.', accent: '#10B981', duration: 40,
+    description: 'Take 5 penalty shots. Time it right to beat the keeper and score more goals than your opponent.',
+    how: 'Watch the marker slide across the goal and tap to shoot. The keeper often dives the way they\'re leaning, so aim the other way. Score in the corners for extra points. After 5 shots each, most goals wins.',
   },
   {
-    slug: 'word-battle', name: 'Word Battle', tagline: 'Unscramble under pressure.', accent: '#A855F7', duration: 90,
-    description: 'Eight scrambled words. Solve each one as fast as you can — every second counts.',
-    how: 'Type the correct word and press Enter. Correct answers score 500 plus a speed bonus of up to 500. You have 20 seconds per word; you can skip at any time.',
+    slug: 'word-battle', name: 'Word Battle', tagline: 'Think faster than your opponent.', accent: '#A855F7', duration: 90,
+    description: 'Unscramble 8 mixed-up words as quickly as you can. Faster, correct answers score more.',
+    how: 'The letters of a word are jumbled up — type the real word and hit enter. You have 20 seconds per word, and you can skip one if you\'re stuck. Whoever scores the most after 8 words wins.',
   },
   {
-    slug: 'memory-battle', name: 'Memory Battle', tagline: 'Remember the pattern.', accent: '#F97316', duration: 80,
-    description: 'Watch the grid light up, then repeat the sequence. Sequences grow from 3 to 9 tiles.',
-    how: 'Memorise the order in which tiles flash, then tap them back in the same order. Correct sequences score 100 per tile plus a speed bonus. Partial sequences earn a little credit.',
+    slug: 'memory-battle', name: 'Memory Battle', tagline: 'Remember more and score more.', accent: '#F97316', duration: 80,
+    description: 'Watch the tiles light up, then repeat the pattern from memory. Patterns get longer each round.',
+    how: 'A sequence of tiles flashes on the grid — watch closely, then tap them back in the same order. Patterns start short and get longer each round. Whoever remembers the most wins.',
   },
   {
-    slug: 'aim-challenge', name: 'Aim Challenge', tagline: 'Precision meets speed.', accent: '#EF4444', duration: 35,
-    description: 'Twenty shrinking targets in quick succession. Hit them fast and close to the centre.',
-    how: 'Each target shrinks and vanishes after 1.2 seconds. Points combine speed and precision — hit the bullseye for the maximum. Misses score 0.',
+    slug: 'aim-challenge', name: 'Aim Challenge', tagline: 'Hit more targets than your opponent.', accent: '#EF4444', duration: 35,
+    description: '20 targets appear one after another and shrink fast — hit as many as you can, right in the centre.',
+    how: 'Targets pop up and shrink away quickly — tap each one before it disappears. Hitting the centre scores more than a glancing hit. Whoever hits the most (and most accurately) wins.',
   },
 ];
 
@@ -149,13 +152,13 @@ export async function seed({ log = console.log } = {}) {
       const m = { id: matchId, code, stake, prize };
       for (const [slot, p] of [[1, a], [2, b]]) {
         p.avail -= toCents(stake); p.locked += toCents(stake);
-        await insertTx(tx, { userId: p.id, walletId: p.walletId, type: 'GAME_ENTRY', direction: 'DEBIT', amount: stake, avail: p.avail, locked: p.locked, description: `${gameName} entry — ${code} (stake locked)`, matchId, key: `match:${matchId}:entry:${p.id}`, at: new Date(t + slot * 15000) });
+        await insertTx(tx, { userId: p.id, walletId: p.walletId, type: 'GAME_ENTRY', direction: 'DEBIT', amount: stake, avail: p.avail, locked: p.locked, description: `${gameName} entry`, matchId, key: `match:${matchId}:entry:${p.id}`, at: new Date(t + slot * 15000) });
         await tx.q('INSERT INTO match_players (match_id, user_id, slot, stake, joined_at, ready_at, started_at, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)', [matchId, p.id, slot, stake, created, cancelled ? null : new Date(t + 60000), cancelled ? null : new Date(t + 90000), cancelled ? null : completed]);
       }
       if (cancelled) {
         for (const p of [a, b]) {
           p.avail += toCents(stake); p.locked -= toCents(stake);
-          await insertTx(tx, { userId: p.id, walletId: p.walletId, type: 'REFUND', direction: 'CREDIT', amount: stake, avail: p.avail, locked: p.locked, description: `Refund — ${code}: player left before the game started`, matchId, key: `match:${matchId}:refund:${p.id}`, at: new Date(t + 120000) });
+          await insertTx(tx, { userId: p.id, walletId: p.walletId, type: 'REFUND', direction: 'CREDIT', amount: stake, avail: p.avail, locked: p.locked, description: 'Refund: player left before the game started', matchId, key: `match:${matchId}:refund:${p.id}`, at: new Date(t + 120000) });
         }
         await tx.q(`UPDATE match_players SET outcome = 'REFUNDED', payout = stake WHERE match_id = ?`, [matchId]);
         await tx.q(`UPDATE matches SET status = 'CANCELLED', cancelled_at = ?, settled_at = ?, cancel_reason = 'player left before the game started' WHERE id = ?`, [new Date(t + 120000), new Date(t + 120000), matchId]);
@@ -176,7 +179,7 @@ export async function seed({ log = console.log } = {}) {
       const loser = winner === a ? b : a;
       winner.locked -= toCents(stake); winner.avail += toCents(prize);
       loser.locked -= toCents(stake);
-      await insertTx(tx, { userId: winner.id, walletId: winner.walletId, type: 'GAME_WIN', direction: 'CREDIT', amount: prize, avail: winner.avail, locked: winner.locked, description: `${gameName} win — ${code} (prize after ${fee}% fee)`, matchId, key: `match:${matchId}:win`, at: completed });
+      await insertTx(tx, { userId: winner.id, walletId: winner.walletId, type: 'GAME_WIN', direction: 'CREDIT', amount: prize, avail: winner.avail, locked: winner.locked, description: `${gameName} win`, matchId, key: `match:${matchId}:win`, at: completed });
       await tx.q(`UPDATE match_players SET outcome = 'WIN', payout = ? WHERE match_id = ? AND user_id = ?`, [prize, matchId, winner.id]);
       await tx.q(`UPDATE match_players SET outcome = 'LOSS', payout = 0 WHERE match_id = ? AND user_id = ?`, [matchId, loser.id]);
       await tx.q(`UPDATE matches SET status = 'COMPLETED', winner_id = ?, completed_at = ?, settled_at = ?, result_reason = ? WHERE id = ?`, [winner.id, completed, completed, cmp === 0 ? 'Won on tiebreak' : 'Higher score', matchId]);

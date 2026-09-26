@@ -2,16 +2,14 @@ import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { MatTooltipModule } from '@angular/material/tooltip';
 import { merge, interval } from 'rxjs';
 import { Api } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { Challenge, Game, MatchSummary, UserStats, Wallet } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
-import { durationLabel } from '../../core/format';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
-import { Avatar, DemoBadge, EmptyState, GameIcon, LoadError, MatchStatusChip, OutcomeChip, SkeletonList } from '../../shared/ui';
+import { Avatar, EmptyState, GameIcon, LoadError, OutcomeChip } from '../../shared/ui';
 
 interface Dashboard {
   wallet: Wallet;
@@ -23,9 +21,15 @@ interface Dashboard {
   games: Game[];
 }
 
+/**
+ * Home screen. Deliberately shows only what an ordinary player needs right
+ * now — balance, one big "Play now" action, anything waiting for a response,
+ * and a taste of games/recent activity. Deep stats live on the Profile page,
+ * not here — this screen is not a dashboard.
+ */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, MatIconModule, MatTooltipModule, MoneyPipe, AgoPipe, Avatar, DemoBadge, EmptyState, GameIcon, LoadError, MatchStatusChip, OutcomeChip, SkeletonList],
+  imports: [RouterLink, MatIconModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -40,11 +44,14 @@ export class DashboardPage implements OnInit {
   protected data = signal<Dashboard | null>(null);
   protected error = signal('');
   protected busy = signal<number | null>(null);
-  protected duration = durationLabel;
+
+  protected incomingChallenges() {
+    return (this.data()?.activeChallenges ?? []).filter((c) => c.direction === 'INCOMING');
+  }
 
   ngOnInit() {
     this.load();
-    merge(this.realtime.match$, this.realtime.challenge$, this.realtime.queue$, interval(30000))
+    merge(this.realtime.match$, this.realtime.challenge$, this.realtime.reconnected$, interval(30000))
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe(() => this.load(true));
   }
@@ -56,7 +63,7 @@ export class DashboardPage implements OnInit {
       this.data.set(d);
       this.auth.wallet.set(d.wallet);
     } catch (err) {
-      if (!silent || !this.data()) this.error.set('Could not load your dashboard.');
+      if (!silent || !this.data()) this.error.set("We couldn't load your home screen. Please try again.");
       void err;
     }
   }
@@ -71,7 +78,7 @@ export class DashboardPage implements OnInit {
     try {
       if (action === 'accept') {
         const r = await this.api.post<{ match: { code: string } }>(`/challenges/${c.id}/accept`);
-        this.toast.success('Challenge accepted — stakes locked. Get ready!');
+        this.toast.success("Challenge accepted! Get ready to play.");
         await this.router.navigate(['/match', r.match.code]);
       } else {
         await this.api.post(`/challenges/${c.id}/decline`);
@@ -88,5 +95,13 @@ export class DashboardPage implements OnInit {
 
   matchLink(m: MatchSummary) {
     return ['COMPLETED', 'CANCELLED'].includes(m.status) ? ['/matches', m.code] : ['/match', m.code];
+  }
+
+  resultLabel(m: MatchSummary) {
+    if (m.status === 'CANCELLED') return 'Cancelled';
+    if (m.outcome === 'WIN') return 'You won';
+    if (m.outcome === 'LOSS') return 'You lost';
+    if (m.outcome === 'DRAW') return 'Draw';
+    return 'In progress';
   }
 }

@@ -41,7 +41,7 @@ type Filter = 'all' | 'wins' | 'losses' | 'cancelled';
                 @for (m of data()!.items; track m.id) {
                   <tr class="clickable" (click)="open(m)">
                     <td><div class="row"><app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="28" />{{ m.game.name }}</div></td>
-                    <td>@if (m.opponent) { <div class="row"><app-avatar [name]="m.opponent.username" [color]="m.opponent.avatarColor" [size]="24" />&#64;{{ m.opponent.username }}</div> } @else { <span class="muted">—</span> }</td>
+                    <td>@if (m.opponent) { <div class="row"><app-avatar [name]="m.opponent.username" [color]="m.opponent.avatarColor" [size]="24" />{{ m.opponent.username }}</div> } @else { <span class="muted">—</span> }</td>
                     <td class="money">{{ m.stake | money }}</td>
                     <td class="num">{{ m.myScore ?? '—' }} <span class="muted">–</span> {{ m.opponentScore ?? '—' }}</td>
                     <td><app-outcome [outcome]="m.outcome" [status]="m.status" /></td>
@@ -58,7 +58,7 @@ type Filter = 'all' | 'wins' | 'losses' | 'cancelled';
               <a class="list-item" (click)="open(m)">
                 <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="36" />
                 <div class="grow">
-                  <div class="t">{{ m.game.name }} <span class="muted small">vs &#64;{{ m.opponent?.username ?? '—' }}</span></div>
+                  <div class="t">{{ m.game.name }} <span class="muted small">vs {{ m.opponent?.username ?? '—' }}</span></div>
                   <div class="muted tiny">{{ (m.completedAt || m.cancelledAt || m.createdAt) | date: 'd MMM, HH:mm' }} · {{ m.code }}</div>
                 </div>
                 <div class="end">

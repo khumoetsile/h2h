@@ -1,0 +1,131 @@
+<div class="page page-narrow wizard">
+  <div class="wiz-head">
+    <button class="back-btn" (click)="back()" aria-label="Back"><mat-icon>arrow_back</mat-icon></button>
+    <div class="wiz-progress">
+      <span class="step-label">Step {{ stepIndex() + 1 }} of 4</span>
+      <div class="dots">
+        @for (s of [0,1,2,3]; track s) { <span class="dot" [class.done]="s <= stepIndex()"></span> }
+      </div>
+    </div>
+  </div>
+
+  <!-- STEP 1: choose player -->
+  @if (step() === 'player') {
+    <section class="screen fade-in">
+      <div class="screen-body">
+        <h1>Who do you want to challenge?</h1>
+        <p class="sub">Search for a player by their username.</p>
+        <div class="search-box">
+          <mat-icon>search</mat-icon>
+          <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" autocomplete="off" autofocus />
+          @if (searching()) { <mat-spinner diameter="20" /> }
+        </div>
+        @if (query.trim().length > 0 && !searching() && results().length === 0) {
+          <app-empty icon="person_search" title="No players found" [text]="'No one matches &quot;' + query + '&quot;.'" />
+        } @else {
+          <div class="result-list">
+            @for (u of results(); track u.id) {
+              <button class="result-row" (click)="pick(u)">
+                <app-avatar [name]="u.username" [color]="u.avatarColor" [size]="44" />
+                <div class="grow">
+                  <div class="r-name">{{ u.username }}</div>
+                  <div class="muted small">{{ u.displayName }}</div>
+                </div>
+                @if (u.online) { <span class="chip chip-win">Online</span> }
+                <mat-icon class="chev">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- STEP 2: choose game -->
+  @if (step() === 'game') {
+    <section class="screen fade-in">
+      <div class="screen-body">
+        <h1>Choose a game</h1>
+        <p class="sub">Challenging {{ opponent()?.username }}</p>
+        @if (!games()) {
+          <app-spinner />
+        } @else {
+          <div class="game-list">
+            @for (g of games(); track g.id) {
+              <button class="game-row" (click)="pickGame(g)">
+                <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="46" />
+                <div class="grow">
+                  <div class="r-name">{{ g.name }}</div>
+                  <div class="muted small">{{ g.tagline }}</div>
+                </div>
+                <mat-icon class="chev">chevron_right</mat-icon>
+              </button>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- STEP 3: choose stake -->
+  @if (step() === 'stake') {
+    <section class="screen fade-in">
+      <div class="screen-body">
+        <h1>Choose an entry amount</h1>
+        <p class="sub">{{ game()?.name }} vs {{ opponent()?.username }}</p>
+        <div class="tiles">
+          @for (s of stakes(); track s.stake) {
+            <button class="tile" [disabled]="s.stake > available()" (click)="pickStake(s.stake)">
+              {{ s.stake | money }}
+              <small>win {{ s.prize | money }}</small>
+            </button>
+          }
+        </div>
+        <p class="muted small balance-hint">Your balance: <strong class="money text-2">{{ available() | money }}</strong></p>
+        @if (available() < (stakes()[0]?.stake ?? 0)) {
+          <div class="form-error">You don't have enough balance to send a challenge. <a class="link" routerLink="/wallet/deposit">Add money</a></div>
+        }
+      </div>
+    </section>
+  }
+
+  <!-- STEP 4: review + send -->
+  @if (step() === 'review') {
+    <section class="screen fade-in">
+      <div class="screen-body">
+        <h1>Review your challenge</h1>
+        <div class="card review-card">
+          <div class="rv-row">
+            <app-avatar [name]="opponent()?.username ?? ''" [color]="opponent()?.avatarColor ?? '#3B82F6'" [size]="40" />
+            <div class="grow"><span class="muted tiny">OPPONENT</span><div class="r-name">{{ opponent()?.username }}</div></div>
+            <button type="button" class="link small" (click)="goTo('player')">Change</button>
+          </div>
+          <div class="rv-row">
+            <app-game-icon [slug]="game()?.slug ?? ''" [color]="game()?.accentColor ?? '#22D3EE'" [size]="40" />
+            <div class="grow"><span class="muted tiny">GAME</span><div class="r-name">{{ game()?.name }}</div></div>
+            <button type="button" class="link small" (click)="goTo('game')">Change</button>
+          </div>
+          <div class="rv-row">
+            <div class="grow"><span class="muted tiny">ENTRY</span><div class="r-name money">{{ stake() | money }}</div></div>
+            <button type="button" class="link small" (click)="goTo('stake')">Change</button>
+          </div>
+          <div class="prize-line">
+            <span>Potential prize</span>
+            <strong class="money accent">{{ potentialPrize() | money }}</strong>
+          </div>
+        </div>
+
+        <label class="msg-label" for="msg">Add a message (optional)</label>
+        <textarea id="msg" class="msg-box" [(ngModel)]="message" maxlength="140" rows="2" placeholder="Think you can beat me?"></textarea>
+
+        @if (formError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ formError() }}</div> }
+      </div>
+      <div class="screen-actions">
+        <button class="btn btn-primary btn-lg btn-block" [disabled]="sending()" (click)="send()">
+          @if (sending()) { <mat-spinner diameter="20" /> Sending… } @else { <mat-icon>swords</mat-icon> Send challenge }
+        </button>
+        <p class="muted tiny center">Nothing is taken from your balance until {{ opponent()?.username }} accepts.</p>
+      </div>
+    </section>
+  }
+</div>

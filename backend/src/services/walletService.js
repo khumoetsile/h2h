@@ -145,7 +145,7 @@ export function lockStake(tx, userId, match, gameName) {
   const cents = toCents(match.stake);
   return applyMovement(tx, userId, {
     availableDelta: -cents, lockedDelta: cents, type: 'GAME_ENTRY', direction: 'DEBIT', amount: match.stake,
-    description: `${gameName} entry — ${match.code} (stake locked)`, matchId: match.id,
+    description: `${gameName} entry`, matchId: match.id,
     idempotencyKey: `match:${match.id}:entry:${userId}`,
   });
 }
@@ -155,7 +155,7 @@ export function refundStake(tx, userId, match, reason) {
   const cents = toCents(match.stake);
   return applyMovement(tx, userId, {
     availableDelta: cents, lockedDelta: -cents, type: 'REFUND', direction: 'CREDIT', amount: match.stake,
-    description: `Refund — ${match.code}: ${reason}`, matchId: match.id,
+    description: `Refund: ${reason}`, matchId: match.id,
     idempotencyKey: `match:${match.id}:refund:${userId}`,
   });
 }
@@ -164,7 +164,7 @@ export function refundStake(tx, userId, match, reason) {
 export function payWinner(tx, userId, match, gameName) {
   return applyMovement(tx, userId, {
     availableDelta: toCents(match.prize), lockedDelta: -toCents(match.stake), type: 'GAME_WIN', direction: 'CREDIT', amount: match.prize,
-    description: `${gameName} win — ${match.code} (prize after ${Number(match.fee_percent)}% fee)`, matchId: match.id,
+    description: `${gameName} win`, matchId: match.id,
     idempotencyKey: `match:${match.id}:win`,
   });
 }

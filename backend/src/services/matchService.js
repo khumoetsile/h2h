@@ -121,8 +121,8 @@ async function joinLockedMatch(tx, m, userId, { autoReady = false } = {}) {
     tx.one('SELECT username FROM users WHERE id = ?', [userId]),
   ]);
   const link = `/match/${m.code}`;
-  await notify(tx, m.created_by, { type: 'MATCH_FOUND', title: 'Opponent found', message: `@${joiner.username} joined your ${game.name} match (${formatMoney(m.stake)} DEMO). Get ready!`, link });
-  await notify(tx, userId, { type: 'MATCH_FOUND', title: 'Match found', message: `You're up against @${creator.username} in ${game.name}.`, link });
+  await notify(tx, m.created_by, { type: 'MATCH_FOUND', title: 'Opponent found', message: `${joiner.username} joined your ${game.name} match. Get ready!`, link });
+  await notify(tx, userId, { type: 'MATCH_FOUND', title: 'Match found', message: `You're up against ${creator.username} in ${game.name}.`, link });
   emitMatch(tx, m.id, [m.created_by, userId]);
   tx.afterCommit(() => broadcastQueueCounts());
   return m.id;
@@ -232,7 +232,7 @@ export async function setReady(userId, matchIdOrCode) {
     if (allReady && players.length === 2) {
       await tx.q(`UPDATE matches SET status = 'READY', ready_at = NOW() WHERE id = ?`, [m.id]);
       for (const p of players) {
-        if (!p.is_bot) await notify(tx, p.user_id, { type: 'MATCH_STARTING', title: 'Your match is starting', message: `${m.game_name} (${m.code}) is ready. Good luck!`, link: `/match/${m.code}` });
+        if (!p.is_bot) await notify(tx, p.user_id, { type: 'MATCH_STARTING', title: 'Your match is starting', message: `${m.game_name} is ready. Good luck!`, link: `/match/${m.code}` });
       }
     }
     emitMatch(tx, m.id, players.map((p) => p.user_id));
@@ -367,7 +367,7 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
     for (const p of players) {
       await refundStake(tx, p.user_id, m, 'match drawn');
       await tx.q(`UPDATE match_players SET outcome = 'DRAW', payout = stake WHERE id = ?`, [p.id]);
-      if (!p.is_bot) await notify(tx, p.user_id, { type: 'MATCH_DRAW', title: 'Match drawn', message: `${m.game_name} ${m.code} ended in a draw. Your ${formatMoney(m.stake)} DEMO stake was refunded.`, link });
+      if (!p.is_bot) await notify(tx, p.user_id, { type: 'MATCH_DRAW', title: 'Match drawn', message: `Your ${m.game_name} match ended in a draw. Your ${formatMoney(m.stake)} entry was refunded.`, link });
     }
   } else {
     const loser = players.find((p) => p.user_id !== winner.user_id);
@@ -375,8 +375,8 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
     await forfeitStake(tx, loser.user_id, m);
     await tx.q(`UPDATE match_players SET outcome = 'WIN', payout = ? WHERE id = ?`, [m.prize, winner.id]);
     await tx.q(`UPDATE match_players SET outcome = 'LOSS', payout = 0 WHERE id = ?`, [loser.id]);
-    if (!winner.is_bot) await notify(tx, winner.user_id, { type: 'MATCH_WON', title: 'Victory!', message: `You won ${formatMoney(m.prize)} DEMO against @${loser.username} in ${m.game_name}.`, link });
-    if (!loser.is_bot) await notify(tx, loser.user_id, { type: 'MATCH_LOST', title: 'Match lost', message: `@${winner.username} won ${m.game_name} ${m.code}. Better luck next time.`, link });
+    if (!winner.is_bot) await notify(tx, winner.user_id, { type: 'MATCH_WON', title: 'Victory!', message: `You won ${formatMoney(m.prize)} DEMO against ${loser.username} in ${m.game_name}.`, link });
+    if (!loser.is_bot) await notify(tx, loser.user_id, { type: 'MATCH_LOST', title: 'Match lost', message: `${winner.username} won this ${m.game_name} match. Better luck next time.`, link });
   }
   emitMatch(tx, matchId, players.map((p) => p.user_id));
   tx.afterCommit(() => emitAll('leaderboard:update', {}));
@@ -400,7 +400,7 @@ export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true } = {}
     if (p.stake_locked) await refundStake(tx, p.user_id, m, reason);
     await tx.q(`UPDATE match_players SET outcome = 'REFUNDED', payout = stake WHERE id = ?`, [p.id]);
     if (notifyPlayers && !p.is_bot) {
-      await notify(tx, p.user_id, { type: 'MATCH_CANCELLED', title: 'Match cancelled', message: `${game.name} ${m.code} was cancelled (${reason}). ${formatMoney(m.stake)} DEMO returned to your available balance.`, link: `/matches/${m.code}` });
+      await notify(tx, p.user_id, { type: 'MATCH_CANCELLED', title: 'Match cancelled', message: `Your ${game.name} match was cancelled (${reason}). ${formatMoney(m.stake)} DEMO was returned to your balance.`, link: `/matches/${m.code}` });
     }
   }
   emitMatch(tx, m.id, players.map((p) => p.user_id));
@@ -415,7 +415,7 @@ export async function cancelMatch(userId, matchIdOrCode) {
     if (m.status === 'IN_PROGRESS' || players.some((p) => p.started_at)) {
       throw conflict('MATCH_ALREADY_STARTED', 'The match has already started and can no longer be cancelled.');
     }
-    const reason = m.status === 'WAITING' ? 'cancelled by player before an opponent joined' : `@${me.username} left before the game started`;
+    const reason = m.status === 'WAITING' ? 'cancelled by player before an opponent joined' : `${me.username} left before the game started`;
     await cancelMatchTx(tx, m, reason);
     return m.id;
   });

@@ -23,7 +23,7 @@ interface Shot { hit: boolean; reactionMs?: number; offset?: number; }
         <button class="t" [style.left.%]="current().x" [style.top.%]="current().y" [style.width.px]="current().size" [style.height.px]="current().size"
                 [style.animation-duration.ms]="spec().lifetimeMs" (pointerdown)="shoot($event)" aria-label="Target"></button>
       }
-      @if (phase() === 'done') { <div class="overlay"><div class="msg">Finished!</div><div class="sub">Submitting your run…</div></div> }
+      @if (phase() === 'done') { <div class="overlay"><div class="msg">Finished!</div><div class="sub">Checking your result…</div></div> }
     </div>
     <div class="progress">
       @for (s of shots(); track $index) { <i [class.hit]="s.hit" [class.miss]="!s.hit"></i> }

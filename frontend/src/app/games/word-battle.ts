@@ -18,7 +18,7 @@ interface Answer { answer: string; timeMs: number; }
     <div class="wb">
       @switch (phase()) {
         @case ('countdown') { <div class="count">{{ count() }}</div><p class="sub">Unscramble each word. Faster answers earn more points.</p> }
-        @case ('done') { <div class="msg">Finished!</div><p class="sub">The server is checking your answers…</p> }
+        @case ('done') { <div class="msg">Finished!</div><p class="sub">Checking your answers…</p> }
         @default {
           <div class="tiles-row">
             @for (ch of letters(); track $index) { <span class="lt">{{ ch }}</span> }

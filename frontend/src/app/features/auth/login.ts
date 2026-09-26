@@ -24,7 +24,7 @@ import { DemoBadge } from '../../shared/ui';
       <div>
         <app-demo-badge label="Demo mode · simulated funds" size="lg" />
         <h1>Skill decides.<br/>Winner takes the pool.</h1>
-        <p class="lead">Go head-to-head in fast, fair 1v1 skill games. Both players face the identical challenge — the server decides the result.</p>
+        <p class="lead">Go head-to-head in fast, fair 1v1 skill games. Both players face the exact same challenge — we always decide the result fairly.</p>
         <div class="flow">
           <div class="flow-step"><div class="n">1</div><div><strong>Pick a game & stake</strong><span>Entries from P5 to P200 (demo funds).</span></div></div>
           <div class="flow-step"><div class="n">2</div><div><strong>Get matched</strong><span>Instant matchmaking or challenge a rival directly.</span></div></div>
