@@ -132,6 +132,14 @@ export async function demoWithdrawal(userId, rawAmount) {
   });
 }
 
+/** Demo float for house bots so they can always cover a stake (recorded in the ledger). */
+export function houseBotFloat(tx, userId, amount) {
+  return applyMovement(tx, userId, {
+    availableDelta: toCents(amount), type: 'DEPOSIT', direction: 'CREDIT', amount,
+    description: 'House bot float — DEMO FUNDS', status: 'DEMO_COMPLETED',
+  });
+}
+
 /** AVAILABLE -> LOCKED when a player enters a match. */
 export function lockStake(tx, userId, match, gameName) {
   const cents = toCents(match.stake);

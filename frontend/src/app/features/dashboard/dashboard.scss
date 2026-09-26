@@ -1,0 +1,32 @@
+.hero { display: flex; justify-content: space-between; align-items: flex-end; gap: 20px; flex-wrap: wrap; margin-bottom: 22px; }
+.hero h1 { font-size: 30px; }
+.handle { font-size: 18px; font-weight: 500; }
+.hero-sub { margin-top: 6px; }
+.hero-cta { display: flex; gap: 10px; flex-wrap: wrap; width: 100%;
+  .btn-play { flex: 1; min-width: 200px; }
+}
+@media (min-width: 900px) { .hero-cta { width: auto; .btn-play { flex: none; min-width: 220px; } } }
+.top-grid { display: grid; gap: 16px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .top-grid { grid-template-columns: 360px 1fr; } }
+.wallet-card { display: flex; flex-direction: column; gap: 4px; border-color: rgba(255,176,32,.25);
+  background: linear-gradient(160deg, rgba(255,176,32,.06), transparent 50%), var(--surface); }
+.kpi-label { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+.wallet-main { font-family: var(--font-display); font-size: 36px; font-weight: 700; margin-top: 10px; }
+.demo-suffix { font-size: 13px; color: var(--demo); margin-left: 8px; letter-spacing: .08em; font-weight: 700; vertical-align: middle; }
+.wallet-sub { display: flex; gap: 18px; color: var(--muted); font-size: 13px; strong { color: var(--text-2); } }
+.wallet-actions { margin-top: auto; padding-top: 14px; }
+.stats-grid { display: grid; gap: 12px; grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 600px) { .stats-grid { grid-template-columns: repeat(3, 1fr); } }
+.stats-grid .card { padding: 14px 16px; }
+.block { margin-top: 28px; }
+.two-col { display: grid; gap: 24px; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .two-col { grid-template-columns: 1fr 1fr; } }
+.grow { flex: 1; min-width: 0; }
+.li-title { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.actions { gap: 6px; }
+.games-row { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.game-mini { display: flex; flex-direction: column; gap: 6px; h3 { margin-top: 10px; } }
+.gm-foot { display: flex; gap: 10px; margin-top: 6px; }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 1.4s infinite; }
+@keyframes blink { 50% { opacity: .3; } }

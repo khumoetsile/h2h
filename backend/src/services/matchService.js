@@ -17,7 +17,7 @@ import { getEngine } from '../games/index.js';
 import { createRng } from '../games/rng.js';
 import { getSettings } from './settingsService.js';
 import { notify } from './notificationService.js';
-import { forfeitStake, lockStake, payWinner, refundStake } from './walletService.js';
+import { forfeitStake, houseBotFloat, lockStake, payWinner, refundStake } from './walletService.js';
 import { config } from '../config.js';
 
 export const ACTIVE_STATUSES = ['WAITING', 'MATCHED', 'READY', 'IN_PROGRESS'];
@@ -189,7 +189,7 @@ export async function addDemoOpponent(userId, matchIdOrCode) {
     // House bots are topped up with demo funds so they can always cover a stake.
     const w = await tx.one('SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE', [bot.id]);
     if (toCents(w.available_balance) < toCents(m.stake)) {
-      await tx.q('UPDATE wallets SET available_balance = available_balance + 1000 WHERE user_id = ?', [bot.id]);
+      await houseBotFloat(tx, bot.id, 1000);
     }
     await joinLockedMatch(tx, m, bot.id, { autoReady: true });
     return m.id;

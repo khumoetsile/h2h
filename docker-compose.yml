@@ -1,0 +1,18 @@
+# Optional: a local MySQL 8 for development if you don't have one installed.
+#   docker compose up -d
+# Matches the defaults in backend/.env.example.
+services:
+  mysql:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: rivalis_dev
+      MYSQL_USER: rivalis
+      MYSQL_PASSWORD: rivalis_pass
+    ports:
+      - "3306:3306"
+    volumes:
+      - rivalis-mysql:/var/lib/mysql
+      - ./backend/scripts/docker-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+volumes:
+  rivalis-mysql:

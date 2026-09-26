@@ -1,0 +1,23 @@
+.back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 16px; mat-icon { font-size: 18px; width: 18px; height: 18px; } &:hover { color: var(--text); } }
+.banner { padding: 22px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 10px; }
+.banner.won { border-color: rgba(61, 220, 151, .45); background: linear-gradient(180deg, rgba(61,220,151,.08), transparent 60%), var(--surface); }
+.banner.lost { border-color: rgba(255, 84, 112, .35); }
+.banner-top { display: flex; align-items: center; gap: 12px; .grow { flex: 1; } }
+.winner-label { font-family: var(--font-display); font-weight: 700; letter-spacing: .2em; text-transform: uppercase; font-size: 13px; color: var(--muted); margin-top: 8px; }
+.banner.won .winner-label { color: var(--win); }
+.banner.lost .winner-label { color: var(--loss); }
+.headline { font-size: 34px; }
+.demo { font-size: 14px; color: var(--demo); letter-spacing: .08em; vertical-align: middle; }
+.money-row { display: flex; gap: 24px; flex-wrap: wrap; align-items: center; padding-top: 12px; border-top: 1px solid var(--border); margin-top: 6px;
+  div { display: flex; flex-direction: column; } strong { font-size: 16px; } }
+.players { display: grid; grid-template-columns: 1fr; gap: 16px; margin-bottom: 16px; }
+@media (min-width: 800px) { .players { grid-template-columns: 1fr 1fr; } }
+.player { display: flex; flex-direction: column; gap: 14px; .grow { flex: 1; min-width: 0; } }
+.player.is-winner { border-color: rgba(61, 220, 151, .45); }
+.score { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; strong { font-family: var(--font-display); font-size: 34px; } }
+.summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px;
+  div { display: flex; flex-direction: column; background: var(--bg-elev); border: 1px solid var(--border); border-radius: 6px; padding: 8px 10px; } }
+.payout { display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 10px; }
+.actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 16px; }
+
+td .tiny { margin: 0 6px; }

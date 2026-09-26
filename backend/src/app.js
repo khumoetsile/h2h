@@ -41,6 +41,7 @@ export function createApp() {
       stakeAmounts: s.stake_amounts,
       stakeBreakdown: s.stake_amounts.map((st) => ({ stake: st, ...computePrize(st, s.platform_fee_percent) })),
       depositPresets: s.deposit_presets,
+      signupBonus: s.signup_bonus,
       maxDeposit: s.max_deposit,
       minWithdrawal: s.min_withdrawal,
       demoBotsEnabled: config.demoBotsEnabled,

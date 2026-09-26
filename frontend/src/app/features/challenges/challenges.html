@@ -1,0 +1,120 @@
+<div class="page">
+  <div class="page-head">
+    <div><h1>Challenges</h1><p class="sub">Call out a specific player. Stakes are only locked once they accept.</p></div>
+  </div>
+
+  <div class="layout">
+    <section class="card new">
+      <div class="row-between"><h2>New challenge</h2><app-demo-badge /></div>
+
+      <mat-form-field>
+        <mat-label>Opponent username</mat-label>
+        <mat-icon matPrefix>alternate_email</mat-icon>
+        <input matInput [(ngModel)]="query" (ngModelChange)="onQuery($event)" [matAutocomplete]="auto" placeholder="e.g. Kabelo" autocomplete="off" />
+        @if (searching()) { <mat-spinner matSuffix diameter="18" /> }
+        <mat-autocomplete #auto="matAutocomplete" (optionSelected)="pickByName($event.option.value)">
+          @for (u of results(); track u.id) {
+            <mat-option [value]="u.username">
+              <div class="opt">
+                <app-avatar [name]="u.username" [color]="u.avatarColor" [size]="26" />
+                <span>&#64;{{ u.username }} <span class="muted small">{{ u.displayName }}</span></span>
+                @if (u.online) { <span class="online">online</span> }
+                @if (u.isBot) { <span class="chip">bot</span> }
+              </div>
+            </mat-option>
+          }
+        </mat-autocomplete>
+      </mat-form-field>
+      @if (query.trim().length > 0 && !searching() && results().length === 0 && !selected()) {
+        <p class="muted small nores">No players found matching "{{ query }}".</p>
+      }
+      @if (selected(); as s) {
+        <div class="picked"><app-avatar [name]="s.username" [color]="s.avatarColor" [size]="32" /><div><strong>&#64;{{ s.username }}</strong><div class="muted tiny">{{ s.displayName }}</div></div>
+          <a class="link small" [routerLink]="['/players', s.username]">View profile</a></div>
+      }
+
+      <label class="lbl">Game</label>
+      <div class="game-pick">
+        @for (g of games(); track g.id) {
+          <button class="gp" [class.selected]="gameId() === g.id" (click)="gameId.set(g.id)" type="button">
+            <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="30" /><span>{{ g.name }}</span>
+          </button>
+        }
+      </div>
+
+      <label class="lbl">Stake</label>
+      <div class="tiles">
+        @for (s of stakes(); track s.stake) {
+          <button type="button" class="tile" [class.selected]="stake() === s.stake" (click)="stake.set(s.stake)" [disabled]="s.stake > available()">{{ s.stake | money }}<small>win {{ s.prize | money }}</small></button>
+        }
+      </div>
+      @if (selectedStake(); as s) {
+        <div class="summary small">
+          <span>Entry <strong class="money">{{ s.stake | money:'demo' }}</strong></span>
+          <span>Potential prize <strong class="money accent">{{ s.prize | money:'demo' }}</strong></span>
+        </div>
+      }
+
+      <mat-form-field>
+        <mat-label>Message (optional)</mat-label>
+        <input matInput [(ngModel)]="message" maxlength="140" placeholder="Think you can beat me?" />
+      </mat-form-field>
+
+      @if (formError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ formError() }}</div> }
+      <button class="btn btn-primary btn-lg btn-block" [disabled]="sending()" (click)="send()">
+        @if (sending()) { <mat-spinner diameter="20" /> } @else { <mat-icon>swords</mat-icon> Send challenge }
+      </button>
+      <p class="muted tiny">Unanswered challenges expire automatically. No funds move until your opponent accepts.</p>
+    </section>
+
+    <section>
+      <div class="segmented tabs">
+        <button [class.active]="tab() === 'incoming'" (click)="tab.set('incoming')">Incoming @if (incoming().length) { <span class="count">{{ incoming().length }}</span> }</button>
+        <button [class.active]="tab() === 'outgoing'" (click)="tab.set('outgoing')">Sent @if (outgoing().length) { <span class="count">{{ outgoing().length }}</span> }</button>
+        <button [class.active]="tab() === 'history'" (click)="tab.set('history')">History</button>
+      </div>
+      <div class="card card-flush">
+        @if (error()) {
+          <app-load-error [message]="error()" (retry)="load()" />
+        } @else if (!challenges()) {
+          <app-skeleton-list [rows]="4" />
+        } @else if (visible().length === 0) {
+          <app-empty icon="swords" [title]="tab() === 'history' ? 'No past challenges' : 'No active challenges'"
+            [text]="tab() === 'incoming' ? 'When someone challenges you it will appear here.' : tab() === 'outgoing' ? 'Challenges you send will appear here.' : 'Accepted, declined and expired challenges appear here.'" />
+        } @else {
+          <div class="list">
+            @for (c of visible(); track c.id) {
+              <div class="list-item ch">
+                @let other = c.direction === 'INCOMING' ? c.challenger : c.opponent;
+                <app-avatar [name]="other.username" [color]="other.avatarColor" [size]="40" />
+                <div class="grow">
+                  @if (c.direction === 'INCOMING') { <div class="t"><a [routerLink]="['/players', c.challenger.username]">{{ c.challenger.username }}</a> challenged you</div> }
+                  @else { <div class="t">You challenged <a [routerLink]="['/players', c.opponent.username]">&#64;{{ c.opponent.username }}</a></div> }
+                  <div class="meta small">
+                    <app-game-icon [slug]="c.game.slug" [color]="c.game.accentColor" [size]="20" /> {{ c.game.name }}
+                    · Entry <strong class="money">{{ c.stake | money:'demo' }}</strong>
+                    · Prize <span class="money accent">{{ c.potentialPrize | money }}</span>
+                  </div>
+                  @if (c.message) { <div class="quote small">“{{ c.message }}”</div> }
+                  <div class="muted tiny">{{ c.createdAt | ago }} @if (c.status === 'PENDING') { · {{ expiresIn(c) }} }</div>
+                </div>
+                <div class="acts">
+                  @if (c.status === 'PENDING' && c.direction === 'INCOMING') {
+                    <button class="btn btn-sm btn-ghost" [disabled]="busy() === c.id" (click)="decline(c)">Decline</button>
+                    <button class="btn btn-sm btn-primary" [disabled]="busy() === c.id" (click)="accept(c)">Accept</button>
+                  } @else if (c.status === 'PENDING') {
+                    <span class="chip">Pending</span>
+                    <button class="btn btn-sm btn-ghost" [disabled]="busy() === c.id" (click)="cancel(c)">Cancel</button>
+                  } @else {
+                    <span class="chip" [class.chip-win]="c.status === 'ACCEPTED'" [class.chip-loss]="c.status === 'DECLINED'">{{ c.status.toLowerCase() }}</span>
+                    @if (c.matchCode) { <a class="btn btn-sm" [routerLink]="['/match', c.matchCode]">View match</a> }
+                  }
+                </div>
+              </div>
+            }
+          </div>
+        }
+      </div>
+    </section>
+  </div>
+</div>

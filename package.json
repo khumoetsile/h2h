@@ -1,0 +1,19 @@
+{
+  "name": "rivalis",
+  "private": true,
+  "description": "Rivalis — peer-to-peer skill gaming platform prototype (DEMO MODE: simulated funds only)",
+  "scripts": {
+    "setup": "npm install && npm --prefix backend install && npm --prefix frontend install && node -e \"require('fs').existsSync('backend/.env')||require('fs').copyFileSync('backend/.env.example','backend/.env')\"",
+    "db:reset": "npm --prefix backend run db:reset",
+    "db:migrate": "npm --prefix backend run migrate",
+    "db:seed": "npm --prefix backend run seed",
+    "dev": "concurrently -n api,web -c yellow,cyan \"npm --prefix backend run dev\" \"npm --prefix frontend start\"",
+    "start:api": "npm --prefix backend start",
+    "start:web": "npm --prefix frontend start",
+    "test": "npm --prefix backend test && npm --prefix frontend test -- --watch=false",
+    "build": "npm --prefix frontend run build"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

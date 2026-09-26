@@ -1,0 +1,92 @@
+<header class="topbar">
+  <div class="topbar-inner">
+    <a class="logo" [routerLink]="auth.homeUrl()">
+      <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path d="M6 26 L13 6 L18 6 L11 26 Z" fill="var(--accent)"/><path d="M15 26 L22 6 L27 6 L20 26 Z" fill="var(--text)"/></svg>
+      <span>{{ brand.name }}</span>
+      @if (auth.isAdmin()) { <span class="chip chip-info admin-tag">Admin</span> }
+    </a>
+
+    <nav class="desktop-nav hide-mobile">
+      @for (item of nav(); track item.link) {
+        <a [routerLink]="item.link" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: !!item.exact }">{{ item.label }}</a>
+      }
+    </nav>
+
+    <div class="spacer"></div>
+
+    @if (!auth.isAdmin() && auth.wallet(); as w) {
+      <a class="wallet-chip" routerLink="/wallet" matTooltip="Demo wallet — no real money">
+        <span class="wc-label">DEMO</span>
+        <span class="wc-amount money">{{ w.available | money }}</span>
+      </a>
+    }
+
+    <button class="icon-btn" [matMenuTriggerFor]="notifMenu" (menuOpened)="loadNotifications()" aria-label="Notifications">
+      <mat-icon>notifications</mat-icon>
+      @if (auth.unread() > 0) { <span class="badge">{{ auth.unread() > 99 ? '99+' : auth.unread() }}</span> }
+    </button>
+
+    @if (auth.user(); as u) {
+      <button class="user-btn" [matMenuTriggerFor]="userMenu" aria-label="Account menu">
+        <app-avatar [name]="u.username" [color]="u.avatarColor" [size]="32" />
+        <mat-icon class="hide-mobile">expand_more</mat-icon>
+      </button>
+    }
+  </div>
+</header>
+
+<mat-menu #notifMenu="matMenu" xPosition="before" class="notif-menu">
+  <div class="notif-panel" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+    <div class="np-head">
+      <strong>Notifications</strong>
+      @if (auth.unread() > 0) { <button class="btn btn-ghost btn-sm" (click)="markAllRead()">Mark all read</button> }
+    </div>
+    @if (loadingNotifications() && notifications().length === 0) {
+      <div class="np-empty">Loading…</div>
+    } @else if (notifications().length === 0) {
+      <div class="np-empty">You're all caught up.</div>
+    } @else {
+      @for (n of notifications(); track n.id) {
+        <button class="np-item" [class.unread]="!n.isRead" (click)="open(n)">
+          <span class="np-dot"></span>
+          <span class="np-body">
+            <span class="np-title">{{ n.title }}</span>
+            <span class="np-msg">{{ n.message }}</span>
+            <span class="np-time">{{ n.createdAt | ago }}</span>
+          </span>
+        </button>
+      }
+    }
+    <a class="np-all" routerLink="/notifications">View all notifications</a>
+  </div>
+</mat-menu>
+
+<mat-menu #userMenu="matMenu" xPosition="before">
+  @if (auth.user(); as u) {
+    <div class="um-head">
+      <strong>{{ u.firstName }} {{ u.lastName }}</strong>
+      <span class="muted small">&#64;{{ u.username }}</span>
+    </div>
+  }
+  <button mat-menu-item routerLink="/profile"><mat-icon>person</mat-icon>Profile</button>
+  @if (!auth.isAdmin()) {
+    <button mat-menu-item routerLink="/matches"><mat-icon>history</mat-icon>Match history</button>
+    <button mat-menu-item routerLink="/wallet/transactions"><mat-icon>receipt_long</mat-icon>Transactions</button>
+    <button mat-menu-item routerLink="/leaderboard"><mat-icon>leaderboard</mat-icon>Leaderboard</button>
+  }
+  <button mat-menu-item routerLink="/notifications"><mat-icon>notifications</mat-icon>Notifications</button>
+  <button mat-menu-item (click)="logout()"><mat-icon>logout</mat-icon>Sign out</button>
+</mat-menu>
+
+<main class="content">
+  <router-outlet />
+</main>
+
+<nav class="bottom-nav hide-desktop">
+  @for (item of bottomNav(); track item.link) {
+    <a [routerLink]="item.link" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: !!item.exact }">
+      <mat-icon>{{ item.icon }}</mat-icon>
+      <span>{{ item.label }}</span>
+    </a>
+  }
+</nav>

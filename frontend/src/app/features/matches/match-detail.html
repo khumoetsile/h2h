@@ -1,0 +1,125 @@
+<div class="page">
+  <a class="back muted small" [routerLink]="auth.isAdmin() ? '/admin/matches' : '/matches'"><mat-icon>arrow_back</mat-icon>{{ auth.isAdmin() ? 'All matches' : 'Match history' }}</a>
+  @if (error()) {
+    <app-load-error [message]="error()" (retry)="load()" />
+  } @else if (!match()) {
+    <app-spinner />
+  } @else {
+    @let m = match()!;
+    <!-- Result banner -->
+    <section class="banner card fade-in"
+      [class.won]="isPlayer() && me()?.outcome === 'WIN'"
+      [class.lost]="isPlayer() && me()?.outcome === 'LOSS'">
+      <div class="banner-top">
+        <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="40" />
+        <div class="grow">
+          <div class="muted small">{{ m.game.name }} · Match ID <strong class="text-2">{{ m.code }}</strong></div>
+          <div class="muted tiny">{{ (m.completedAt || m.cancelledAt || m.createdAt) | date: 'd MMM y, HH:mm' }}</div>
+        </div>
+        <app-match-status [status]="m.status" />
+      </div>
+
+      @if (m.status === 'COMPLETED') {
+        @if (m.isDraw) {
+          <h1 class="headline">Draw</h1>
+          <p class="text-2">{{ m.resultReason }}. Both stakes were refunded.</p>
+        } @else if (isPlayer()) {
+          <div class="winner-label">{{ me()?.outcome === 'WIN' ? 'Winner' : 'Defeat' }}</div>
+          <h1 class="headline">
+            @if (me()?.outcome === 'WIN') { You won <span class="money win">{{ m.prize | money }}</span> <span class="demo">DEMO</span> }
+            @else { &#64;{{ winner()?.username }} won this one }
+          </h1>
+          <p class="text-2">{{ m.resultReason }}</p>
+        } @else {
+          <div class="winner-label">Winner</div>
+          <h1 class="headline">&#64;{{ winner()?.username }} <span class="muted">won</span> <span class="money win">{{ m.prize | money }}</span> <span class="demo">DEMO</span></h1>
+          <p class="text-2">{{ m.resultReason }}</p>
+        }
+      } @else if (m.status === 'CANCELLED') {
+        <h1 class="headline">Match cancelled</h1>
+        <p class="text-2">{{ m.cancelReason }}. All locked stakes were returned to available balances.</p>
+      } @else {
+        <h1 class="headline">Match {{ m.status.toLowerCase().replace('_', ' ') }}</h1>
+      }
+
+      <div class="money-row">
+        <div><span class="muted tiny">STAKE</span><strong class="money">{{ m.stake | money }}</strong></div>
+        <div><span class="muted tiny">POOL</span><strong class="money">{{ m.pool | money }}</strong></div>
+        <div><span class="muted tiny">FEE ({{ m.feePercent }}%)</span><strong class="money">{{ (m.status === 'COMPLETED' && !m.isDraw ? m.fee : 0) | money }}</strong></div>
+        <div><span class="muted tiny">PRIZE</span><strong class="money accent">{{ m.prize | money }}</strong></div>
+        <app-demo-badge label="Demo funds" />
+      </div>
+    </section>
+
+    <!-- Players -->
+    <section class="players">
+      @for (p of [left(), right()]; track $index) {
+        @if (p) {
+          <div class="card player" [class.is-winner]="p.outcome === 'WIN'">
+            <div class="row">
+              <app-avatar [name]="p.username" [color]="p.avatarColor" [size]="44" />
+              <div class="grow">
+                <strong>&#64;{{ p.username }}</strong>@if (p.userId === m.viewerId) { <span class="muted small"> (you)</span> }
+                <div class="muted tiny">{{ p.isBot ? 'Demo opponent (bot)' : p.displayName }}</div>
+              </div>
+              @if (p.outcome === 'WIN') { <span class="chip chip-win"><mat-icon inline>emoji_events</mat-icon> Winner</span> }
+              @else if (p.outcome === 'LOSS') { <span class="chip chip-loss">Loser</span> }
+              @else if (p.outcome === 'DRAW') { <span class="chip chip-info">Draw</span> }
+              @else if (p.outcome === 'REFUNDED') { <span class="chip">Refunded</span> }
+            </div>
+            @if (p.result; as r) {
+              <div class="score">
+                <span class="muted tiny">SCORE</span>
+                <strong class="num">{{ r.score.toLocaleString() }}</strong>
+                @if (!r.valid) { <span class="chip chip-loss">Invalid: {{ r.invalidReason }}</span> }
+              </div>
+              <div class="summary">
+                @for (s of summaryEntries(p); track s.label) {
+                  <div><span class="muted tiny">{{ s.label }}</span><strong class="num">{{ s.value }}</strong></div>
+                }
+              </div>
+            } @else if (m.status === 'COMPLETED') {
+              <p class="muted small">Did not finish — forfeited.</p>
+            }
+            <div class="payout small">
+              <span class="muted">Payout</span>
+              <strong class="money" [class.win]="p.outcome === 'WIN'">{{ p.payout | money:'demo' }}</strong>
+            </div>
+          </div>
+        }
+      }
+    </section>
+
+    @if (rounds().length) {
+      <section class="card card-flush">
+        <div class="card-head"><h3>Round by round</h3><span class="muted small">Identical sequence for both players</span></div>
+        <div class="table-wrap">
+          <table class="table">
+            <thead><tr><th>#</th><th>&#64;{{ left()?.username }}</th><th class="right">&#64;{{ right()?.username }}</th></tr></thead>
+            <tbody>
+              @for (row of rounds(); track row.n) {
+                @let a = roundCell(row.l, m.game.slug);
+                @let b = roundCell(row.r, m.game.slug);
+                <tr>
+                  <td class="muted">{{ row.n }}</td>
+                  <td><span [class.win]="a.ok" [class.loss]="!a.ok && a.main !== '—'">{{ a.main }}</span> <span class="muted tiny">{{ a.sub }}</span></td>
+                  <td class="right"><span class="muted tiny">{{ b.sub }}</span> <span [class.win]="b.ok" [class.loss]="!b.ok && b.main !== '—'">{{ b.main }}</span></td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    }
+
+    @if (isPlayer()) {
+      <div class="actions">
+        <button class="btn btn-primary" (click)="playAgain()"><mat-icon>replay</mat-icon>Play again</button>
+        @if (right() && !right()!.isBot) {
+          <button class="btn" [disabled]="rematching()" (click)="rematch()"><mat-icon>swords</mat-icon>Challenge &#64;{{ right()!.username }} to a rematch</button>
+        }
+        <a class="btn btn-ghost" routerLink="/wallet/transactions"><mat-icon>receipt_long</mat-icon>View transactions</a>
+      </div>
+    }
+  }
+</div>
