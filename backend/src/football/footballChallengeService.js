@@ -195,8 +195,11 @@ function mapFootballChallenge(c, viewerId) {
       homeTeam: c.home_name, awayTeam: c.away_name,
       kickoffAt: c.kickoff_at,
       question: fillQuestion(c.question_template, c.home_short, c.away_short),
+      pickType: c.pick_type,
       creatorPick: c.creator_pick,
       creatorPickLabel: c.creator_pick === 'HOME' ? c.home_short : c.creator_pick === 'AWAY' ? c.away_short : c.creator_pick,
+      homePickLabel: c.home_short || c.home_name,
+      awayPickLabel: c.away_short || c.away_name,
     },
   };
 }
@@ -246,7 +249,7 @@ export async function createFootballChallenge(challengerId, { opponent, fixtureI
 const CHALLENGE_SELECT = `
   SELECT c.*, cu.username AS challenger_username, cu.avatar_color AS challenger_color,
          ou.username AS opponent_username, ou.avatar_color AS opponent_color, m.code AS match_code,
-         ct.question_template, comp.name AS competition_name, fx.kickoff_at,
+         ct.question_template, ct.pick_type, comp.name AS competition_name, fx.kickoff_at,
          ht.name AS home_name, ht.short_name AS home_short, at.name AS away_name, at.short_name AS away_short
   FROM challenges c
   JOIN users cu ON cu.id = c.challenger_id
@@ -271,7 +274,15 @@ export async function getFootballChallenge(id, viewerId) {
   return mapFootballChallenge(c, viewerId);
 }
 
-export async function acceptFootballChallenge(userId, id) {
+/**
+ * Accept a direct football challenge. The opponent's pick is NOT derived —
+ * it must come from the opponent's own request, and the backend
+ * independently validates it (against the challenge type's allowed picks,
+ * and against the creator's pick — the two sides can never match). This is
+ * what makes the challenge genuinely player-vs-player rather than one
+ * player's pick simply being echoed back as the "opponent's" side.
+ */
+export async function acceptFootballChallenge(userId, id, { pick: opponentPick } = {}) {
   const matchId = await withTransaction(async (tx) => {
     const c = await tx.one('SELECT * FROM challenges WHERE id = ? FOR UPDATE', [id]);
     if (!c) throw notFound('Challenge not found.');
@@ -283,6 +294,13 @@ export async function acceptFootballChallenge(userId, id) {
       throw conflict('CHALLENGE_CLOSED', 'This match has already kicked off, so this challenge is no longer available.');
     }
     const type = await tx.one('SELECT * FROM football_challenge_types WHERE id = ?', [c.challenge_type_id]);
+    // The frontend is never trusted here: re-validate the pick server-side
+    // even though the client should already prevent both of these.
+    if (!opponentPick) throw badRequest('PICK_REQUIRED', 'Choose your side before accepting.');
+    validatePick(type, opponentPick);
+    if (opponentPick === c.creator_pick) {
+      throw conflict('SAME_SIDE_NOT_ALLOWED', 'You must take the opposing side to accept this challenge — the challenger already picked that one.');
+    }
     const [challenger, me] = await Promise.all([
       tx.one('SELECT * FROM users WHERE id = ?', [c.challenger_id]),
       tx.one('SELECT username FROM users WHERE id = ?', [userId]),
@@ -297,7 +315,6 @@ export async function acceptFootballChallenge(userId, id) {
     await tx.q('INSERT INTO match_players (match_id, user_id, slot, stake) VALUES (?, ?, 2, ?)', [match.id, userId, c.stake]);
     await tx.q('UPDATE matches SET matched_at = NOW() WHERE id = ?', [match.id]);
     await tx.q(`UPDATE challenges SET status = 'ACCEPTED', responded_at = NOW(), match_id = ? WHERE id = ?`, [match.id, c.id]);
-    const opponentPick = opposite(type.pick_type, c.creator_pick);
     await tx.q(
       `INSERT INTO football_challenges (match_id, fixture_id, challenge_type_id, creator_pick, opponent_pick, cutoff_at) VALUES (?, ?, ?, ?, ?, ?)`,
       [match.id, c.fixture_id, c.challenge_type_id, c.creator_pick, opponentPick, fixture.kickoff_at],
@@ -305,7 +322,7 @@ export async function acceptFootballChallenge(userId, id) {
     await recordAudit(tx, {
       actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_ACCEPTED', entityType: 'CHALLENGE', entityId: c.id,
       challengeId: c.id, matchId: match.id, previousState: 'PENDING', newState: 'ACCEPTED',
-      metadata: { fixtureId: c.fixture_id, opponentPick },
+      metadata: { fixtureId: c.fixture_id, opponentPick, creatorPick: c.creator_pick },
     });
     await notify(tx, c.challenger_id, { type: 'CHALLENGE_ACCEPTED', title: 'Challenge accepted', message: `${me.username} accepted your football challenge. Your match is ready.`, link: `/match/${match.code}` });
     for (const uid of [c.challenger_id, userId]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));

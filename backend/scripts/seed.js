@@ -56,6 +56,8 @@ const FOOTBALL_CHALLENGE_TYPES = [
   { slug: 'more_shots', name: 'Who will have more shots?', question: 'Who will have more shots — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more shots. An equal count is a draw — full refund, no fee.' },
   { slug: 'more_corners', name: 'Who will have more corners?', question: 'Who will win more corners — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more corners. An equal count is a draw — full refund, no fee.' },
   { slug: 'more_cards', name: 'Who gets more cards?', question: 'Which team will receive more cards — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team shown more cards. An equal count is a draw — full refund, no fee.' },
+  { slug: 'more_possession', name: 'Who will have more possession?', question: 'Who will have more possession — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more possession. An equal split is a draw — full refund, no fee.' },
+  { slug: 'more_shots_on_target', name: 'Who will have more shots on target?', question: 'Who will have more shots on target — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more shots on target. An equal count is a draw — full refund, no fee.' },
 ];
 
 const PASSWORD_PLAYER = 'Player123!';
@@ -274,8 +276,9 @@ export async function seed({ log = console.log } = {}) {
     const finished = await tx.q(
       `INSERT INTO football_fixtures
          (provider, provider_fixture_id, competition_id, season, home_team_id, away_team_id, kickoff_at, status, minute,
-          home_score, away_score, home_shots, away_shots, home_corners, away_corners, home_cards, away_cards, first_goal_team, stats_available, is_simulated, last_synced_at)
-       VALUES ('mock', 'seed-demo-finished-1', ?, ?, ?, ?, NOW() - INTERVAL 2 HOUR, 'FINISHED', 90, 2, 1, 14, 9, 7, 4, 1, 2, 'HOME', 1, 1, NOW())`,
+          home_score, away_score, home_shots, away_shots, home_shots_on_target, away_shots_on_target, home_possession, away_possession,
+          home_corners, away_corners, home_cards, away_cards, first_goal_team, stats_available, is_simulated, last_synced_at)
+       VALUES ('mock', 'seed-demo-finished-1', ?, ?, ?, ?, NOW() - INTERVAL 2 HOUR, 'FINISHED', 90, 2, 1, 14, 9, 6, 3, 58, 42, 7, 4, 1, 2, 'HOME', 1, 1, NOW())`,
       [flCompetition.insertId, `${new Date().getUTCFullYear()}`, arsenal, chelsea],
     );
     await tx.q(`INSERT INTO football_events (fixture_id, minute, type, team) VALUES (?, 23, 'GOAL', 'HOME'), (?, 61, 'GOAL', 'AWAY'), (?, 78, 'GOAL', 'HOME')`, [finished.insertId, finished.insertId, finished.insertId]);

@@ -91,9 +91,14 @@ function simulateFinal(seed) {
   for (let i = 0; i < cardCount; i++) {
     cards.push({ minute: rng.int(1, MATCH_MINUTES), team: rng.bool(0.5) ? 'HOME' : 'AWAY', type: rng.bool(0.88) ? 'YELLOW_CARD' : 'RED_CARD' });
   }
+  const homeShots = rng.int(4, 18);
+  const awayShots = rng.int(4, 18);
+  const homePossession = rng.int(35, 65);
   return {
     homeScore, awayScore,
-    homeShots: rng.int(4, 18), awayShots: rng.int(4, 18),
+    homeShots, awayShots,
+    homeShotsOnTarget: rng.int(1, homeShots), awayShotsOnTarget: rng.int(1, awayShots),
+    homePossession, awayPossession: 100 - homePossession,
     homeCorners: rng.int(1, 12), awayCorners: rng.int(1, 12),
     homeCards: cards.filter((c) => c.team === 'HOME').length,
     awayCards: cards.filter((c) => c.team === 'AWAY').length,
@@ -156,7 +161,12 @@ export class MockFootballProvider extends FootballDataProvider {
     if (elapsedMin >= MATCH_MINUTES + 5) {
       return {
         ...base, status: 'FINISHED', minute: 90, homeScore: final.homeScore, awayScore: final.awayScore,
-        stats: { homeShots: final.homeShots, awayShots: final.awayShots, homeCorners: final.homeCorners, awayCorners: final.awayCorners, homeCards: final.homeCards, awayCards: final.awayCards, firstGoalTeam: final.firstGoalTeam },
+        stats: {
+          homeShots: final.homeShots, awayShots: final.awayShots, homeCorners: final.homeCorners, awayCorners: final.awayCorners,
+          homeCards: final.homeCards, awayCards: final.awayCards, firstGoalTeam: final.firstGoalTeam,
+          homeShotsOnTarget: final.homeShotsOnTarget, awayShotsOnTarget: final.awayShotsOnTarget,
+          homePossession: final.homePossession, awayPossession: final.awayPossession,
+        },
         events: final.events,
       };
     }
@@ -172,6 +182,8 @@ export class MockFootballProvider extends FootballDataProvider {
       homeScore: homeScoreSoFar, awayScore: awayScoreSoFar,
       stats: {
         homeShots: Math.round(final.homeShots * progress), awayShots: Math.round(final.awayShots * progress),
+        homeShotsOnTarget: Math.round(final.homeShotsOnTarget * progress), awayShotsOnTarget: Math.round(final.awayShotsOnTarget * progress),
+        homePossession: final.homePossession, awayPossession: final.awayPossession,
         homeCorners: Math.round(final.homeCorners * progress), awayCorners: Math.round(final.awayCorners * progress),
         homeCards: eventsSoFar.filter((e) => e.team === 'HOME' && e.type.endsWith('CARD')).length,
         awayCards: eventsSoFar.filter((e) => e.team === 'AWAY' && e.type.endsWith('CARD')).length,

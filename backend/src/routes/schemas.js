@@ -80,6 +80,10 @@ export const footballChallengeSchema = z.object({
   message: z.string().trim().max(140).optional().nullable(),
 });
 
+export const footballAcceptSchema = z.object({
+  pick: z.enum(['HOME', 'AWAY', 'YES', 'NO'], { error: 'Choose your side before accepting.' }),
+});
+
 export const footballFindSchema = z.object({
   fixtureId: z.coerce.number().int().positive('Choose a match.'),
   challengeTypeSlug: z.string().trim().min(1, 'Choose a challenge type.'),

@@ -31,6 +31,13 @@
           @if (f.isSimulated) { <p class="muted tiny">Simulated demo fixture — for testing only.</p> }
         </div>
 
+        @if (rematchNote()) {
+          <div class="card notice rematch-notice">
+            <mat-icon>swords</mat-icon>
+            <div><strong>Rematch</strong><p class="text-2">{{ rematchNote() }}</p></div>
+          </div>
+        }
+
         @if (closed()) {
           <div class="card notice">
             <mat-icon>lock_clock</mat-icon>

@@ -1,5 +1,6 @@
 import { Component, computed, DestroyRef, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -8,6 +9,7 @@ import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
 import { ConfigStore } from '../../core/config.store';
 import { MatchView } from '../../core/models';
+import { relevantStat } from '../../core/football-stat';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { MoneyPipe } from '../../shared/pipes';
@@ -15,7 +17,7 @@ import { Avatar, GameIcon, LoadError, MatchStatusChip, Spinner } from '../../sha
 
 @Component({
   selector: 'app-match-lobby',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, MatchStatusChip, Spinner],
+  imports: [RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, MatchStatusChip, Spinner],
   templateUrl: './match-lobby.html',
   styleUrl: './match-lobby.scss',
 })
@@ -41,13 +43,20 @@ export class MatchLobbyPage implements OnInit {
     const s = Math.max(0, Math.floor((this.now() - new Date(m.createdAt).getTime()) / 1000));
     return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
   });
+  protected isFootball = computed(() => this.match()?.category === 'FOOTBALL');
+  protected liveStat = computed(() => {
+    const f = this.match()?.football;
+    return f ? relevantStat(f) : null;
+  });
+
   competitionName(c: { name: string; code: string } | string) {
     return typeof c === 'string' ? c : c.name;
   }
-  myPickLabel(m: MatchView) {
+  /** The pick belonging to whichever player `userId` is (creator or opponent) — used to label each side of the versus card. */
+  pickLabelFor(m: MatchView, userId: number) {
     const f = m.football;
     if (!f) return '';
-    return m.createdBy === m.viewerId ? f.creatorPickLabel : (f.opponentPickLabel ?? f.creatorPickLabel);
+    return m.createdBy === userId ? f.creatorPickLabel : (f.opponentPickLabel ?? '');
   }
   protected countdownTo = (iso: string | null) => {
     if (!iso) return '';

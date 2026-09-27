@@ -1,6 +1,9 @@
 .lobby-head { display: flex; align-items: center; gap: 14px; margin-bottom: 16px; .grow { flex: 1; } }
-.football-summary { display: flex; flex-direction: column; gap: 6px; padding: 12px 16px; margin-bottom: 16px; }
-.fs-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; }
+.pick-chip { font-weight: 700; }
+.live-chip { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 6px; }
+.live-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 1.4s infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+.kickoff-icon { font-size: 32px; width: 32px; height: 32px; color: var(--muted); margin-bottom: 4px; }
 .stake-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 16px; margin-bottom: 16px;
   div { display: flex; flex-direction: column; gap: 2px; } strong { font-size: 20px; font-family: var(--font-display); } }
 .state { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 32px 20px; margin-bottom: 16px; }

@@ -3,7 +3,8 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../core/api.service';
-import { Challenge } from '../../core/models';
+import { apiError } from '../../core/api-error';
+import { Challenge, Pick as FootballPick } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
@@ -33,6 +34,9 @@ export class ChallengesPage implements OnInit {
   protected error = signal('');
   protected tab = signal<Tab>('incoming');
   protected busy = signal<number | null>(null);
+  /** The side an incoming football challenge's recipient has tapped, per challenge — nothing is sent until Accept. */
+  protected myPick = signal<Record<number, FootballPick>>({});
+  protected acceptError = signal<Record<number, string>>({});
 
   protected incoming = computed(() => (this.challenges() ?? []).filter((c) => c.direction === 'INCOMING' && c.status === 'PENDING'));
   protected outgoing = computed(() => (this.challenges() ?? []).filter((c) => c.direction === 'OUTGOING' && c.status === 'PENDING'));
@@ -56,14 +60,26 @@ export class ChallengesPage implements OnInit {
     }
   }
 
+  choosePick(c: Challenge, pick: FootballPick) {
+    this.myPick.update((m) => ({ ...m, [c.id]: pick }));
+    this.acceptError.update((m) => ({ ...m, [c.id]: '' }));
+  }
+
   async accept(c: Challenge) {
+    const pick = this.myPick()[c.id];
+    if (c.football && !pick) {
+      this.acceptError.update((m) => ({ ...m, [c.id]: 'Choose your side before accepting.' }));
+      return;
+    }
     this.busy.set(c.id);
+    this.acceptError.update((m) => ({ ...m, [c.id]: '' }));
     try {
-      const { match } = await this.api.post<{ match: { code: string } }>(`/challenges/${c.id}/accept`);
+      const { match } = await this.api.post<{ match: { code: string } }>(`/challenges/${c.id}/accept`, c.football ? { pick } : {});
       this.toast.success('Challenge accepted! Get ready to play.');
       await this.router.navigate(['/match', match.code]);
     } catch (err) {
-      this.toast.error(err);
+      if (c.football) this.acceptError.update((m) => ({ ...m, [c.id]: apiError(err).message }));
+      else this.toast.error(err);
       await this.load(true);
     } finally { this.busy.set(null); }
   }

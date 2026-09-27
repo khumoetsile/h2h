@@ -1,10 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { queryOne } from '../db.js';
-import { ah } from '../utils/errors.js';
+import { ah, badRequest } from '../utils/errors.js';
 import { validate } from '../middleware/validate.js';
 import { requirePlayer } from '../middleware/auth.js';
-import { challengeSchema } from './schemas.js';
+import { challengeSchema, footballAcceptSchema } from './schemas.js';
 import * as svc from '../services/challengeService.js';
 import * as footballSvc from '../football/footballChallengeService.js';
 
@@ -37,7 +37,20 @@ router.get('/:id', ah(async (req, res) => {
 }));
 router.post('/:id/accept', requirePlayer, ah(async (req, res) => {
   const id = idParam(req);
-  const match = (await isFootballChallenge(id)) ? await footballSvc.acceptFootballChallenge(req.user.id, id) : await svc.acceptChallenge(req.user.id, id);
+  let match;
+  if (await isFootballChallenge(id)) {
+    // Validated here (rather than via the static `validate` middleware)
+    // because whether a `pick` body is required depends on the challenge
+    // type, which we only know once we've looked up the row.
+    const parsed = footballAcceptSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      const first = parsed.error.issues[0];
+      throw badRequest('VALIDATION_ERROR', first?.message || 'Choose your side before accepting.', { fields: { pick: first?.message } });
+    }
+    match = await footballSvc.acceptFootballChallenge(req.user.id, id, parsed.data);
+  } else {
+    match = await svc.acceptChallenge(req.user.id, id);
+  }
   res.json({ match });
 }));
 // "decline" and "reject" are the same action — the UI and the wording in

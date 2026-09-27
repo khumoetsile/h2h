@@ -19,15 +19,6 @@
       <app-match-status [status]="m.status" />
     </div>
 
-    @if (m.category === 'FOOTBALL' && m.football) {
-      <div class="card football-summary">
-        <div class="fs-row"><span class="muted small">Your pick</span><strong>{{ myPickLabel(m) }}</strong></div>
-        @if (m.football.fixtureStatus === 'LIVE') {
-          <div class="fs-row"><span class="muted small">Score</span><strong>{{ m.football.homeScore }} – {{ m.football.awayScore }} @if (m.football.minute) { ({{ m.football.minute }}') }</strong></div>
-        }
-      </div>
-    }
-
     <div class="stake-bar card">
       <div><span class="muted tiny">YOUR ENTRY</span><strong class="money">{{ m.stake | money }}</strong></div>
       <div><span class="muted tiny">POTENTIAL PRIZE</span><strong class="money accent">{{ m.prize | money }}</strong></div>
@@ -59,51 +50,82 @@
             <app-avatar [name]="me()?.username ?? ''" [color]="me()?.avatarColor ?? '#3B82F6'" [size]="64" />
             <strong>{{ me()?.username }}</strong>
             <span class="muted small">You</span>
-            <span class="chip" [class.chip-win]="me()?.ready">{{ me()?.submitted ? 'Finished' : me()?.ready ? 'Ready' : 'Not ready' }}</span>
+            @if (isFootball()) {
+              <span class="chip chip-accent pick-chip">{{ pickLabelFor(m, m.viewerId) }}</span>
+            } @else {
+              <span class="chip" [class.chip-win]="me()?.ready">{{ me()?.submitted ? 'Finished' : me()?.ready ? 'Ready' : 'Not ready' }}</span>
+            }
           </div>
           <div class="vs">VS</div>
           <div class="player">
             <app-avatar [name]="opponent()?.username ?? '?'" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="64" />
             <strong>{{ opponent()?.username }}</strong>
             <span class="muted small">{{ opponent()?.isBot ? 'Practice opponent' : 'Opponent' }}</span>
-            <span class="chip" [class.chip-win]="opponent()?.ready">{{ opponent()?.submitted ? 'Finished' : opponent()?.started ? 'Playing' : opponent()?.ready ? 'Ready' : 'Not ready' }}</span>
+            @if (isFootball()) {
+              <span class="chip chip-loss pick-chip">{{ opponent() ? pickLabelFor(m, opponent()!.userId) : '' }}</span>
+            } @else {
+              <span class="chip" [class.chip-win]="opponent()?.ready">{{ opponent()?.submitted ? 'Finished' : opponent()?.started ? 'Playing' : opponent()?.ready ? 'Ready' : 'Not ready' }}</span>
+            }
           </div>
         </section>
 
-        <section class="card state fade-in">
-          @if (m.status === 'MATCHED') {
-            @if (!me()?.ready) {
-              <h2>Opponent found!</h2>
-              <p class="text-2">Tap ready when you're set to play.</p>
-              <div class="actions">
-                <button class="btn btn-primary btn-play" [disabled]="!!busy()" (click)="ready()">
-                  @if (busy() === 'ready') { <mat-spinner diameter="20" /> } @else { <mat-icon>check</mat-icon> } I'm ready
-                </button>
-              </div>
-            } @else {
+        @if (isFootball()) {
+          <section class="card state fade-in">
+            @if (m.football?.fixtureStatus === 'LIVE') {
+              <span class="chip chip-win live-chip"><span class="live-dot"></span>LIVE @if (m.football?.minute) { {{ m.football!.minute }}' }</span>
+              <h2>{{ m.football?.homeScore }} – {{ m.football?.awayScore }}</h2>
+              @if (liveStat(); as stat) {
+                <p class="text-2">{{ stat.label }}: {{ m.football?.homeTeam }} {{ stat.home ?? '–' }} · {{ m.football?.awayTeam }} {{ stat.away ?? '–' }}</p>
+              }
+            } @else if (m.status === 'IN_PROGRESS') {
               <mat-spinner diameter="28" />
-              <h2>Waiting for {{ opponent()?.username }}…</h2>
-            }
-            <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="cancel()">Leave match</button>
-          }
-          @if (m.status === 'READY') {
-            <h2>Both players are ready</h2>
-            <p class="text-2">Good luck!</p>
-            <div class="actions"><button class="btn btn-primary btn-play" (click)="play()"><mat-icon>play_arrow</mat-icon> Start game</button></div>
-            <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="cancel()">Leave match</button>
-          }
-          @if (m.status === 'IN_PROGRESS') {
-            @if (!me()?.submitted) {
-              <h2>Your turn to play</h2>
-              <p class="text-2">{{ me()?.started ? "You've already started — jump back in." : 'Play now before time runs out.' }}</p>
-              <div class="actions"><button class="btn btn-primary btn-play" (click)="play()"><mat-icon>play_arrow</mat-icon> {{ me()?.started ? 'Resume game' : 'Start game' }}</button></div>
+              <h2>Match under way</h2>
+              <p class="text-2">{{ m.football?.homeTeam }} vs {{ m.football?.awayTeam }} has kicked off. We'll settle this challenge automatically once the real match finishes.</p>
             } @else {
-              <mat-spinner diameter="28" />
-              <h2>Nice work — you're done!</h2>
-              <p class="text-2">Waiting for {{ opponent()?.username }} to finish. We'll show your result the moment they're done.</p>
+              <mat-icon class="kickoff-icon">schedule</mat-icon>
+              <h2>Challenge locked — waiting for kickoff</h2>
+              <p class="text-2">Both entries are locked in. {{ m.football?.homeTeam }} vs {{ m.football?.awayTeam }} kicks off {{ m.football?.kickoffAt ? (m.football!.kickoffAt | date: 'EEE d MMM, HH:mm') : 'soon' }}.</p>
             }
-          }
-        </section>
+            @if (m.status !== 'IN_PROGRESS' && m.football?.fixtureStatus !== 'LIVE') {
+              <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="cancel()">Leave challenge</button>
+            }
+          </section>
+        } @else {
+          <section class="card state fade-in">
+            @if (m.status === 'MATCHED') {
+              @if (!me()?.ready) {
+                <h2>Opponent found!</h2>
+                <p class="text-2">Tap ready when you're set to play.</p>
+                <div class="actions">
+                  <button class="btn btn-primary btn-play" [disabled]="!!busy()" (click)="ready()">
+                    @if (busy() === 'ready') { <mat-spinner diameter="20" /> } @else { <mat-icon>check</mat-icon> } I'm ready
+                  </button>
+                </div>
+              } @else {
+                <mat-spinner diameter="28" />
+                <h2>Waiting for {{ opponent()?.username }}…</h2>
+              }
+              <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="cancel()">Leave match</button>
+            }
+            @if (m.status === 'READY') {
+              <h2>Both players are ready</h2>
+              <p class="text-2">Good luck!</p>
+              <div class="actions"><button class="btn btn-primary btn-play" (click)="play()"><mat-icon>play_arrow</mat-icon> Start game</button></div>
+              <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="cancel()">Leave match</button>
+            }
+            @if (m.status === 'IN_PROGRESS') {
+              @if (!me()?.submitted) {
+                <h2>Your turn to play</h2>
+                <p class="text-2">{{ me()?.started ? "You've already started — jump back in." : 'Play now before time runs out.' }}</p>
+                <div class="actions"><button class="btn btn-primary btn-play" (click)="play()"><mat-icon>play_arrow</mat-icon> {{ me()?.started ? 'Resume game' : 'Start game' }}</button></div>
+              } @else {
+                <mat-spinner diameter="28" />
+                <h2>Nice work — you're done!</h2>
+                <p class="text-2">Waiting for {{ opponent()?.username }} to finish. We'll show your result the moment they're done.</p>
+              }
+            }
+          </section>
+        }
       }
     }
     <p class="muted tiny center"><a routerLink="/games" class="link">Back to games</a> · Match {{ m.code }}</p>

@@ -7,6 +7,8 @@ import { MatchView } from '../../core/models';
 import { Toast } from '../../core/toast.service';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, LoadError, Spinner } from '../../shared/ui';
+import { relevantStat } from '../../core/football-stat';
+import { RematchService } from '../../core/rematch.service';
 
 /**
  * The moment right after a game ends. One screen, instantly understandable:
@@ -48,7 +50,15 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
                 }
                 <span>{{ m.football.awayTeam }}</span>
               </div>
-              <p class="muted small">{{ m.football.challengeType?.question }} — you picked <strong>{{ myPick() }}</strong></p>
+              @if (stat(); as s) {
+                <p class="stat-line">{{ s.label }}: {{ m.football.homeTeam }} <strong>{{ s.home ?? '–' }}</strong> · {{ m.football.awayTeam }} <strong>{{ s.away ?? '–' }}</strong></p>
+              }
+              <p class="muted small">{{ m.football.challengeType?.question }}</p>
+              <div class="pvp-recap">
+                <div class="pvp-side"><span class="muted tiny">YOU</span><strong>{{ myPick() }}</strong></div>
+                <div class="pvp-vs">vs</div>
+                <div class="pvp-side"><span class="muted tiny">{{ opponent()?.username ?? 'OPPONENT' }}</span><strong>{{ opponentPick() }}</strong></div>
+              </div>
             </div>
           } @else {
             <div class="vs-row">
@@ -67,7 +77,12 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
           }
 
           <div class="actions">
-            <button class="btn btn-primary btn-lg btn-block" (click)="playAgain()"><mat-icon>replay</mat-icon>Play again</button>
+            @if (isFootball() && opponent() && !opponent()!.isBot) {
+              <button class="btn btn-primary btn-lg btn-block" (click)="rematch()"><mat-icon>swords</mat-icon>Rematch {{ opponent()?.username }}</button>
+              <button class="btn btn-lg btn-block" (click)="playAgain()"><mat-icon>sports_soccer</mat-icon>Back to Football</button>
+            } @else {
+              <button class="btn btn-primary btn-lg btn-block" (click)="playAgain()"><mat-icon>replay</mat-icon>Play again</button>
+            }
             <a class="btn btn-lg btn-block" routerLink="/dashboard"><mat-icon>home</mat-icon>Back home</a>
             <a class="link small" [routerLink]="['/matches', m.code]">View match details</a>
           </div>
@@ -91,9 +106,13 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
     .vs-side { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; color: var(--muted);
       strong { font-family: var(--font-display); font-size: 22px; color: var(--text); } }
     .vs-mid { font-family: var(--font-display); font-weight: 700; color: var(--muted); font-size: 14px; }
-    .football-recap { margin: 22px 0 8px; width: 100%; }
+    .football-recap { margin: 22px 0 8px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
     .fr-teams { display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 700; font-family: var(--font-display); font-size: 18px;
       .num { color: var(--accent); font-size: 22px; } }
+    .stat-line { font-size: 14px; color: var(--text-2); strong { color: var(--text); } }
+    .pvp-recap { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
+    .pvp-side { display: flex; flex-direction: column; align-items: center; gap: 2px; strong { font-family: var(--font-display); font-size: 16px; } }
+    .pvp-vs { color: var(--muted); font-size: 12px; font-weight: 700; }
     .actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 22px; }
   `],
 })
@@ -102,6 +121,7 @@ export class MatchResultPage implements OnInit {
   private api = inject(Api);
   private router = inject(Router);
   private toast = inject(Toast);
+  private rematchSvc = inject(RematchService);
 
   protected match = signal<MatchView | null>(null);
   protected error = signal('');
@@ -115,6 +135,16 @@ export class MatchResultPage implements OnInit {
     const f = m?.football;
     if (!f) return '';
     return m!.createdBy === m!.viewerId ? f.creatorPickLabel : (f.opponentPickLabel ?? f.creatorPickLabel);
+  });
+  protected opponentPick = computed(() => {
+    const m = this.match();
+    const f = m?.football;
+    if (!f) return '';
+    return m!.createdBy === m!.viewerId ? (f.opponentPickLabel ?? '') : f.creatorPickLabel;
+  });
+  protected stat = computed(() => {
+    const f = this.match()?.football;
+    return f ? relevantStat(f) : null;
   });
 
   protected icon = computed(() => {
@@ -165,11 +195,21 @@ export class MatchResultPage implements OnInit {
 
   playAgain() {
     const m = this.match();
-    if (m?.category === 'FOOTBALL' && m.football) {
-      this.router.navigate(['/football', m.football.fixtureId]);
+    if (m?.category === 'FOOTBALL') {
+      // The fixture just played is already kicked off/finished — a rematch
+      // has to be on a new fixture, so this goes to the Football list rather
+      // than back into the same (now closed) fixture.
+      this.router.navigate(['/football']);
       return;
     }
     const slug = m?.game.slug;
     this.router.navigate(slug ? ['/games', slug] : ['/games']);
+  }
+
+  /** Same opponent, a new fixture — pre-fills "Challenge someone" the next time they build a football challenge. */
+  rematch() {
+    const opp = this.opponent();
+    if (opp) this.rematchSvc.setPending({ username: opp.username, avatarColor: opp.avatarColor });
+    this.router.navigate(['/football']);
   }
 }

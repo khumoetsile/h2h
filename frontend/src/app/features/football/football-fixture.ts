@@ -13,6 +13,7 @@ import { FootballChallengeType, FootballFixture, MatchView, Pick as FootballPick
 import { Toast } from '../../core/toast.service';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, LoadError, Spinner } from '../../shared/ui';
+import { RematchService } from '../../core/rematch.service';
 
 /**
  * Fixture detail + challenge builder: pick a question, pick a side, pick an
@@ -35,6 +36,8 @@ export class FootballFixturePage implements OnInit {
   private toast = inject(Toast);
   protected configStore = inject(ConfigStore);
   private destroyRef = inject(DestroyRef);
+  private rematchSvc = inject(RematchService);
+  protected rematchNote = signal<string | null>(null);
 
   protected fixture = signal<FootballFixture | null>(null);
   protected error = signal('');
@@ -78,6 +81,13 @@ export class FootballFixturePage implements OnInit {
   ngOnInit() {
     this.search$.pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe((q) => this.doSearch(q));
     this.load();
+    const rematchTarget = this.rematchSvc.consume();
+    if (rematchTarget) {
+      this.opponent.set({ id: 0, username: rematchTarget.username, displayName: rematchTarget.username, avatarColor: rematchTarget.avatarColor, isBot: false, online: false });
+      this.query = `@${rematchTarget.username}`;
+      this.mode.set('direct');
+      this.rematchNote.set(`Rematch: pick a question and stake to challenge ${rematchTarget.username} again.`);
+    }
   }
 
   async load() {

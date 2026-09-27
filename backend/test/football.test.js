@@ -99,7 +99,7 @@ describe('football: direct challenge -> settlement (WIN)', () => {
     assert.equal(create.status, 201, JSON.stringify(create.body));
     assert.equal((await wallet(A.token)).locked, 0, 'no lock until accepted');
 
-    const accept = await api().post(`/api/challenges/${create.body.challenge.id}/accept`).set(auth(B.token));
+    const accept = await api().post(`/api/challenges/${create.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     assert.equal(accept.status, 200, JSON.stringify(accept.body));
     assert.equal(accept.body.match.status, 'MATCHED');
     assert.equal(accept.body.match.category, 'FOOTBALL');
@@ -153,7 +153,7 @@ describe('football: direct challenge -> settlement (WIN)', () => {
     });
     assert.equal(created.status, 201);
     await query('UPDATE football_fixtures SET kickoff_at = NOW() - INTERVAL 1 MINUTE, status = ? WHERE id = ?', ['LIVE', soon]);
-    const lateAccept = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token));
+    const lateAccept = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'HOME' });
     assert.equal(lateAccept.body.error.code, 'CHALLENGE_CLOSED');
     assert.equal((await wallet(A.token)).locked, 0, 'rejected accept must not lock anything');
   });
@@ -187,7 +187,7 @@ describe('football: draw (no winner => full refund, zero fee)', () => {
     const fixtureId = await makeFixture({ status: 'SCHEDULED', kickoffMs: 2000 });
     const created = await api().post('/api/football/challenges').set(auth(A.token)).send({ opponent: B.user.username, fixtureId, challengeTypeSlug: 'match_winner', pick: 'HOME', stake: 20 });
     assert.equal(created.status, 201, JSON.stringify(created.body));
-    const accept = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token));
+    const accept = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     assert.equal(accept.status, 200, JSON.stringify(accept.body));
     await query(`UPDATE football_fixtures SET status = 'FINISHED', home_score = 1, away_score = 1, kickoff_at = NOW() - INTERVAL 2 HOUR WHERE id = ?`, [fixtureId]);
     await settleMatchesForFixture(fixtureId);
@@ -208,7 +208,7 @@ describe('football: draw (no winner => full refund, zero fee)', () => {
     const B = await newPlayer('cornB');
     const fixtureId = await makeFixture({ status: 'SCHEDULED', kickoffMs: 1000 });
     const created = await api().post('/api/football/challenges').set(auth(A.token)).send({ opponent: B.user.username, fixtureId, challengeTypeSlug: 'more_corners', pick: 'HOME', stake: 5 });
-    const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token));
+    const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     await query(`UPDATE football_fixtures SET status='FINISHED', home_score=1, away_score=0, home_corners=6, away_corners=6, stats_available=1, kickoff_at = NOW() - INTERVAL 1 HOUR WHERE id = ?`, [fixtureId]);
     await settleMatchesForFixture(fixtureId);
     assert.equal((await wallet(A.token)).available, 250);
@@ -225,7 +225,7 @@ describe('football: cancellation and void (no fee, full refund)', () => {
     const B = await newPlayer('pstB');
     const fixtureId = await makeFixture({ status: 'SCHEDULED', kickoffMs: 1000 });
     const created = await api().post('/api/football/challenges').set(auth(A.token)).send({ opponent: B.user.username, fixtureId, challengeTypeSlug: 'match_winner', pick: 'HOME', stake: 20 });
-    const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token));
+    const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     assert.equal((await wallet(A.token)).locked, 20);
     await query(`UPDATE football_fixtures SET status = 'POSTPONED' WHERE id = ?`, [fixtureId]);
     const count = await voidMatchesForFixture(fixtureId, 'the football match was postponed', { toStatus: 'CANCELLED' });
@@ -244,7 +244,7 @@ describe('football: cancellation and void (no fee, full refund)', () => {
     const B = await newPlayer('abnB');
     const fixtureId = await makeFixture({ status: 'SCHEDULED', kickoffMs: 1000 });
     const created = await api().post('/api/football/challenges').set(auth(A.token)).send({ opponent: B.user.username, fixtureId, challengeTypeSlug: 'match_winner', pick: 'HOME', stake: 50 });
-    const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token));
+    const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     await query(`UPDATE matches SET status = 'IN_PROGRESS', started_at = NOW() WHERE id = ?`, [match.body.match.id]);
     await query(`UPDATE football_fixtures SET status = 'ABANDONED' WHERE id = ?`, [fixtureId]);
     await voidMatchesForFixture(fixtureId, 'the football match was abandoned before full time', { toStatus: 'VOID' });
@@ -261,7 +261,7 @@ describe('football: cancellation and void (no fee, full refund)', () => {
     const B = await newPlayer('noStB');
     const fixtureId = await makeFixture({ status: 'SCHEDULED', kickoffMs: 1000 });
     const created = await api().post('/api/football/challenges').set(auth(A.token)).send({ opponent: B.user.username, fixtureId, challengeTypeSlug: 'more_shots', pick: 'HOME', stake: 10 });
-    const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token));
+    const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     // Finished, but this provider run never populated shot statistics.
     await query(`UPDATE football_fixtures SET status = 'FINISHED', home_score = 1, away_score = 0, stats_available = 0, kickoff_at = NOW() - INTERVAL 1 HOUR WHERE id = ?`, [fixtureId]);
     // Kickoff has passed, so in the real pipeline the sync tick would already

@@ -24,6 +24,8 @@ export const SETTLEMENT_RULES = {
   more_shots: (fx) => teamResult(fx.home_shots, fx.away_shots),
   more_corners: (fx) => teamResult(fx.home_corners, fx.away_corners),
   more_cards: (fx) => teamResult(fx.home_cards, fx.away_cards),
+  more_possession: (fx) => teamResult(fx.home_possession, fx.away_possession),
+  more_shots_on_target: (fx) => teamResult(fx.home_shots_on_target, fx.away_shots_on_target),
 
   first_to_score: (fx) => {
     if (!fx.first_goal_team) return { outcome: 'VOID', reason: 'Required match data was not available.' };

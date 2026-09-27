@@ -15,6 +15,7 @@ import { forfeitStake, payWinner, refundStake } from '../services/walletService.
 import { resolveOutcome } from './settlementRules.js';
 import { logSystemError } from '../services/systemErrorService.js';
 import { cancelMatchTx, getMatchView } from '../services/matchService.js';
+import { recordAudit } from '../services/auditService.js';
 
 function emitMatch(tx, matchId, userIds) {
   tx.afterCommit(async () => {
@@ -120,7 +121,17 @@ export async function settleFootballMatch(matchId) {
         await tx.q(`UPDATE match_players SET outcome = 'REFUNDED', payout = stake WHERE id = ?`, [p.id]);
         if (!p.is_bot) await notify(tx, p.user_id, { type: 'MATCH_VOID', title: 'Challenge voided', message: `${matchLabel}: this challenge could not be fairly completed (${decision.reason}). ${formatMoney(m.stake)} DEMO was returned to your balance. No fee was charged.`, link });
       }
-      await tx.q(`INSERT INTO settlements (match_id, reference, outcome, pool, fee_percent, fee_amount, prize, reason) VALUES (?, ?, 'VOID', ?, ?, 0, 0, ?)`, [matchId, matchCode().replace('M-', 'S-'), m.pool, m.fee_percent, decision.reason]);
+      const voidRef = matchCode().replace('M-', 'S-');
+      await tx.q(`INSERT INTO settlements (match_id, reference, outcome, pool, fee_percent, fee_amount, prize, reason) VALUES (?, ?, 'VOID', ?, ?, 0, 0, ?)`, [matchId, voidRef, m.pool, m.fee_percent, decision.reason]);
+      await recordAudit(tx, {
+        actorType: 'SYSTEM', action: 'MATCH_VOID', entityType: 'MATCH', entityId: matchId, matchId,
+        previousState: m.status, newState: 'VOID', reason: decision.reason,
+        metadata: { fixtureId: fc.fixture_id, challengeTypeSlug: fc.type_slug },
+      });
+      await recordAudit(tx, {
+        actorType: 'SYSTEM', action: 'SETTLEMENT_CREATED', entityType: 'SETTLEMENT', entityId: voidRef, matchId,
+        reason: decision.reason, metadata: { outcome: 'VOID', pool: Number(m.pool), feeAmount: 0, prize: 0 },
+      });
       emitMatch(tx, matchId, players.map((p) => p.user_id));
       return true;
     }
@@ -136,7 +147,17 @@ export async function settleFootballMatch(matchId) {
         await tx.q(`UPDATE match_players SET outcome = 'DRAW', payout = stake WHERE id = ?`, [p.id]);
         if (!p.is_bot) await notify(tx, p.user_id, { type: 'MATCH_DRAW', title: 'Match drawn', message: `${matchLabel}: ${decision.reason} Your ${formatMoney(m.stake)} entry was refunded. No platform fee was charged.`, link });
       }
-      await tx.q(`INSERT INTO settlements (match_id, reference, outcome, pool, fee_percent, fee_amount, prize, reason) VALUES (?, ?, 'DRAW', ?, ?, 0, 0, ?)`, [matchId, matchCode().replace('M-', 'S-'), m.pool, m.fee_percent, decision.reason]);
+      const drawRef = matchCode().replace('M-', 'S-');
+      await tx.q(`INSERT INTO settlements (match_id, reference, outcome, pool, fee_percent, fee_amount, prize, reason) VALUES (?, ?, 'DRAW', ?, ?, 0, 0, ?)`, [matchId, drawRef, m.pool, m.fee_percent, decision.reason]);
+      await recordAudit(tx, {
+        actorType: 'SYSTEM', action: 'MATCH_COMPLETED', entityType: 'MATCH', entityId: matchId, matchId,
+        previousState: m.status, newState: 'COMPLETED', reason: decision.reason,
+        metadata: { outcome: 'DRAW', fixtureId: fc.fixture_id, challengeTypeSlug: fc.type_slug },
+      });
+      await recordAudit(tx, {
+        actorType: 'SYSTEM', action: 'SETTLEMENT_CREATED', entityType: 'SETTLEMENT', entityId: drawRef, matchId,
+        reason: decision.reason, metadata: { outcome: 'DRAW', pool: Number(m.pool), feeAmount: 0, prize: 0 },
+      });
       emitMatch(tx, matchId, players.map((p) => p.user_id));
       return true;
     }
@@ -155,7 +176,18 @@ export async function settleFootballMatch(matchId) {
     await tx.q(`UPDATE match_players SET outcome = 'LOSS', payout = 0 WHERE id = ?`, [loserSide.id]);
     if (!winnerSide.is_bot) await notify(tx, winnerSide.user_id, { type: 'MATCH_WON', title: 'Victory!', message: `${matchLabel}: you won ${formatMoney(m.prize)} DEMO. Your pick was correct.`, link });
     if (!loserSide.is_bot) await notify(tx, loserSide.user_id, { type: 'MATCH_LOST', title: 'Match lost', message: `${matchLabel}: ${winnerSide.username} won this challenge. Better luck next time.`, link });
-    await tx.q(`INSERT INTO settlements (match_id, reference, outcome, winner_id, pool, fee_percent, fee_amount, prize, reason) VALUES (?, ?, 'WIN', ?, ?, ?, ?, ?, 'Correct pick')`, [matchId, matchCode().replace('M-', 'S-'), winnerSide.user_id, m.pool, m.fee_percent, m.fee_amount, m.prize]);
+    const winRef = matchCode().replace('M-', 'S-');
+    await tx.q(`INSERT INTO settlements (match_id, reference, outcome, winner_id, pool, fee_percent, fee_amount, prize, reason) VALUES (?, ?, 'WIN', ?, ?, ?, ?, ?, 'Correct pick')`, [matchId, winRef, winnerSide.user_id, m.pool, m.fee_percent, m.fee_amount, m.prize]);
+    await recordAudit(tx, {
+      actorType: 'SYSTEM', action: 'MATCH_COMPLETED', entityType: 'MATCH', entityId: matchId, matchId,
+      previousState: m.status, newState: 'COMPLETED', reason: 'Correct pick',
+      metadata: { outcome: 'WIN', winnerId: winnerSide.user_id, fixtureId: fc.fixture_id, challengeTypeSlug: fc.type_slug },
+    });
+    await recordAudit(tx, {
+      actorType: 'SYSTEM', action: 'SETTLEMENT_CREATED', entityType: 'SETTLEMENT', entityId: winRef, matchId,
+      reason: 'Correct pick',
+      metadata: { outcome: 'WIN', winnerId: winnerSide.user_id, pool: Number(m.pool), feePercent: Number(m.fee_percent), feeAmount: Number(m.fee_amount), prize: Number(m.prize) },
+    });
     emitMatch(tx, matchId, players.map((p) => p.user_id));
     return true;
   });

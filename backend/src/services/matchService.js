@@ -550,6 +550,8 @@ export async function loadFootballSummary(matchId) {
   const row = await queryOne(
     `SELECT fc.creator_pick, fc.opponent_pick, ct.slug AS type_slug, ct.name AS type_name, ct.question_template, ct.pick_type,
             fx.id AS fixture_id, fx.kickoff_at, fx.status AS fixture_status, fx.minute, fx.home_score, fx.away_score,
+            fx.home_shots, fx.away_shots, fx.home_shots_on_target, fx.away_shots_on_target,
+            fx.home_possession, fx.away_possession, fx.home_corners, fx.away_corners, fx.home_cards, fx.away_cards,
             comp.name AS competition_name, comp.code AS competition_code,
             ht.name AS home_team, ht.short_name AS home_team_short, at.name AS away_team, at.short_name AS away_team_short
      FROM football_challenges fc
@@ -573,6 +575,16 @@ export async function loadFootballSummary(matchId) {
     homeTeam: row.home_team, awayTeam: row.away_team,
     kickoffAt: row.kickoff_at, fixtureStatus: row.fixture_status, minute: row.minute,
     homeScore: row.home_score, awayScore: row.away_score,
+    // Whatever the fixture doesn't have yet is simply null here — these
+    // columns are only ever populated once the fixture is LIVE/FINISHED, so
+    // this can never leak a stat before it's fair for players to see it.
+    stats: {
+      shots: { home: row.home_shots, away: row.away_shots },
+      shotsOnTarget: { home: row.home_shots_on_target, away: row.away_shots_on_target },
+      possession: { home: row.home_possession, away: row.away_possession },
+      corners: { home: row.home_corners, away: row.away_corners },
+      cards: { home: row.home_cards, away: row.away_cards },
+    },
     challengeType: { slug: row.type_slug, name: row.type_name, question: row.question_template.replace('{home}', row.home_team_short || row.home_team).replace('{away}', row.away_team_short || row.away_team), pickType: row.pick_type },
     creatorPick: row.creator_pick, creatorPickLabel: pickLabel(row.creator_pick),
     opponentPick: row.opponent_pick, opponentPickLabel: row.opponent_pick ? pickLabel(row.opponent_pick) : null,

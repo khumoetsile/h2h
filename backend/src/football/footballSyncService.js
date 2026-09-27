@@ -56,20 +56,26 @@ async function upsertFixture(provider, competitionRow, fx) {
   await query(
     `INSERT INTO football_fixtures
        (provider, provider_fixture_id, competition_id, season, home_team_id, away_team_id, kickoff_at, status, minute,
-        home_score, away_score, home_shots, away_shots, home_corners, away_corners, home_cards, away_cards,
+        home_score, away_score, home_shots, away_shots, home_shots_on_target, away_shots_on_target,
+        home_possession, away_possession, home_corners, away_corners, home_cards, away_cards,
         first_goal_team, stats_available, is_simulated, last_synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE
        kickoff_at = VALUES(kickoff_at), status = VALUES(status), minute = VALUES(minute),
        home_score = VALUES(home_score), away_score = VALUES(away_score),
        home_shots = VALUES(home_shots), away_shots = VALUES(away_shots),
+       home_shots_on_target = VALUES(home_shots_on_target), away_shots_on_target = VALUES(away_shots_on_target),
+       home_possession = VALUES(home_possession), away_possession = VALUES(away_possession),
        home_corners = VALUES(home_corners), away_corners = VALUES(away_corners),
        home_cards = VALUES(home_cards), away_cards = VALUES(away_cards),
        first_goal_team = VALUES(first_goal_team), stats_available = VALUES(stats_available),
        last_synced_at = NOW()`,
     [
       provider.name, fx.providerId, competitionRow.id, fx.season, homeId, awayId, new Date(fx.kickoffAt), fx.status, fx.minute,
-      fx.homeScore, fx.awayScore, fx.stats.homeShots ?? null, fx.stats.awayShots ?? null, fx.stats.homeCorners ?? null, fx.stats.awayCorners ?? null,
+      fx.homeScore, fx.awayScore, fx.stats.homeShots ?? null, fx.stats.awayShots ?? null,
+      fx.stats.homeShotsOnTarget ?? null, fx.stats.awayShotsOnTarget ?? null,
+      fx.stats.homePossession ?? null, fx.stats.awayPossession ?? null,
+      fx.stats.homeCorners ?? null, fx.stats.awayCorners ?? null,
       fx.stats.homeCards ?? null, fx.stats.awayCards ?? null, fx.stats.firstGoalTeam ?? null, fx.statsAvailable ? 1 : 0, isSimulated,
     ],
   );

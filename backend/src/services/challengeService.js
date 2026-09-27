@@ -13,6 +13,35 @@ import { recordAudit } from './auditService.js';
 
 const PENDING_LIMIT = 10;
 
+const fillQuestion = (template, home, away) => template.replace('{home}', home).replace('{away}', away);
+
+/**
+ * Football challenges live in this same `challenges` table (fixture_id,
+ * challenge_type_id, creator_pick columns), so the generic list/detail
+ * endpoints must surface the football fields too — otherwise a football
+ * challenge's recipient never sees the question or gets to pick their side.
+ */
+function footballFieldsFor(c) {
+  if (!c.fixture_id) return undefined;
+  const pickLabel = (pick) => {
+    if (pick === 'HOME') return c.home_short || c.home_name;
+    if (pick === 'AWAY') return c.away_short || c.away_name;
+    return pick;
+  };
+  return {
+    fixtureId: c.fixture_id,
+    competition: c.competition_name,
+    homeTeam: c.home_name, awayTeam: c.away_name,
+    kickoffAt: c.kickoff_at,
+    question: fillQuestion(c.question_template, c.home_short, c.away_short),
+    pickType: c.pick_type,
+    creatorPick: c.creator_pick,
+    creatorPickLabel: pickLabel(c.creator_pick),
+    homePickLabel: c.home_short || c.home_name,
+    awayPickLabel: c.away_short || c.away_name,
+  };
+}
+
 export function mapChallenge(c, viewerId) {
   return {
     id: c.id,
@@ -30,18 +59,26 @@ export function mapChallenge(c, viewerId) {
     respondedAt: c.responded_at,
     createdAt: c.created_at,
     isDemo: true,
+    football: footballFieldsFor(c),
   };
 }
 
 const SELECT = `
   SELECT c.*, cu.username AS challenger_username, cu.avatar_color AS challenger_color,
          ou.username AS opponent_username, ou.avatar_color AS opponent_color,
-         g.slug AS game_slug, g.name AS game_name, g.accent_color, m.code AS match_code
+         g.slug AS game_slug, g.name AS game_name, g.accent_color, m.code AS match_code,
+         ct.question_template, ct.pick_type, comp.name AS competition_name, fx.kickoff_at,
+         ht.name AS home_name, ht.short_name AS home_short, at.name AS away_name, at.short_name AS away_short
   FROM challenges c
   JOIN users cu ON cu.id = c.challenger_id
   JOIN users ou ON ou.id = c.opponent_id
   JOIN games g ON g.id = c.game_id
-  LEFT JOIN matches m ON m.id = c.match_id`;
+  LEFT JOIN matches m ON m.id = c.match_id
+  LEFT JOIN football_challenge_types ct ON ct.id = c.challenge_type_id
+  LEFT JOIN football_fixtures fx ON fx.id = c.fixture_id
+  LEFT JOIN football_competitions comp ON comp.id = fx.competition_id
+  LEFT JOIN football_teams ht ON ht.id = fx.home_team_id
+  LEFT JOIN football_teams at ON at.id = fx.away_team_id`;
 
 async function withPrize(rows) {
   const { platform_fee_percent: fee } = await getSettings();

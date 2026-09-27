@@ -88,6 +88,13 @@ export interface FootballMatchInfo {
   minute?: number | null;
   homeScore?: number | null;
   awayScore?: number | null;
+  stats?: {
+    shots: { home: number | null; away: number | null };
+    shotsOnTarget: { home: number | null; away: number | null };
+    possession: { home: number | null; away: number | null };
+    corners: { home: number | null; away: number | null };
+    cards: { home: number | null; away: number | null };
+  };
   challengeType?: { slug: string; name: string; question: string; pickType: PickType };
   questionName?: string;
   creatorPick: Pick;
@@ -204,7 +211,8 @@ export interface Challenge {
   createdAt: string;
   football?: {
     fixtureId: number; competition: string; homeTeam: string; awayTeam: string; kickoffAt: string;
-    question: string; creatorPick: Pick; creatorPickLabel: string;
+    question: string; pickType: PickType; creatorPick: Pick; creatorPickLabel: string;
+    homePickLabel: string; awayPickLabel: string;
   };
 }
 

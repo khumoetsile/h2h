@@ -38,7 +38,36 @@
                   · <span class="money">{{ c.stake | money }}</span> entry
                   · win <span class="money accent">{{ c.potentialPrize | money }}</span>
                 </div>
-                <div class="muted small">{{ c.football.question }} — picked <strong>{{ c.football.creatorPickLabel }}</strong></div>
+                <div class="muted small">{{ c.football.question }}</div>
+                <div class="pvp-line small">
+                  <span class="muted">{{ c.direction === 'OUTGOING' ? 'Your pick' : c.challenger.username + '\'s pick' }}</span>
+                  <strong class="pvp-pick opp-pick">{{ c.football.creatorPickLabel }}</strong>
+                </div>
+                @if (c.status === 'PENDING' && c.direction === 'INCOMING') {
+                  <div class="choose-side">
+                    <span class="muted small">Choose your side</span>
+                    <div class="side-tiles">
+                      @if (c.football.pickType === 'TEAM') {
+                        <button type="button" class="side-tile" [class.selected]="myPick()[c.id] === 'HOME'" [disabled]="c.football.creatorPick === 'HOME'" (click)="choosePick(c, 'HOME')">
+                          {{ c.football.homePickLabel }}
+                          @if (c.football.creatorPick === 'HOME') { <span class="taken tiny">taken</span> }
+                        </button>
+                        <button type="button" class="side-tile" [class.selected]="myPick()[c.id] === 'AWAY'" [disabled]="c.football.creatorPick === 'AWAY'" (click)="choosePick(c, 'AWAY')">
+                          {{ c.football.awayPickLabel }}
+                          @if (c.football.creatorPick === 'AWAY') { <span class="taken tiny">taken</span> }
+                        </button>
+                      } @else {
+                        <button type="button" class="side-tile" [class.selected]="myPick()[c.id] === 'YES'" [disabled]="c.football.creatorPick === 'YES'" (click)="choosePick(c, 'YES')">
+                          Yes @if (c.football.creatorPick === 'YES') { <span class="taken tiny">taken</span> }
+                        </button>
+                        <button type="button" class="side-tile" [class.selected]="myPick()[c.id] === 'NO'" [disabled]="c.football.creatorPick === 'NO'" (click)="choosePick(c, 'NO')">
+                          No @if (c.football.creatorPick === 'NO') { <span class="taken tiny">taken</span> }
+                        </button>
+                      }
+                    </div>
+                    @if (acceptError()[c.id]) { <div class="form-error tiny"><mat-icon>error</mat-icon>{{ acceptError()[c.id] }}</div> }
+                  </div>
+                }
               } @else {
                 <div class="meta small">
                   <app-game-icon [slug]="c.game.slug" [color]="c.game.accentColor" [size]="20" /> {{ c.game.name }}
@@ -52,7 +81,7 @@
             <div class="acts">
               @if (c.status === 'PENDING' && c.direction === 'INCOMING') {
                 <button class="btn btn-sm btn-ghost" [disabled]="busy() === c.id" (click)="decline(c)">Decline</button>
-                <button class="btn btn-sm btn-primary" [disabled]="busy() === c.id" (click)="accept(c)">Accept</button>
+                <button class="btn btn-sm btn-primary" [disabled]="busy() === c.id || (!!c.football && !myPick()[c.id])" (click)="accept(c)">Accept</button>
               } @else if (c.status === 'PENDING') {
                 <button class="btn btn-sm btn-ghost" [disabled]="busy() === c.id" (click)="cancel(c)">Cancel</button>
               } @else {
