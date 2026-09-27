@@ -169,12 +169,16 @@ export function payWinner(tx, userId, match, gameName) {
   });
 }
 
-/** Loser: locked stake goes to the pool (no ledger row; GAME_ENTRY already recorded the debit). */
+/** Loser: locked stake is forfeited to the pool. Still gets its own ledger row and idempotency key — every wallet mutation must be independently traceable and safe to retry. */
 export function forfeitStake(tx, userId, match) {
-  return applyMovement(tx, userId, { lockedDelta: -toCents(match.stake) });
+  return applyMovement(tx, userId, {
+    lockedDelta: -toCents(match.stake), type: 'FORFEIT', direction: 'DEBIT', amount: match.stake,
+    description: 'Stake forfeited — lost to the pool', matchId: match.id,
+    idempotencyKey: `match:${match.id}:forfeit:${userId}`,
+  });
 }
 
-const TX_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND'];
+const TX_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT'];
 
 export async function listTransactions({ userId = null, type, from, to, search, page = 1, pageSize = 20 }) {
   const where = [];

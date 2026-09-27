@@ -28,7 +28,7 @@ export interface Wallet {
   updatedAt: string;
 }
 
-export type TxType = 'DEPOSIT' | 'WITHDRAWAL' | 'GAME_ENTRY' | 'GAME_WIN' | 'REFUND';
+export type TxType = 'DEPOSIT' | 'WITHDRAWAL' | 'GAME_ENTRY' | 'GAME_WIN' | 'REFUND' | 'FORFEIT';
 
 export interface Transaction {
   id: number;

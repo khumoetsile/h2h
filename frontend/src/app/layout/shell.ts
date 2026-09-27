@@ -31,6 +31,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Transactions', icon: 'receipt_long', link: '/admin/transactions' },
   { label: 'Challenges', icon: 'swords', link: '/admin/challenges' },
   { label: 'Games', icon: 'toggle_on', link: '/admin/games' },
+  { label: 'Audit trail', icon: 'history', link: '/admin/audit' },
   { label: 'Settings', icon: 'tune', link: '/admin/settings' },
 ];
 const ADMIN_BOTTOM = ['/admin', '/admin/users', '/admin/matches', '/admin/transactions', '/admin/settings'];

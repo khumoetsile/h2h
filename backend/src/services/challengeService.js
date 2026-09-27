@@ -9,6 +9,7 @@ import { getSettings } from './settingsService.js';
 import { notify } from './notificationService.js';
 import { createMatchTx, getMatchView, ACTIVE_STATUSES } from './matchService.js';
 import { lockStake } from './walletService.js';
+import { recordAudit } from './auditService.js';
 
 const PENDING_LIMIT = 10;
 
@@ -109,6 +110,10 @@ export async function createChallenge(challengerId, { opponent, gameId, stake, m
       link: '/challenges',
     });
     tx.afterCommit(() => emitToUser(opp.id, 'challenge:update', { id: res.insertId }));
+    await recordAudit(tx, {
+      actorType: 'PLAYER', actorUserId: challengerId, action: 'CHALLENGE_CREATED', entityType: 'CHALLENGE', entityId: res.insertId,
+      challengeId: res.insertId, newState: 'PENDING', metadata: { opponentId: opp.id, gameId, stake },
+    });
     return res.insertId;
   });
   return getChallenge(id, challengerId);
@@ -155,6 +160,10 @@ export async function acceptChallenge(userId, id) {
     await tx.q('INSERT INTO match_players (match_id, user_id, slot, stake) VALUES (?, ?, 2, ?)', [match.id, userId, c.stake]);
     await tx.q('UPDATE matches SET matched_at = NOW() WHERE id = ?', [match.id]);
     await tx.q(`UPDATE challenges SET status = 'ACCEPTED', responded_at = NOW(), match_id = ? WHERE id = ?`, [match.id, c.id]);
+    await recordAudit(tx, {
+      actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_ACCEPTED', entityType: 'CHALLENGE', entityId: c.id,
+      challengeId: c.id, matchId: match.id, previousState: 'PENDING', newState: 'ACCEPTED',
+    });
     await notify(tx, c.challenger_id, {
       type: 'CHALLENGE_ACCEPTED',
       title: 'Challenge accepted',
@@ -173,6 +182,10 @@ export async function declineChallenge(userId, id) {
     if (c.opponent_id !== userId) throw forbidden('Only the challenged player can decline.');
     assertPending(c);
     await tx.q(`UPDATE challenges SET status = 'DECLINED', responded_at = NOW() WHERE id = ?`, [c.id]);
+    await recordAudit(tx, {
+      actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_DECLINED', entityType: 'CHALLENGE', entityId: c.id,
+      challengeId: c.id, previousState: 'PENDING', newState: 'DECLINED',
+    });
     const [me, game] = await Promise.all([
       tx.one('SELECT username FROM users WHERE id = ?', [userId]),
       tx.one('SELECT name FROM games WHERE id = ?', [c.game_id]),
@@ -189,6 +202,10 @@ export async function cancelChallenge(userId, id) {
     if (c.challenger_id !== userId) throw forbidden('Only the challenger can cancel this challenge.');
     assertPending(c);
     await tx.q(`UPDATE challenges SET status = 'CANCELLED', responded_at = NOW() WHERE id = ?`, [c.id]);
+    await recordAudit(tx, {
+      actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_CANCELLED', entityType: 'CHALLENGE', entityId: c.id,
+      challengeId: c.id, previousState: 'PENDING', newState: 'CANCELLED',
+    });
     for (const uid of [c.challenger_id, c.opponent_id]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));
   });
   return getChallenge(id, userId);
@@ -203,6 +220,10 @@ export async function expireChallenges() {
       const c = await tx.one(`SELECT c.*, g.name AS game_name, ou.username AS opp FROM challenges c JOIN games g ON g.id = c.game_id JOIN users ou ON ou.id = c.opponent_id WHERE c.id = ? FOR UPDATE`, [id]);
       if (!c || c.status !== 'PENDING') return;
       await tx.q(`UPDATE challenges SET status = 'EXPIRED' WHERE id = ?`, [id]);
+      await recordAudit(tx, {
+        actorType: 'SYSTEM', action: 'CHALLENGE_EXPIRED', entityType: 'CHALLENGE', entityId: id,
+        challengeId: id, previousState: 'PENDING', newState: 'EXPIRED', reason: 'no response before expiry',
+      });
       await notify(tx, c.challenger_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `Your ${c.game_name} challenge to ${c.opp} expired without a response.`, link: '/challenges' });
     });
   }

@@ -27,7 +27,7 @@ router.post('/login', limiter, validate(loginSchema), ah(async (req, res) => {
 }));
 
 router.post('/logout', requireAuth, ah(async (req, res) => {
-  await auth.logout(req.user.sessionId);
+  await auth.logout(req.user.sessionId, req.user.id);
   res.json({ ok: true });
 }));
 

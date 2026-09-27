@@ -18,6 +18,7 @@ import { createRng } from '../games/rng.js';
 import { getSettings } from './settingsService.js';
 import { notify } from './notificationService.js';
 import { forfeitStake, houseBotFloat, lockStake, payWinner, refundStake } from './walletService.js';
+import { recordAudit } from './auditService.js';
 import { config } from '../config.js';
 
 export const ACTIVE_STATUSES = ['WAITING', 'MATCHED', 'READY', 'IN_PROGRESS'];
@@ -92,6 +93,11 @@ export async function createMatchTx(tx, userId, gameId, stake, { source = 'MATCH
   const match = { id: res.insertId, code, stake: amount, prize, fee_percent: feePercent };
   await lockStake(tx, userId, match, game.name);
   await tx.q('INSERT INTO match_players (match_id, user_id, slot, stake) VALUES (?, ?, 1, ?)', [match.id, userId, amount]);
+  await recordAudit(tx, {
+    actorType: 'PLAYER', actorUserId: userId, action: 'MATCH_CREATED', entityType: 'MATCH', entityId: match.id,
+    matchId: match.id, newState: status, reason: source,
+    metadata: { code, gameId: game.id, gameSlug: game.slug, category, stake: amount, feePercent, source },
+  });
   return { match, game };
 }
 
@@ -117,9 +123,13 @@ export async function joinLockedMatch(tx, m, userId, { autoReady = false } = {})
   await tx.q('INSERT INTO match_players (match_id, user_id, slot, stake, ready_at) VALUES (?, ?, 2, ?, ?)', [m.id, userId, m.stake, autoReady ? new Date() : null]);
   await tx.q(`UPDATE matches SET status = 'MATCHED', matched_at = NOW() WHERE id = ?`, [m.id]);
   const [creator, joiner] = await Promise.all([
-    tx.one('SELECT username FROM users WHERE id = ?', [m.created_by]),
-    tx.one('SELECT username FROM users WHERE id = ?', [userId]),
+    tx.one('SELECT username, is_bot FROM users WHERE id = ?', [m.created_by]),
+    tx.one('SELECT username, is_bot FROM users WHERE id = ?', [userId]),
   ]);
+  await recordAudit(tx, {
+    actorType: joiner.is_bot ? 'BOT' : 'PLAYER', actorUserId: userId, action: 'MATCH_JOINED', entityType: 'MATCH', entityId: m.id,
+    matchId: m.id, previousState: 'WAITING', newState: 'MATCHED',
+  });
   const link = `/match/${m.code}`;
   await notify(tx, m.created_by, { type: 'MATCH_FOUND', title: 'Opponent found', message: `${joiner.username} joined your ${game.name} match. Get ready!`, link });
   await notify(tx, userId, { type: 'MATCH_FOUND', title: 'Match found', message: `You're up against ${creator.username} in ${game.name}.`, link });
@@ -228,10 +238,14 @@ export async function setReady(userId, matchIdOrCode) {
     assertNotFinished(m);
     if (m.status === 'WAITING') throw conflict('OPPONENT_UNAVAILABLE', 'Still waiting for an opponent to join.');
     if (m.status !== 'MATCHED') return m.id; // already READY / IN_PROGRESS: idempotent
-    if (!me.ready_at) await tx.q('UPDATE match_players SET ready_at = NOW() WHERE id = ?', [me.id]);
+    if (!me.ready_at) {
+      await tx.q('UPDATE match_players SET ready_at = NOW() WHERE id = ?', [me.id]);
+      await recordAudit(tx, { actorType: me.is_bot ? 'BOT' : 'PLAYER', actorUserId: userId, action: 'PLAYER_READY', entityType: 'MATCH', entityId: m.id, matchId: m.id });
+    }
     const allReady = players.every((p) => p.id === me.id || p.ready_at);
     if (allReady && players.length === 2) {
       await tx.q(`UPDATE matches SET status = 'READY', ready_at = NOW() WHERE id = ?`, [m.id]);
+      await recordAudit(tx, { actorType: 'SYSTEM', action: 'MATCH_READY', entityType: 'MATCH', entityId: m.id, matchId: m.id, previousState: 'MATCHED', newState: 'READY' });
       for (const p of players) {
         if (!p.is_bot) await notify(tx, p.user_id, { type: 'MATCH_STARTING', title: 'Your match is starting', message: `${m.game_name} is ready. Good luck!`, link: `/match/${m.code}` });
       }
@@ -253,9 +267,13 @@ export async function startMatch(userId, matchIdOrCode) {
     if (me.submitted_at) throw conflict('ALREADY_SUBMITTED', 'You have already played this match. Waiting for your opponent.');
     const engine = getEngine(m.game_slug);
     const startedAt = me.started_at || new Date();
-    if (!me.started_at) await tx.q('UPDATE match_players SET started_at = ? WHERE id = ?', [startedAt, me.id]);
+    if (!me.started_at) {
+      await tx.q('UPDATE match_players SET started_at = ? WHERE id = ?', [startedAt, me.id]);
+      await recordAudit(tx, { actorType: me.is_bot ? 'BOT' : 'PLAYER', actorUserId: userId, action: 'GAMEPLAY_STARTED', entityType: 'MATCH', entityId: m.id, matchId: m.id });
+    }
     if (m.status === 'READY') {
       await tx.q(`UPDATE matches SET status = 'IN_PROGRESS', started_at = NOW() WHERE id = ?`, [m.id]);
+      await recordAudit(tx, { actorType: 'SYSTEM', action: 'MATCH_STARTED', entityType: 'MATCH', entityId: m.id, matchId: m.id, previousState: 'READY', newState: 'IN_PROGRESS' });
       // House bots play as soon as the match goes live.
       for (const p of players) if (p.is_bot && !p.submitted_at) await submitBotResult(tx, m, p);
     }
@@ -285,6 +303,10 @@ async function submitBotResult(tx, m, p) {
     [m.id, p.user_id, scored.score, scored.tiebreak, JSON.stringify(scored.summary), JSON.stringify(scored.rounds)],
   );
   await tx.q('UPDATE match_players SET started_at = NOW(), submitted_at = NOW() WHERE id = ?', [p.id]);
+  await recordAudit(tx, {
+    actorType: 'BOT', actorUserId: p.user_id, action: 'ANSWER_SUBMITTED', entityType: 'GAME_RESULT', entityId: m.id,
+    matchId: m.id, metadata: { score: scored.score, valid: true },
+  });
 }
 
 /**
@@ -322,6 +344,11 @@ export async function submitResult(userId, matchIdOrCode, body) {
       [m.id, userId, valid ? scored.score : 0, valid ? scored.tiebreak : -2147483647, valid ? 1 : 0, invalidReason, JSON.stringify(scored.summary), JSON.stringify(scored.rounds), clientElapsed, serverElapsed],
     );
     await tx.q('UPDATE match_players SET submitted_at = NOW() WHERE id = ?', [me.id]);
+    await recordAudit(tx, {
+      actorType: 'PLAYER', actorUserId: userId, action: valid ? 'ANSWER_SUBMITTED' : 'ANSWER_REJECTED', entityType: 'GAME_RESULT', entityId: m.id,
+      matchId: m.id, reason: valid ? null : invalidReason,
+      metadata: { score: valid ? scored.score : 0, valid, invalidReason, serverElapsedMs: serverElapsed },
+    });
     const others = players.filter((p) => p.id !== me.id);
     if (others.every((p) => p.submitted_at)) {
       await finalizeMatch(tx, m.id);
@@ -340,7 +367,7 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
     'SELECT m.*, g.name AS game_name FROM matches m JOIN games g ON g.id = m.game_id WHERE m.id = ? FOR UPDATE',
     [matchId],
   );
-  if (!m || m.settled_at || m.status === 'COMPLETED' || m.status === 'CANCELLED') return false;
+  if (!m || m.settled_at || m.status === 'COMPLETED' || m.status === 'CANCELLED' || m.status === 'VOID') return false;
   const players = await tx.q('SELECT mp.*, u.username, u.is_bot FROM match_players mp JOIN users u ON u.id = mp.user_id WHERE match_id = ? ORDER BY slot', [matchId]);
   const results = await tx.q('SELECT * FROM game_results WHERE match_id = ?', [matchId]);
   const byUser = Object.fromEntries(results.map((r) => [r.user_id, r]));
@@ -363,11 +390,25 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
     [winner ? winner.user_id : null, winner ? 0 : 1, resultReason, matchId],
   );
   if (upd.affectedRows !== 1) return false;
+  const settlementReference = matchCode().replace('M-', 'S-');
   await tx.q(
     `INSERT INTO settlements (match_id, reference, outcome, winner_id, pool, fee_percent, fee_amount, prize, reason)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [matchId, matchCode().replace('M-', 'S-'), winner ? 'WIN' : 'DRAW', winner ? winner.user_id : null, m.pool, m.fee_percent, winner ? m.fee_amount : 0, winner ? m.prize : 0, resultReason],
+    [matchId, settlementReference, winner ? 'WIN' : 'DRAW', winner ? winner.user_id : null, m.pool, m.fee_percent, winner ? m.fee_amount : 0, winner ? m.prize : 0, resultReason],
   );
+  await recordAudit(tx, {
+    actorType: 'SYSTEM', action: 'MATCH_COMPLETED', entityType: 'MATCH', entityId: matchId, matchId,
+    previousState: m.status, newState: 'COMPLETED', reason: resultReason,
+    metadata: { outcome: winner ? 'WIN' : 'DRAW', winnerId: winner ? winner.user_id : null, forfeited: !!forfeitUserId },
+  });
+  await recordAudit(tx, {
+    actorType: 'SYSTEM', action: 'SETTLEMENT_CREATED', entityType: 'SETTLEMENT', entityId: settlementReference, matchId,
+    reason: resultReason,
+    metadata: {
+      outcome: winner ? 'WIN' : 'DRAW', pool: Number(m.pool), feePercent: Number(m.fee_percent),
+      feeAmount: winner ? Number(m.fee_amount) : 0, prize: winner ? Number(m.prize) : 0, winnerId: winner ? winner.user_id : null,
+    },
+  });
   const link = `/matches/${m.code}`;
   if (!winner) {
     for (const p of players) {
@@ -400,7 +441,7 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
  * charge zero platform fee — a technical or external-data failure must never
  * cost a player their stake.
  */
-export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true, toStatus = 'CANCELLED' } = {}) {
+export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true, toStatus = 'CANCELLED', actorType = 'SYSTEM', actorUserId = null } = {}) {
   const upd = await tx.q(
     `UPDATE matches SET status = ?, cancelled_at = NOW(), cancel_reason = ?, settled_at = NOW()
      WHERE id = ? AND status IN ('WAITING','MATCHED','READY','IN_PROGRESS') AND settled_at IS NULL`,
@@ -410,6 +451,11 @@ export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true, toSta
   const game = await tx.one('SELECT name FROM games WHERE id = ?', [m.game_id]);
   const players = await tx.q('SELECT mp.*, u.is_bot FROM match_players mp JOIN users u ON u.id = mp.user_id WHERE match_id = ?', [m.id]);
   const isVoid = toStatus === 'VOID';
+  await recordAudit(tx, {
+    actorType, actorUserId, action: isVoid ? 'MATCH_VOID' : 'MATCH_CANCELLED', entityType: 'MATCH', entityId: m.id, matchId: m.id,
+    previousState: m.status, newState: toStatus, reason,
+    metadata: { pool: Number(m.pool), feeAmount: 0, refundedStakeEach: Number(m.stake) },
+  });
   for (const p of players) {
     if (p.stake_locked) await refundStake(tx, p.user_id, m, reason);
     await tx.q(`UPDATE match_players SET outcome = 'REFUNDED', payout = stake WHERE id = ?`, [p.id]);
@@ -422,11 +468,16 @@ export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true, toSta
       });
     }
   }
+  const settlementReference = matchCode().replace('M-', 'S-');
   await tx.q(
     `INSERT INTO settlements (match_id, reference, outcome, pool, fee_percent, fee_amount, prize, reason)
      VALUES (?, ?, ?, ?, ?, 0, 0, ?)`,
-    [m.id, matchCode().replace('M-', 'S-'), isVoid ? 'VOID' : 'CANCELLED', m.pool, m.fee_percent, reason],
+    [m.id, settlementReference, isVoid ? 'VOID' : 'CANCELLED', m.pool, m.fee_percent, reason],
   );
+  await recordAudit(tx, {
+    actorType: 'SYSTEM', action: 'SETTLEMENT_CREATED', entityType: 'SETTLEMENT', entityId: settlementReference, matchId: m.id,
+    reason, metadata: { outcome: isVoid ? 'VOID' : 'CANCELLED', pool: Number(m.pool), feeAmount: 0, prize: 0 },
+  });
   emitMatch(tx, m.id, players.map((p) => p.user_id));
   tx.afterCommit(() => broadcastQueueCounts());
   return true;
@@ -440,7 +491,7 @@ export async function cancelMatch(userId, matchIdOrCode) {
       throw conflict('MATCH_ALREADY_STARTED', 'The match has already started and can no longer be cancelled.');
     }
     const reason = m.status === 'WAITING' ? 'cancelled by player before an opponent joined' : `${me.username} left before the game started`;
-    await cancelMatchTx(tx, m, reason);
+    await cancelMatchTx(tx, m, reason, { actorType: me.is_bot ? 'BOT' : 'PLAYER', actorUserId: userId });
     return m.id;
   });
 }

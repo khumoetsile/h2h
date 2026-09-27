@@ -6,10 +6,10 @@ import { Transaction, TxType } from '../../core/models';
 import { MoneyPipe } from '../../shared/pipes';
 
 export const TX_LABEL: Record<TxType, string> = {
-  DEPOSIT: 'Deposit', WITHDRAWAL: 'Withdrawal', GAME_ENTRY: 'Game entry', GAME_WIN: 'Game win', REFUND: 'Refund',
+  DEPOSIT: 'Deposit', WITHDRAWAL: 'Withdrawal', GAME_ENTRY: 'Game entry', GAME_WIN: 'Game win', REFUND: 'Refund', FORFEIT: 'Stake forfeited',
 };
 const TX_ICON: Record<TxType, string> = {
-  DEPOSIT: 'south_west', WITHDRAWAL: 'north_east', GAME_ENTRY: 'lock', GAME_WIN: 'emoji_events', REFUND: 'undo',
+  DEPOSIT: 'south_west', WITHDRAWAL: 'north_east', GAME_ENTRY: 'lock', GAME_WIN: 'emoji_events', REFUND: 'undo', FORFEIT: 'trending_down',
 };
 
 /** Transaction history: table on desktop, stacked list on mobile. */
@@ -60,7 +60,7 @@ const TX_ICON: Record<TxType, string> = {
     .type { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; font-size: 13px; mat-icon { font-size: 18px; width: 18px; height: 18px; } }
     .desc { white-space: normal; min-width: 240px; max-width: 420px; font-size: 13px; }
     [data-t="DEPOSIT"], [data-t="GAME_WIN"] { color: var(--win); }
-    [data-t="WITHDRAWAL"] { color: var(--loss); }
+    [data-t="WITHDRAWAL"], [data-t="FORFEIT"] { color: var(--loss); }
     [data-t="GAME_ENTRY"] { color: var(--demo); }
     [data-t="REFUND"] { color: var(--info); }
     .ico { width: 34px; height: 34px; border-radius: 8px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }

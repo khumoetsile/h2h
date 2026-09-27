@@ -44,6 +44,7 @@ export const routes: Routes = [
           { path: 'matches', title: 'Matches', loadComponent: () => import('./features/admin/admin-matches').then((m) => m.AdminMatchesPage) },
           { path: 'challenges', title: 'Challenges', loadComponent: () => import('./features/admin/admin-challenges').then((m) => m.AdminChallengesPage) },
           { path: 'games', title: 'Games', loadComponent: () => import('./features/admin/admin-games').then((m) => m.AdminGamesPage) },
+          { path: 'audit', title: 'Audit trail', loadComponent: () => import('./features/admin/admin-audit').then((m) => m.AdminAuditPage) },
           { path: 'settings', title: 'Settings', loadComponent: () => import('./features/admin/admin-settings').then((m) => m.AdminSettingsPage) },
         ],
       },

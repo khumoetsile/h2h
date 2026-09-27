@@ -4,7 +4,7 @@ import { query, queryOne, withTransaction } from '../db.js';
 import { ah, badRequest, notFound } from '../utils/errors.js';
 import { validate } from '../middleware/validate.js';
 import { mapUser } from '../services/authService.js';
-import { getWallet, listTransactions, TX_TYPES } from '../services/walletService.js';
+import { getWallet, listTransactions, mapTransaction, TX_TYPES } from '../services/walletService.js';
 import { getUserStats } from '../services/statsService.js';
 import { cancelMatchTx, getMatchView, mapMatchRow } from '../services/matchService.js';
 import { mapChallenge } from '../services/challengeService.js';
@@ -12,13 +12,26 @@ import { getSettingRows, updateSettings } from '../services/settingsService.js';
 import { listGames, mapGame } from '../services/gameService.js';
 import { notify } from '../services/notificationService.js';
 import { emitAll, emitToUser } from '../realtime.js';
+import { listAuditEvents, recordAudit } from '../services/auditService.js';
 
 const router = Router();
 
-async function audit(adminId, action, targetType, targetId, details) {
+// Every privileged admin action is written to BOTH the original
+// `admin_audit_log` (kept for backward compatibility) AND the unified
+// `audit_events` trail, so a single Audit Trail view covers admin actions
+// alongside player/system events — an admin cannot silently modify or
+// bypass this: `audit()` is called from every mutating admin route below.
+async function legacyAudit(adminId, action, targetType, targetId, details) {
   await query('INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, CAST(? AS JSON))', [
     adminId, action, targetType, targetId != null ? String(targetId) : null, JSON.stringify(details ?? null),
   ]);
+}
+async function audit(adminId, action, targetType, targetId, details, { matchId, challengeId, reason } = {}) {
+  await legacyAudit(adminId, action, targetType, targetId, details);
+  await recordAudit(null, {
+    actorType: 'ADMIN', actorUserId: adminId, action, entityType: targetType.toUpperCase(), entityId: targetId,
+    matchId: matchId ?? null, challengeId: challengeId ?? null, reason: reason ?? null, metadata: details ?? null,
+  });
 }
 
 const page = (q) => {
@@ -214,15 +227,25 @@ router.get('/matches/:id', ah(async (req, res) => {
   res.json({ match: await getMatchView(req.params.id, req.user.id, { admin: true }) });
 }));
 
-router.post('/matches/:id/cancel', ah(async (req, res) => {
+const adminCancelSchema = z.object({
+  reason: z.string().max(255).optional(),
+  toStatus: z.enum(['CANCELLED', 'VOID']).optional(),
+});
+router.post('/matches/:id/cancel', validate(adminCancelSchema), ah(async (req, res) => {
+  const toStatus = req.body.toStatus || 'CANCELLED';
+  const reason = req.body.reason || `${toStatus === 'VOID' ? 'voided' : 'cancelled'} by an administrator`;
   const id = await withTransaction(async (tx) => {
     const m = await tx.one('SELECT * FROM matches WHERE id = ? OR code = ? FOR UPDATE', [Number(req.params.id) || 0, String(req.params.id)]);
     if (!m) throw notFound('Match not found.');
     if (!['WAITING', 'MATCHED', 'READY', 'IN_PROGRESS'].includes(m.status)) throw badRequest('MATCH_NOT_ACTIVE', `Match is already ${m.status.toLowerCase()}.`);
-    await cancelMatchTx(tx, m, 'cancelled by an administrator');
+    const ok = await cancelMatchTx(tx, m, reason, { toStatus, actorType: 'ADMIN', actorUserId: req.user.id });
+    if (!ok) throw badRequest('SETTLEMENT_FAILED', 'This match was already settled — it could not be cancelled again.');
     return m.id;
   });
-  await audit(req.user.id, 'MATCH_CANCELLED', 'match', id, null);
+  // cancelMatchTx already wrote the primary audit_events row (with
+  // previous/new state and the refund summary) tagged actorType=ADMIN above;
+  // this only preserves the legacy admin_audit_log entry for compatibility.
+  await legacyAudit(req.user.id, toStatus === 'VOID' ? 'MATCH_VOID' : 'MATCH_CANCELLED', 'match', id, { reason });
   res.json({ match: await getMatchView(id, req.user.id, { admin: true }) });
 }));
 
@@ -343,9 +366,53 @@ router.get('/system-errors', ah(async (_req, res) => {
 }));
 
 // ---- Audit ------------------------------------------------------------------
+// Legacy admin-only action log (kept for compatibility with existing callers).
 router.get('/audit', ah(async (_req, res) => {
   const rows = await query(`SELECT a.*, u.username FROM admin_audit_log a JOIN users u ON u.id = a.admin_id ORDER BY a.created_at DESC, a.id DESC LIMIT 100`);
   res.json({ entries: rows.map((r) => ({ id: r.id, admin: r.username, action: r.action, targetType: r.target_type, targetId: r.target_id, details: r.details, createdAt: r.created_at })) });
+}));
+
+// Unified, filterable audit trail across auth, match/challenge lifecycle,
+// gameplay, wallet and admin events — the "reconstruct exactly what
+// happened" view. Every field is a real column/index, not a text search
+// over free-form logs.
+const auditEventsQuery = z.object({
+  userId: z.coerce.number().int().positive().optional(),
+  matchId: z.coerce.number().int().positive().optional(),
+  challengeId: z.coerce.number().int().positive().optional(),
+  action: z.string().max(60).optional(),
+  entityType: z.string().max(30).optional(),
+  actorType: z.enum(['PLAYER', 'ADMIN', 'SYSTEM', 'BOT']).optional(),
+  q: z.string().max(100).optional(),
+  from: z.string().optional(),
+  to: z.string().optional(),
+  page: z.coerce.number().int().min(1).optional(),
+  pageSize: z.coerce.number().int().min(1).max(200).optional(),
+});
+router.get('/audit-events', validate(auditEventsQuery, 'query'), ah(async (req, res) => {
+  res.json(await listAuditEvents(req.validatedQuery));
+}));
+
+// One page for investigating a single match end-to-end: summary + gameplay +
+// financial detail + its complete chronological audit history, as required
+// by "why did this player receive this amount" / "was this settled twice".
+router.get('/matches/:id/details', ah(async (req, res) => {
+  const match = await getMatchView(req.params.id, req.user.id, { admin: true });
+  const [settlements, transactions, auditTrail] = await Promise.all([
+    query(`SELECT s.*, wu.username AS winner_username FROM settlements s LEFT JOIN users wu ON wu.id = s.winner_id WHERE s.match_id = ? ORDER BY s.settled_at`, [match.id]),
+    query(`SELECT t.*, u.username FROM transactions t JOIN users u ON u.id = t.user_id WHERE t.match_id = ? ORDER BY t.created_at, t.id`, [match.id]),
+    listAuditEvents({ matchId: match.id, page: 1, pageSize: 200 }),
+  ]);
+  res.json({
+    match,
+    settlements: settlements.map((s) => ({
+      id: s.id, reference: s.reference, outcome: s.outcome, winner: s.winner_username,
+      pool: Number(s.pool), feePercent: Number(s.fee_percent), fee: Number(s.fee_amount), prize: Number(s.prize),
+      reason: s.reason, settledAt: s.settled_at,
+    })),
+    transactions: transactions.map(mapTransaction),
+    auditTrail: auditTrail.items,
+  });
 }));
 
 // Admin broadcast to a user (handy for testing notifications)

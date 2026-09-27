@@ -9,6 +9,7 @@ import { txReference } from '../utils/ids.js';
 import { createWallet } from './walletService.js';
 import { getSettings } from './settingsService.js';
 import { notify } from './notificationService.js';
+import { recordAudit } from './auditService.js';
 
 const AVATAR_COLORS = ['#3B82F6', '#22D3EE', '#A855F7', '#F97316', '#10B981', '#EF4444', '#EAB308', '#EC4899', '#14B8A6', '#6366F1'];
 export const BCRYPT_ROUNDS = 10;
@@ -86,6 +87,10 @@ export async function register(data, meta = {}) {
   const user = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
   const session = await createSession(userId, !!data.remember, meta);
   await query('UPDATE users SET last_login_at = NOW(), last_seen_at = NOW() WHERE id = ?', [userId]);
+  await recordAudit(null, {
+    actorType: 'PLAYER', actorUserId: userId, action: 'USER_REGISTERED', entityType: 'USER', entityId: userId,
+    ip: meta.ip, userAgent: meta.userAgent, newState: 'ACTIVE',
+  });
   return { user: mapUser(user), ...session };
 }
 
@@ -94,20 +99,39 @@ export async function login({ identifier, password, remember }, meta = {}) {
   const user = await queryOne('SELECT * FROM users WHERE email = ? OR username = ?', [id.toLowerCase(), id]);
   // Always run bcrypt to keep timing similar whether or not the user exists.
   const ok = await bcrypt.compare(password, user?.password_hash || '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinva');
-  if (!user || !ok) throw unauthorized('Incorrect email/username or password.');
+  if (!user || !ok) {
+    await recordAudit(null, {
+      actorType: 'PLAYER', action: 'LOGIN_FAILED', entityType: 'USER', entityId: user?.id ?? null,
+      actorUserId: user?.id ?? null, ip: meta.ip, userAgent: meta.userAgent, reason: 'incorrect credentials',
+      metadata: { identifier: id },
+    });
+    throw unauthorized('Incorrect email/username or password.');
+  }
   if (user.is_bot) throw forbidden('Demo opponent accounts cannot sign in.');
-  if (user.status !== 'ACTIVE') throw forbidden('Your account has been disabled. Contact support.');
+  if (user.status !== 'ACTIVE') {
+    await recordAudit(null, {
+      actorType: 'PLAYER', actorUserId: user.id, action: 'LOGIN_FAILED', entityType: 'USER', entityId: user.id,
+      ip: meta.ip, userAgent: meta.userAgent, reason: 'account disabled',
+    });
+    throw forbidden('Your account has been disabled. Contact support.');
+  }
   const session = await createSession(user.id, !!remember, meta);
   await query('UPDATE users SET last_login_at = NOW(), last_seen_at = NOW() WHERE id = ?', [user.id]);
+  await recordAudit(null, {
+    actorType: user.role === 'ADMIN' ? 'ADMIN' : 'PLAYER', actorUserId: user.id, action: 'LOGIN_SUCCESS', entityType: 'USER', entityId: user.id,
+    ip: meta.ip, userAgent: meta.userAgent,
+  });
   return { user: mapUser(user), ...session };
 }
 
-export async function logout(sessionId) {
+export async function logout(sessionId, actorUserId = null) {
   await query('UPDATE sessions SET revoked_at = NOW() WHERE id = ? AND revoked_at IS NULL', [sessionId]);
+  await recordAudit(null, { actorType: 'PLAYER', actorUserId, action: 'LOGOUT', entityType: 'USER', entityId: actorUserId });
 }
 
 export async function changePassword(userId, currentPassword, newPassword) {
   const user = await queryOne('SELECT password_hash FROM users WHERE id = ?', [userId]);
   if (!(await bcrypt.compare(currentPassword, user.password_hash))) throw badRequest('INVALID_PASSWORD', 'Your current password is incorrect.', { fields: { currentPassword: 'Incorrect password.' } });
   await query('UPDATE users SET password_hash = ? WHERE id = ?', [await bcrypt.hash(newPassword, BCRYPT_ROUNDS), userId]);
+  await recordAudit(null, { actorType: 'PLAYER', actorUserId: userId, action: 'PASSWORD_CHANGED', entityType: 'USER', entityId: userId });
 }

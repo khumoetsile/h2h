@@ -13,6 +13,7 @@ import { emitToUser } from '../realtime.js';
 import { lockStake } from '../services/walletService.js';
 import { createMatchTx, joinLockedMatch, getMatchView, ACTIVE_STATUSES } from '../services/matchService.js';
 import { getFootballProvider } from './providerRegistry.js';
+import { recordAudit } from '../services/auditService.js';
 
 const PICKS_BY_TYPE = { TEAM: ['HOME', 'AWAY'], YES_NO: ['YES', 'NO'] };
 const opposite = (pickType, pick) => PICKS_BY_TYPE[pickType].find((p) => p !== pick);
@@ -233,6 +234,10 @@ export async function createFootballChallenge(challengerId, { opponent, fixtureI
       link: '/challenges',
     });
     tx.afterCommit(() => emitToUser(opp.id, 'challenge:update', { id: res.insertId }));
+    await recordAudit(tx, {
+      actorType: 'PLAYER', actorUserId: challengerId, action: 'CHALLENGE_CREATED', entityType: 'CHALLENGE', entityId: res.insertId,
+      challengeId: res.insertId, newState: 'PENDING', metadata: { opponentId: opp.id, fixtureId, challengeTypeSlug, pick, stake, football: true },
+    });
     return res.insertId;
   });
   return getFootballChallenge(id, challengerId);
@@ -297,6 +302,11 @@ export async function acceptFootballChallenge(userId, id) {
       `INSERT INTO football_challenges (match_id, fixture_id, challenge_type_id, creator_pick, opponent_pick, cutoff_at) VALUES (?, ?, ?, ?, ?, ?)`,
       [match.id, c.fixture_id, c.challenge_type_id, c.creator_pick, opponentPick, fixture.kickoff_at],
     );
+    await recordAudit(tx, {
+      actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_ACCEPTED', entityType: 'CHALLENGE', entityId: c.id,
+      challengeId: c.id, matchId: match.id, previousState: 'PENDING', newState: 'ACCEPTED',
+      metadata: { fixtureId: c.fixture_id, opponentPick },
+    });
     await notify(tx, c.challenger_id, { type: 'CHALLENGE_ACCEPTED', title: 'Challenge accepted', message: `${me.username} accepted your football challenge. Your match is ready.`, link: `/match/${match.code}` });
     for (const uid of [c.challenger_id, userId]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));
     return match.id;
