@@ -1,5 +1,6 @@
 .back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 16px; min-height: 32px; mat-icon { font-size: 18px; width: 18px; height: 18px; } &:hover { color: var(--text); } }
-.layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
+.layout { display: grid; gap: 20px; grid-template-columns: 1fr; min-width: 0; }
+.layout > * { min-width: 0; }
 @media (min-width: 960px) { .layout { grid-template-columns: 1fr 400px; align-items: start; } .entry { position: sticky; top: 84px; } }
 
 .fixture-head { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
@@ -36,7 +37,15 @@
 .pb-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--text-2); }
 .win-row { border-top: 1px dashed var(--border-strong); padding-top: 8px; strong { font-size: 20px; font-family: var(--font-display); } }
 
-.mode-tabs { display: flex; gap: 8px; margin-top: 18px; button { flex: 1; } }
+// .btn (global) sets white-space: nowrap, which — combined with flex:1 — refused to
+// shrink "Challenge someone" below its full-text width and pushed the whole page
+// into horizontal overflow on narrow screens. These two buttons are the entire
+// point of this screen (choose how to find your opponent), so they must never
+// be allowed to overflow off-screen.
+.mode-tabs {
+  display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap;
+  button { flex: 1 1 140px; min-width: 0; white-space: normal; line-height: 1.2; text-align: center; }
+}
 .search-box {
   display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   background: var(--surface-2); margin-top: 12px;
