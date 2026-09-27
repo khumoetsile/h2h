@@ -16,7 +16,7 @@ import { TxTable } from './tx-table';
       <div class="page-head">
         <div><h1>Demo wallet</h1><p class="sub">Simulated balance for testing the full platform experience.</p></div>
       </div>
-      <div class="demo-strip" style="margin-bottom:16px"><mat-icon>info</mat-icon> Demo wallet · Demo funds · No real money — nothing here can be deposited or withdrawn for real</div>
+      <div class="demo-strip" style="margin-bottom:16px"><mat-icon>info</mat-icon> Demo wallet · Demo funds · No real money: nothing here can be deposited or withdrawn for real</div>
 
       <section class="balances">
         <div class="card bal main">

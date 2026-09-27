@@ -40,7 +40,7 @@ export function createApp() {
     res.json({
       appName: config.appName,
       demoMode: true,
-      demoNotice: 'DEMO MODE — all funds are simulated. No real money is deposited, staked, won or withdrawn.',
+      demoNotice: 'DEMO MODE: all funds are simulated. No real money is deposited, staked, won or withdrawn.',
       currency: { symbol: config.currencySymbol, code: config.currencyCode },
       platformFeePercent: s.platform_fee_percent,
       stakeAmounts: s.stake_amounts,

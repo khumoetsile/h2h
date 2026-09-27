@@ -111,7 +111,7 @@ export class RealtimeService {
       // Never interrupt a focused screen (gameplay, the result reveal) with a
       // toast, and don't toast about the match you're already looking at.
       const onFocusedScreen = /\/(play|result)$/.test(this.router.url);
-      if (!onFocusedScreen && !(n.link && this.router.url.startsWith(n.link))) this.toast.info(`${n.title} — ${n.message}`);
+      if (!onFocusedScreen && !(n.link && this.router.url.startsWith(n.link))) this.toast.info(`${n.title}: ${n.message}`);
     });
     s.on('match:update', (m: MatchView) => this.match$.next(m));
     s.on('challenge:update', (c: { id: number }) => this.challenge$.next(c));

@@ -17,7 +17,7 @@ interface Shot { hit: boolean; reactionMs?: number; offset?: number; }
     </div>
     <div class="arena">
       @if (phase() === 'countdown') {
-        <div class="overlay"><div class="count">{{ count() }}</div><div class="sub">Hit each target before it shrinks away — aim for the centre</div></div>
+        <div class="overlay"><div class="count">{{ count() }}</div><div class="sub">Hit each target before it shrinks away, aim for the centre</div></div>
       }
       @if (phase() === 'target') {
         <button class="t" [style.left.%]="current().x" [style.top.%]="current().y" [style.width.px]="current().size" [style.height.px]="current().size"
@@ -49,8 +49,8 @@ export class AimChallengeGame implements OnInit, OnDestroy {
   protected current = computed(() => this.spec().targets[Math.min(this.index(), this.total() - 1)]);
   protected remaining = computed(() => Array.from({ length: this.total() - this.shots().length }));
   protected hits = computed(() => this.shots().filter((s) => s.hit).length);
-  protected accuracy = computed(() => (this.shots().length ? `${Math.round((this.hits() / this.shots().length) * 100)}%` : '—'));
-  protected last = computed(() => { const s = this.shots().at(-1); return !s ? '—' : s.hit ? `${s.reactionMs}ms` : 'Miss'; });
+  protected accuracy = computed(() => (this.shots().length ? `${Math.round((this.hits() / this.shots().length) * 100)}%` : '-'));
+  protected last = computed(() => { const s = this.shots().at(-1); return !s ? '-' : s.hit ? `${s.reactionMs}ms` : 'Miss'; });
   private shownAt = 0;
   private resolve: ((s: Shot) => void) | null = null;
   private destroyed = false;

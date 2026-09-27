@@ -70,11 +70,11 @@ export class ReactionRushGame implements OnInit, OnDestroy {
   protected score = computed(() => this.results().reduce((a, r) => a + (r.hit && r.reactionMs ? pointsFor(r.reactionMs) : 0), 0));
   protected last = computed(() => {
     const r = this.results().at(-1);
-    return !r ? '—' : r.hit ? `${r.reactionMs}ms` : r.falseStart ? 'Early' : 'Miss';
+    return !r ? '-' : r.hit ? `${r.reactionMs}ms` : r.falseStart ? 'Early' : 'Miss';
   });
   protected avg = computed(() => {
     const hits = this.results().filter((r) => r.hit);
-    return hits.length ? `${Math.round(hits.reduce((a, r) => a + (r.reactionMs ?? 0), 0) / hits.length)}ms` : '—';
+    return hits.length ? `${Math.round(hits.reduce((a, r) => a + (r.reactionMs ?? 0), 0) / hits.length)}ms` : '-';
   });
 
   private startedAt = 0;
@@ -101,7 +101,7 @@ export class ReactionRushGame implements OnInit, OnDestroy {
       this.feedback.set(
         result.hit
           ? { title: `${result.reactionMs} ms`, sub: `+${pointsFor(result.reactionMs!)} points`, good: true }
-          : result.falseStart ? { title: 'Too early!', sub: 'Wait for the target — 0 points', good: false } : { title: 'Missed', sub: '0 points', good: false },
+          : result.falseStart ? { title: 'Too early!', sub: 'Wait for the target, 0 points', good: false } : { title: 'Missed', sub: '0 points', good: false },
       );
       this.phase.set('feedback');
       await sleep(spec.interRoundMs);

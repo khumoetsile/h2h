@@ -195,7 +195,7 @@ export class FootballFixturePage implements OnInit {
         const r = await this.api.post<{ matched: boolean; alreadyQueued: boolean; match: MatchView }>('/football/find', {
           fixtureId: f.id, challengeTypeSlug: t.slug, pick: p, stake: s,
         });
-        if (r.matched) this.toast.success('Opponent found — you are both locked in!');
+        if (r.matched) this.toast.success('Opponent found, you are both locked in!');
         else if (r.alreadyQueued) this.toast.info("You're already waiting for an opponent on this pick.");
         else this.toast.success('Locked in. Your challenge is now in Open Challenges.');
         this.reviewOpen.set(false);

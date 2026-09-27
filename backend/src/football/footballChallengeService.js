@@ -26,7 +26,7 @@ async function footballGameId(runner = query) {
   if (footballGameIdCache) return footballGameIdCache;
   const rows = await runner('SELECT id FROM games WHERE slug = ?', ['football']);
   const row = Array.isArray(rows) ? rows[0] : rows;
-  if (!row) throw new Error('Football pseudo-game row is missing — re-run the seed script.');
+  if (!row) throw new Error('Football pseudo-game row is missing. Re-run the seed script.');
   footballGameIdCache = row.id;
   return footballGameIdCache;
 }
@@ -393,7 +393,7 @@ export async function acceptFootballChallenge(userId, id, { pick: opponentPick }
     if (!opponentPick) throw badRequest('PICK_REQUIRED', 'Choose your side before accepting.');
     validatePick(type, opponentPick);
     if (opponentPick === c.creator_pick) {
-      throw conflict('SAME_SIDE_NOT_ALLOWED', 'You must take the opposing side to accept this challenge — the challenger already picked that one.');
+      throw conflict('SAME_SIDE_NOT_ALLOWED', 'You must take the opposing side to accept this challenge. The challenger already picked that one.');
     }
     const [challenger, me] = await Promise.all([
       tx.one('SELECT * FROM users WHERE id = ?', [c.challenger_id]),
@@ -421,7 +421,7 @@ export async function acceptFootballChallenge(userId, id, { pick: opponentPick }
     });
     // "Accept & Lock In" — the accepting player is locked in now.
     await recordLockIn(tx, match.id, userId);
-    await notify(tx, c.challenger_id, { type: 'CHALLENGE_ACCEPTED', title: 'Challenge accepted — locked in', message: `${me.username} accepted your football challenge. You're both locked in.`, link: `/match/${match.code}` });
+    await notify(tx, c.challenger_id, { type: 'CHALLENGE_ACCEPTED', title: 'Challenge accepted, locked in', message: `${me.username} accepted your football challenge. You're both locked in.`, link: `/match/${match.code}` });
     for (const uid of [c.challenger_id, userId]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));
     return match.id;
   });

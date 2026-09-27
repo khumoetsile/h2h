@@ -20,7 +20,7 @@
           <div class="fh-teams">
             <span class="team">{{ f.homeTeam.name }}</span>
             @if (f.status === 'LIVE' || f.status === 'FINISHED') {
-              <span class="score">{{ f.homeScore }} – {{ f.awayScore }}</span>
+              <span class="score">{{ f.homeScore }} - {{ f.awayScore }}</span>
             } @else {
               <span class="vs-sep">vs</span>
             }
@@ -33,13 +33,13 @@
             </div>
             <p class="muted tiny">Challenges on this match close at kickoff. The challenge becomes active when the match begins.</p>
           }
-          @if (f.isSimulated) { <p class="muted tiny">Simulated demo fixture — for testing only.</p> }
+          @if (f.isSimulated) { <p class="muted tiny">Simulated demo fixture (for testing only).</p> }
         </div>
 
         @if (target()) {
           <div class="card notice rematch-notice">
             <mat-icon>swords</mat-icon>
-            <div><strong>Challenging {{ target()!.username }}</strong><p class="text-2">Pick a question, your side and a stake — they'll get a new challenge to accept.</p></div>
+            <div><strong>Challenging {{ target()!.username }}</strong><p class="text-2">Pick a question, your side and a stake. They'll get a new challenge to accept.</p></div>
           </div>
         }
 
@@ -131,7 +131,7 @@
                     <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'find'" [class.selected]="mode() === 'find'" (click)="chooseMode('find')">
                       <mat-icon>travel_explore</mat-icon>
                       <strong>Find opponent</strong>
-                      <span>Make it public — any available player can join.</span>
+                      <span>Make it public: any available player can join.</span>
                     </button>
                   </div>
 

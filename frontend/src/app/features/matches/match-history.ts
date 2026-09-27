@@ -56,7 +56,7 @@ type Filter = 'all' | 'active' | 'wins' | 'losses' | 'draws' | 'void' | 'timed_o
                     }
                   } @else {
                     <div class="t">{{ m.game.name }}</div>
-                    @if (m.myScore !== null) { <div class="muted small">Score {{ m.myScore }} – {{ m.opponentScore ?? '—' }}</div> }
+                    @if (m.myScore !== null) { <div class="muted small">Score {{ m.myScore }} - {{ m.opponentScore ?? '-' }}</div> }
                   }
                   <div class="muted tiny opp">
                     @if (m.opponent) { <app-avatar [name]="m.opponent.username" [color]="m.opponent.avatarColor" [size]="16" /> vs {{ m.opponent.username }} · }
@@ -137,7 +137,7 @@ export class MatchHistoryPage implements OnInit {
   }
 
   label(m: MatchSummary) {
-    if (m.displayState === 'LOCKING_IN' && m.lockedIn === false) return { label: 'Your turn — lock in', chip: 'chip chip-accent' };
+    if (m.displayState === 'LOCKING_IN' && m.lockedIn === false) return { label: 'Your turn: lock in', chip: 'chip chip-accent' };
     return DISPLAY_STATE[m.displayState];
   }
   isActive(m: MatchSummary) { return ACTIVE_STATES.includes(m.displayState); }
@@ -155,7 +155,7 @@ export class MatchHistoryPage implements OnInit {
       case 'WON': return `+${formatMoney((m.payout ?? m.prize) - m.stake)}`;
       case 'LOST': return `−${formatMoney(m.stake)}`;
       case 'LEFT': return `−${this.config.abandonmentFee()} fee`;
-      case 'IN_PROGRESS': return m.football?.fixtureStatus === 'LIVE' ? `LIVE ${m.football.homeScore}–${m.football.awayScore}` : 'Live';
+      case 'IN_PROGRESS': return m.football?.fixtureStatus === 'LIVE' ? `LIVE ${m.football.homeScore}-${m.football.awayScore}` : 'Live';
       default: return `${formatMoney(m.stake)} refunded`;
     }
   }

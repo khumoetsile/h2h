@@ -172,7 +172,7 @@ export async function recordLockIn(tx, matchId, userId, { actorType = 'PLAYER' }
     if (!p.is_bot) {
       await notify(tx, p.user_id, {
         type: 'MATCH_STARTING', title: 'Locked in',
-        message: m.category === 'FOOTBALL' ? 'Both players are locked in. The challenge goes live at kickoff.' : `Both players are locked in — ${m.game_name} is ready. Good luck!`,
+        message: m.category === 'FOOTBALL' ? 'Both players are locked in. The challenge goes live at kickoff.' : `Both players are locked in. ${m.game_name} is ready. Good luck!`,
         link: `/match/${m.code}`,
       });
     }
@@ -205,7 +205,7 @@ export async function joinLockedMatch(tx, m, userId, { lockIn = false, isBot = f
   }
   if (m.created_by === userId) throw badRequest('CANNOT_JOIN_OWN_MATCH', 'You cannot join your own match.');
   const now = new Date();
-  if (isPast(m.acceptance_deadline, now)) throw conflict('CHALLENGE_EXPIRED', 'This challenge expired — no opponent joined in time.');
+  if (isPast(m.acceptance_deadline, now)) throw conflict('CHALLENGE_EXPIRED', 'This challenge expired. No opponent joined in time.');
   const game = await requireEnabledGame(tx, m.game_id);
   const kickoffAt = m.category === 'FOOTBALL' ? await kickoffFor(tx.q, m.id) : null;
   await lockStake(tx, userId, m, game.name);
@@ -223,8 +223,8 @@ export async function joinLockedMatch(tx, m, userId, { lockIn = false, isBot = f
   const link = `/match/${m.code}`;
   const creatorLocked = !!(await tx.one('SELECT ready_at FROM match_players WHERE match_id = ? AND user_id = ?', [m.id, m.created_by]))?.ready_at;
   await notify(tx, m.created_by, creatorLocked
-    ? { type: 'MATCH_FOUND', title: 'Opponent found — locked in', message: `${joiner.username} joined your challenge. You're both locked in.`, link }
-    : { type: 'MATCH_FOUND', title: 'Opponent found — lock in now', message: `${joiner.username} joined your ${game.name} match. Lock in before the timer runs out.`, link });
+    ? { type: 'MATCH_FOUND', title: 'Opponent found, locked in', message: `${joiner.username} joined your challenge. You're both locked in.`, link }
+    : { type: 'MATCH_FOUND', title: 'Opponent found, lock in now', message: `${joiner.username} joined your ${game.name} match. Lock in before the timer runs out.`, link });
   if (!joiner.is_bot) await notify(tx, userId, { type: 'MATCH_FOUND', title: 'Match found', message: `You're up against ${creator.username} in ${game.name}.`, link });
   if (lockIn || isBot) await recordLockIn(tx, m.id, userId, { actorType: joiner.is_bot ? 'BOT' : 'PLAYER' });
   emitMatch(tx, m.id, [m.created_by, userId]);
@@ -360,7 +360,7 @@ export async function startMatch(userId, matchIdOrCode) {
   return withTransaction(async (tx) => {
     const { m, players, me } = await lockMatchForPlayer(tx, userId, matchIdOrCode);
     assertNotFinished(m);
-    if (m.category !== 'SKILL_GAME') throw conflict('MATCH_NOT_READY', 'Football challenges are decided by the real match — there is nothing to play.');
+    if (m.category !== 'SKILL_GAME') throw conflict('MATCH_NOT_READY', 'Football challenges are decided by the real match. There is nothing to play.');
     if (!['READY', 'IN_PROGRESS'].includes(m.status)) throw conflict('MATCH_NOT_READY', 'Both players must lock in before the game starts.');
     if (me.submitted_at) throw conflict('ALREADY_SUBMITTED', 'You have already played this match. Waiting for your opponent.');
     const deadline = await myDeadline(tx, m, me);
@@ -491,7 +491,7 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
     const rb = byUser[b.user_id];
     const cmp = (ra.score - rb.score) || (ra.tiebreak - rb.tiebreak);
     if (cmp > 0) winner = a; else if (cmp < 0) winner = b;
-    resultReason = winner ? (ra.score === rb.score ? 'Won on tiebreak' : 'Higher score') : 'Exact tie — stakes refunded';
+    resultReason = winner ? (ra.score === rb.score ? 'Won on tiebreak' : 'Higher score') : 'Exact tie, stakes refunded';
   }
   // Duplicate-settlement guard.
   const upd = await tx.q(

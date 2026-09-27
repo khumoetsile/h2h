@@ -74,7 +74,7 @@ export class MatchLobbyPage implements OnInit {
     this.match.set(m);
     if (prev && prev.status === 'WAITING' && m.status !== 'WAITING' && ['MATCHED', 'READY'].includes(m.status)) {
       const opp = m.players.find((p) => p.userId !== m.viewerId);
-      this.toast.success(m.status === 'READY' ? `${opp?.username} joined — you're both locked in!` : `Opponent found: ${opp?.username}. Lock in now.`);
+      this.toast.success(m.status === 'READY' ? `${opp?.username} joined, you're both locked in!` : `Opponent found: ${opp?.username}. Lock in now.`);
     }
     if (m.status === 'COMPLETED' || m.status === 'CANCELLED' || m.status === 'VOID') {
       this.router.navigate(['/match', m.code, 'result'], { replaceUrl: true });
@@ -122,7 +122,7 @@ export class MatchLobbyPage implements OnInit {
     const locked = this.isLocked();
     const ok = await this.act('cancel', 'cancel', locked
       ? `You left the challenge. Your stake was refunded and the ${this.config.abandonmentFee()} abandonment fee was charged.`
-      : 'Challenge cancelled — your stake was returned in full.');
+      : 'Challenge cancelled. Your stake was returned in full.');
     if (ok) this.leaveOpen.set(false);
   }
 }

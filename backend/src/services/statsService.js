@@ -3,7 +3,7 @@ import { query, queryOne } from '../db.js';
 /** Current streak from a list of outcomes ordered newest-first. */
 export function computeStreak(outcomes) {
   const decisive = outcomes.filter((o) => o === 'WIN' || o === 'LOSS');
-  if (!decisive.length) return { type: null, count: 0, label: '—' };
+  if (!decisive.length) return { type: null, count: 0, label: '-' };
   const first = decisive[0];
   let count = 0;
   for (const o of decisive) { if (o === first) count++; else break; }

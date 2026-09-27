@@ -57,7 +57,7 @@ const MAX_AUTO_RETRIES = 3;
             @if (submitting() && !submitError()) {
               <mat-spinner diameter="32" />
               <h2>{{ retryAttempt() > 0 ? "Reconnecting…" : "Sending your result…" }}</h2>
-              <p class="muted">{{ retryAttempt() > 0 ? "We're trying again — this won't cost you the match." : "Just a moment." }}</p>
+              <p class="muted">{{ retryAttempt() > 0 ? "We're trying again. This won't cost you the match." : "Just a moment." }}</p>
             }
             @if (submitError()) {
               <mat-icon class="loss big-icon">wifi_off</mat-icon>
@@ -131,7 +131,7 @@ export class MatchPlayPage implements OnInit {
   exit() { this.router.navigate(['/match', this.code()], { replaceUrl: true }); }
 
   confirmExit() {
-    if (confirm("Leave this game screen? The timer keeps running — if you don't finish before it runs out, you forfeit.")) this.exit();
+    if (confirm("Leave this game screen? The timer keeps running, and if you don't finish before it runs out, you forfeit.")) this.exit();
   }
 
   async submit(result: GameFinish, isRetry = false) {
@@ -162,7 +162,7 @@ export class MatchPlayPage implements OnInit {
       }
       this.submitError.set(
         e.code === 'NETWORK'
-          ? "We couldn't reach the game server. Check your connection and try again — your result is safe on your device."
+          ? "We couldn't reach the game server. Check your connection and try again. Your result is safe on your device."
           : e.message,
       );
       this.submitting.set(false);

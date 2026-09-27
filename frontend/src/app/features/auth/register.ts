@@ -74,7 +74,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
             <mat-label>Username</mat-label>
             <span matTextPrefix class="muted">&#64;&nbsp;</span>
             <input matInput formControlName="username" autocomplete="username" />
-            <mat-hint>3–20 letters, numbers or underscores</mat-hint>
+            <mat-hint>3-20 letters, numbers or underscores</mat-hint>
             <mat-error>{{ msg('username') }}</mat-error>
           </mat-form-field>
           <mat-form-field>
@@ -107,7 +107,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
           <button class="btn btn-primary btn-lg btn-block" type="submit" [disabled]="loading()">
             @if (loading()) { <mat-spinner diameter="20" /> } @else { Create account }
           </button>
-          <p class="muted tiny" style="margin-top:12px;text-align:center">DEMO prototype — deposits, stakes and winnings use simulated funds only.</p>
+          <p class="muted tiny" style="margin-top:12px;text-align:center">DEMO prototype: deposits, stakes and winnings use simulated funds only.</p>
         </form>
         <p class="foot">Already have an account? <a class="link" routerLink="/login">Sign in</a></p>
       </div>

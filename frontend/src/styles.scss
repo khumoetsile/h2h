@@ -88,7 +88,19 @@ body {
   overscroll-behavior-y: none;
 }
 a { color: inherit; text-decoration: none; }
-button { font-family: inherit; touch-action: manipulation; }
+// Reset every <button> to plain, chrome-less text by default. Without this,
+// an element with only a text-style class (e.g. `.link`) and no explicit
+// background/border falls back to the browser's native control rendering —
+// which, combined with `color-scheme: dark` above, some browsers render as
+// a rounded, accent-tinted pill. Every real button style (.btn, .tile,
+// .chip, .mode-card, segmented tabs, etc.) sets its own background/border
+// with higher specificity, so this only affects buttons that were relying
+// on native chrome by omission.
+button {
+  font-family: inherit; touch-action: manipulation; cursor: pointer;
+  background: none; border: 0; margin: 0; padding: 0; color: inherit; text-align: inherit;
+  border-radius: 0; appearance: none;
+}
 // Mobile-first type scale — steps up on larger screens (see breakpoints below).
 h1, h2, h3, h4 { font-family: var(--font-display); letter-spacing: -0.01em; margin: 0; line-height: 1.2; }
 h1 { font-size: 26px; font-weight: 700; }

@@ -45,7 +45,7 @@ import { DemoBadge } from '../../shared/ui';
             @for (q of [10, 50, 100]; track q) { <button type="button" class="btn btn-sm" (click)="amount = q" [disabled]="q > available()">{{ q | money }}</button> }
           </div>
           <label class="lbl">Destination</label>
-          <div class="dest"><mat-icon>account_balance</mat-icon><div><strong>Demo payout account</strong><div class="muted tiny">Simulated — no bank, card or mobile-money provider is connected.</div></div></div>
+          <div class="dest"><mat-icon>account_balance</mat-icon><div><strong>Demo payout account</strong><div class="muted tiny">Simulated: no bank, card or mobile-money provider is connected.</div></div></div>
 
           @if (error()) { <div class="form-error"><mat-icon>error</mat-icon>{{ error() }}</div> }
           <button class="btn btn-primary btn-lg btn-block" [disabled]="loading()" (click)="submit()">

@@ -28,7 +28,7 @@ interface Stats {
         <div><h1>Platform overview</h1><p class="sub">Live figures from the database.</p></div>
         <button class="btn btn-sm" (click)="load()"><mat-icon>refresh</mat-icon>Refresh</button>
       </div>
-      <div class="demo-strip" style="margin-bottom:16px">All financial figures are DEMO — simulated funds, no real money</div>
+      <div class="demo-strip" style="margin-bottom:16px">All financial figures are DEMO: simulated funds, no real money</div>
       @if (error()) { <app-load-error [message]="error()" (retry)="load()" /> }
       @else if (!s()) { <app-spinner /> }
       @else {

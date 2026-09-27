@@ -19,7 +19,7 @@ interface RoundInput { input: number[]; timeMs: number; }
         @switch (phase()) {
           @case ('countdown') { <span class="count-sm">{{ count() }}</span> Get ready to memorise… }
           @case ('show') { <span class="muted">Watch the sequence…</span> }
-          @case ('input') { Your turn — repeat the sequence ({{ entered().length }}/{{ seqLen() }}) }
+          @case ('input') { Your turn: repeat the sequence ({{ entered().length }}/{{ seqLen() }}) }
           @case ('feedback') { <span [class.win]="lastOk()" [class.loss]="!lastOk()">{{ lastOk() ? 'Correct!' : 'Not quite' }}</span> }
           @case ('done') { Finished! Checking your result… }
         }
@@ -60,7 +60,7 @@ export class MemoryBattleGame implements OnInit, OnDestroy {
   protected cells = computed(() => Array.from({ length: this.spec().grid ** 2 }, (_, i) => i));
   protected seqLen = computed(() => this.spec().rounds[Math.min(this.index(), this.total() - 1)].sequence.length);
   protected correct = computed(() => this.results().filter((r, i) => this.isCorrect(r.input, i)).length);
-  protected timeLeft = computed(() => (this.phase() === 'input' ? `${Math.max(0, Math.ceil((this.deadline() - this.now()) / 1000))}s` : '—'));
+  protected timeLeft = computed(() => (this.phase() === 'input' ? `${Math.max(0, Math.ceil((this.deadline() - this.now()) / 1000))}s` : '-'));
   private inputStart = 0;
   private resolve: (() => void) | null = null;
   private destroyed = false;

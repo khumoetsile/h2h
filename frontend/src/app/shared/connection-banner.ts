@@ -20,20 +20,20 @@ import { RealtimeService } from '../core/realtime.service';
   template: `
     @if (rt.connectionState() === 'unstable') {
       <div class="conn-banner unstable" role="status" aria-live="polite">
-        <span class="spin"></span> Connection unstable — we're trying to keep you connected.
+        <span class="spin"></span> Connection unstable: we're trying to keep you connected.
       </div>
     }
     @if (rt.connectionState() === 'lost') {
       <div class="conn-banner lost" role="status" aria-live="assertive">
         <span class="spin"></span>
-        <span><strong>CONNECTION LOST</strong> — we're trying to reconnect you.</span>
+        <span><strong>CONNECTION LOST</strong>: we're trying to reconnect you.</span>
         @if (windowLeft() > 0) { <span class="clock">{{ clock() }}</span> }
         @else { <span>Still trying… your challenge timers keep running on the server.</span> }
       </div>
     }
     @if (rt.justRestored() && rt.connectionState() === 'online') {
       <div class="conn-banner restored" role="status" aria-live="polite">
-        You're back online — your challenge continues.
+        You're back online. Your challenge continues.
       </div>
     }
   `,

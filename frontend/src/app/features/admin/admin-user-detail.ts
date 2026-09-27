@@ -72,7 +72,7 @@ interface Detail { user: User; wallet: Wallet; stats: UserStats; transactions: T
                 @for (m of x.matches; track m.id) {
                   <tr class="clickable" (click)="router.navigate(['/matches', m.code])">
                     <td><div class="row"><app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="24" />{{ m.game.name }}</div></td>
-                    <td>&#64;{{ m.opponent?.username ?? '—' }}</td>
+                    <td>&#64;{{ m.opponent?.username ?? '-' }}</td>
                     <td class="money">{{ m.stake | money }}</td>
                     <td><app-outcome [outcome]="m.outcome" [status]="m.status" /></td>
                     <td class="muted">{{ m.createdAt | date: 'd MMM, HH:mm' }}</td>

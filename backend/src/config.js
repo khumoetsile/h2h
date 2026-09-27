@@ -68,7 +68,13 @@ export const config = {
     // provider — deterministic, needs no API key, safe for local dev/testing.
     // 'football-data': a real implementation against api.football-data.org.
     // Swap providers with zero code changes elsewhere in the app.
-    provider: process.env.FOOTBALL_PROVIDER || 'mock',
+    //
+    // The test suite ALWAYS uses 'mock', regardless of FOOTBALL_PROVIDER in
+    // .env: tests seed their own deterministic mock fixtures and assert on
+    // mock capabilities (statistics/events available), so a developer's real
+    // provider key for local manual testing must never change what `npm
+    // test` exercises or silently disable the stats-dependent test cases.
+    provider: env === 'test' ? 'mock' : (process.env.FOOTBALL_PROVIDER || 'mock'),
     apiKey: process.env.FOOTBALL_API_KEY || '',
     apiBaseUrl: process.env.FOOTBALL_API_BASE_URL || 'https://api.football-data.org/v4',
     syncIntervalSeconds: num('FOOTBALL_SYNC_INTERVAL_SECONDS', 20),

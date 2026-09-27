@@ -34,7 +34,7 @@ import { EmptyState, GameIcon, LoadError, SkeletonList } from '../../shared/ui';
                   <td><span class="chip" [class.chip-win]="c.status === 'ACCEPTED'" [class.chip-loss]="c.status === 'DECLINED'" [class.chip-accent]="c.status === 'PENDING'">{{ c.status }}</span></td>
                   <td class="muted">{{ c.createdAt | date: 'd MMM, HH:mm' }}</td>
                   <td class="muted">{{ c.expiresAt | date: 'd MMM, HH:mm' }}</td>
-                  <td>@if (c.matchCode) { <a class="link small" [routerLink]="['/matches', c.matchCode]">{{ c.matchCode }}</a> } @else { — }</td>
+                  <td>@if (c.matchCode) { <a class="link small" [routerLink]="['/matches', c.matchCode]">{{ c.matchCode }}</a> } @else { - }</td>
                 </tr>
               }
             </tbody>

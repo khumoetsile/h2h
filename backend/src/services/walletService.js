@@ -108,7 +108,7 @@ export async function demoDeposit(userId, rawAmount, { source = 'Demo deposit', 
   return withTransaction(async (tx) => {
     const result = await applyMovement(tx, userId, {
       availableDelta: toCents(amount), type: 'DEPOSIT', direction: 'CREDIT', amount,
-      description: `${source} — DEMO FUNDS (no real money)`, status: 'DEMO_COMPLETED',
+      description: `${source}, DEMO FUNDS (no real money)`, status: 'DEMO_COMPLETED',
     });
     if (!silent) {
       await notify(tx, userId, { type: 'DEPOSIT', title: 'Demo deposit successful', message: `${formatMoney(amount)} DEMO has been added to your demo wallet.`, link: '/wallet' });
@@ -126,7 +126,7 @@ export async function demoWithdrawal(userId, rawAmount) {
   return withTransaction(async (tx) => {
     const result = await applyMovement(tx, userId, {
       availableDelta: -toCents(amount), type: 'WITHDRAWAL', direction: 'DEBIT', amount,
-      description: 'Demo withdrawal — no real money transferred', status: 'DEMO_COMPLETED',
+      description: 'Demo withdrawal, no real money transferred', status: 'DEMO_COMPLETED',
     });
     await notify(tx, userId, { type: 'WITHDRAWAL', title: 'Demo withdrawal completed', message: `${formatMoney(amount)} DEMO was withdrawn. No real money was transferred.`, link: '/wallet' });
     return { ...result, amount };
@@ -137,7 +137,7 @@ export async function demoWithdrawal(userId, rawAmount) {
 export function houseBotFloat(tx, userId, amount) {
   return applyMovement(tx, userId, {
     availableDelta: toCents(amount), type: 'DEPOSIT', direction: 'CREDIT', amount,
-    description: 'House bot float — DEMO FUNDS', status: 'DEMO_COMPLETED',
+    description: 'House bot float, DEMO FUNDS', status: 'DEMO_COMPLETED',
   });
 }
 
@@ -174,7 +174,7 @@ export function payWinner(tx, userId, match, gameName) {
 export function forfeitStake(tx, userId, match) {
   return applyMovement(tx, userId, {
     lockedDelta: -toCents(match.stake), type: 'FORFEIT', direction: 'DEBIT', amount: match.stake,
-    description: 'Stake forfeited — lost to the pool', matchId: match.id,
+    description: 'Stake forfeited, lost to the pool', matchId: match.id,
     idempotencyKey: `match:${match.id}:forfeit:${userId}`,
   });
 }
@@ -186,7 +186,7 @@ export const ABANDONMENT_FEE_AMOUNT = config.abandonmentFee;
 export function chargeAbandonmentFee(tx, userId, match) {
   return applyMovement(tx, userId, {
     availableDelta: -toCents(ABANDONMENT_FEE_AMOUNT), type: 'ABANDONMENT_FEE', direction: 'DEBIT', amount: ABANDONMENT_FEE_AMOUNT,
-    description: 'Abandonment fee — left a locked 1v1 challenge', matchId: match.id,
+    description: 'Abandonment fee, left a locked 1v1 challenge', matchId: match.id,
     idempotencyKey: `match:${match.id}:abandon:${userId}`,
   });
 }

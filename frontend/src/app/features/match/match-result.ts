@@ -44,7 +44,7 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
               <div class="muted tiny">{{ f.challengeType?.question }} · {{ m.stake | money }}</div>
               <div class="fr-teams">
                 <span>{{ f.homeTeam }}</span>
-                @if (f.homeScore !== null && f.homeScore !== undefined) { <strong class="num">{{ f.homeScore }} – {{ f.awayScore }}</strong> } @else { <span class="muted small">vs</span> }
+                @if (f.homeScore !== null && f.homeScore !== undefined) { <strong class="num">{{ f.homeScore }} - {{ f.awayScore }}</strong> } @else { <span class="muted small">vs</span> }
                 <span>{{ f.awayTeam }}</span>
               </div>
               @if (stat(); as s) {
@@ -59,14 +59,14 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
               <div class="pvp-recap">
                 <div class="pvp-side"><span class="muted tiny">YOU</span><strong>{{ picks().mine }}</strong></div>
                 <div class="pvp-vs">vs</div>
-                <div class="pvp-side"><span class="muted tiny">{{ opponent()?.username ?? 'OPPONENT' }}</span><strong>{{ picks().theirs || '—' }}</strong></div>
+                <div class="pvp-side"><span class="muted tiny">{{ opponent()?.username ?? 'OPPONENT' }}</span><strong>{{ picks().theirs || '-' }}</strong></div>
               </div>
             </div>
           } @else if (m.status === 'COMPLETED') {
             <div class="vs-row">
-              <div class="vs-side"><app-avatar [name]="mine.username" [color]="mine.avatarColor" [size]="48" /><span>You</span><strong class="num">{{ mine.result?.score ?? '—' }}</strong></div>
+              <div class="vs-side"><app-avatar [name]="mine.username" [color]="mine.avatarColor" [size]="48" /><span>You</span><strong class="num">{{ mine.result?.score ?? '-' }}</strong></div>
               <div class="vs-mid">VS</div>
-              <div class="vs-side"><app-avatar [name]="opponent()?.username ?? ''" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="48" /><span>{{ opponent()?.username }}</span><strong class="num">{{ opponent()?.result?.score ?? '—' }}</strong></div>
+              <div class="vs-side"><app-avatar [name]="opponent()?.username ?? ''" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="48" /><span>{{ opponent()?.username }}</span><strong class="num">{{ opponent()?.result?.score ?? '-' }}</strong></div>
             </div>
           }
 
@@ -165,15 +165,15 @@ export class MatchResultPage implements OnInit {
     if (!m) return '';
     const stake = formatMoney(m.stake);
     switch (this.ds()) {
-      case 'WON': return m.endReason === 'ACTION_TIMEOUT' ? `You beat ${opp} — they didn't finish before the timer ran out.` : `You beat ${opp}.`;
+      case 'WON': return m.endReason === 'ACTION_TIMEOUT' ? `You beat ${opp}. They didn't finish before the timer ran out.` : `You beat ${opp}.`;
       case 'LOST': return m.endReason === 'ACTION_TIMEOUT' ? `You didn't finish before the timer ran out, so ${opp} won.` : `${opp} won this one.`;
       case 'DRAW': return `${stake} refunded to both players.`;
       case 'VOID': return `The result couldn't be fairly decided (${m.cancelReason ?? 'no verifiable result'}). ${stake} refunded to both players.`;
-      case 'EXPIRED': return `No opponent joined in time. Your ${stake} was returned — no fee.`;
-      case 'TIMED_OUT': return `${m.cancelReason ?? 'The timer ran out'}. Both stakes were returned in full — no fee.`;
+      case 'EXPIRED': return `No opponent joined in time. Your ${stake} was returned, with no fee.`;
+      case 'TIMED_OUT': return `${m.cancelReason ?? 'The timer ran out'}. Both stakes were returned in full, with no fee.`;
       case 'LEFT': return `You left after the challenge was locked. Your ${stake} was refunded and the ${this.config.abandonmentFee()} abandonment fee was charged.`;
-      case 'OPPONENT_LEFT': return `${opp} left after the challenge was locked. Your ${stake} was refunded in full — no fee for you.`;
-      default: return `${m.cancelReason ? m.cancelReason.charAt(0).toUpperCase() + m.cancelReason.slice(1) + '. ' : ''}Your ${stake} was returned — no fee.`;
+      case 'OPPONENT_LEFT': return `${opp} left after the challenge was locked. Your ${stake} was refunded in full, with no fee for you.`;
+      default: return `${m.cancelReason ? m.cancelReason.charAt(0).toUpperCase() + m.cancelReason.slice(1) + '. ' : ''}Your ${stake} was returned, with no fee.`;
     }
   });
 

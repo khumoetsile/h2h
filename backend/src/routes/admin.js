@@ -239,7 +239,7 @@ router.post('/matches/:id/cancel', validate(adminCancelSchema), ah(async (req, r
     if (!m) throw notFound('Match not found.');
     if (!['WAITING', 'MATCHED', 'READY', 'IN_PROGRESS'].includes(m.status)) throw badRequest('MATCH_NOT_ACTIVE', `Match is already ${m.status.toLowerCase()}.`);
     const ok = await cancelMatchTx(tx, m, reason, { toStatus, actorType: 'ADMIN', actorUserId: req.user.id });
-    if (!ok) throw badRequest('SETTLEMENT_FAILED', 'This match was already settled — it could not be cancelled again.');
+    if (!ok) throw badRequest('SETTLEMENT_FAILED', 'This match was already settled. It could not be cancelled again.');
     return m.id;
   });
   // cancelMatchTx already wrote the primary audit_events row (with

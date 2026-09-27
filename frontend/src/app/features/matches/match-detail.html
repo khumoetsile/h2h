@@ -79,7 +79,7 @@
                 }
               </div>
             } @else if (m.status === 'COMPLETED') {
-              <p class="muted small">Did not finish — forfeited.</p>
+              <p class="muted small">Did not finish (forfeited).</p>
             }
             <div class="payout small">
               <span class="muted">Payout</span>
@@ -102,8 +102,8 @@
                 @let b = roundCell(row.r, m.game.slug);
                 <tr>
                   <td class="muted">{{ row.n }}</td>
-                  <td><span [class.win]="a.ok" [class.loss]="!a.ok && a.main !== '—'">{{ a.main }}</span> <span class="muted tiny">{{ a.sub }}</span></td>
-                  <td class="right"><span class="muted tiny">{{ b.sub }}</span> <span [class.win]="b.ok" [class.loss]="!b.ok && b.main !== '—'">{{ b.main }}</span></td>
+                  <td><span [class.win]="a.ok" [class.loss]="!a.ok && a.main !== '-'">{{ a.main }}</span> <span class="muted tiny">{{ a.sub }}</span></td>
+                  <td class="right"><span class="muted tiny">{{ b.sub }}</span> <span [class.win]="b.ok" [class.loss]="!b.ok && b.main !== '-'">{{ b.main }}</span></td>
                 </tr>
               }
             </tbody>

@@ -73,7 +73,7 @@ export async function register(data, meta = {}) {
       await tx.q(
         `INSERT INTO transactions (reference, user_id, wallet_id, type, direction, amount, available_after, locked_after, description, status, idempotency_key)
          VALUES (?, ?, ?, 'DEPOSIT', 'CREDIT', ?, ?, 0, ?, 'DEMO_COMPLETED', ?)`,
-        [txReference(), uid, walletId, bonus, fromCents(toCents(bonus)), 'Welcome bonus — DEMO FUNDS (no real money)', `signup:${uid}`],
+        [txReference(), uid, walletId, bonus, fromCents(toCents(bonus)), 'Welcome bonus, DEMO FUNDS (no real money)', `signup:${uid}`],
       );
     }
     await notify(tx, uid, {

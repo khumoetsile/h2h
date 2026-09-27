@@ -16,7 +16,7 @@ export function markerAt(periodMs: number, phase: number, t: number) {
   template: `
     <div class="hud">
       <div class="hud-item"><span>Shot</span><strong>{{ Math.min(index() + 1, total()) }}/{{ total() }}</strong></div>
-      <div class="hud-item"><span>Keeper leans</span><strong>{{ phase() === 'aim' ? leanLabel() : '—' }}</strong></div>
+      <div class="hud-item"><span>Keeper leans</span><strong>{{ phase() === 'aim' ? leanLabel() : '-' }}</strong></div>
       <div class="hud-item"><span>Shot clock</span><strong>{{ clock() }}s</strong></div>
     </div>
     <div class="pitch" (pointerdown)="shoot()">

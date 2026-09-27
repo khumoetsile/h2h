@@ -16,5 +16,5 @@ export class AgoPipe implements PipeTransform {
 
 @Pipe({ name: 'ms' })
 export class MsPipe implements PipeTransform {
-  transform(value: number | null | undefined) { return value == null ? '—' : `${Math.round(value)} ms`; }
+  transform(value: number | null | undefined) { return value == null ? '-' : `${Math.round(value)} ms`; }
 }

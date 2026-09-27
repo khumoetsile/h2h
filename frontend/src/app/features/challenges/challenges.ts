@@ -104,7 +104,7 @@ export class ChallengesPage implements OnInit {
     this.acceptError.update((m) => ({ ...m, [c.id]: '' }));
     try {
       const { match } = await this.api.post<{ match: { code: string } }>(`/challenges/${c.id}/accept`, c.football ? { pick } : {});
-      this.toast.success(c.football ? "Accepted — you're both locked in!" : 'Accepted and locked in — waiting for ' + c.challenger.username + ' to lock in.');
+      this.toast.success(c.football ? "Accepted, you're both locked in!" : 'Accepted and locked in. Waiting for ' + c.challenger.username + ' to lock in.');
       this.acceptTarget.set(null);
       await this.router.navigate(['/match', match.code]);
     } catch (err) {

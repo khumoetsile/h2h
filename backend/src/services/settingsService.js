@@ -56,7 +56,7 @@ function validate(key, value) {
       return [...new Set(value.map((v) => Math.round(v * 100) / 100))].sort((a, b) => a - b);
     }
     case 'signup_bonus':
-      if (typeof value !== 'number' || value < 0 || value > 100000) throw badRequest('INVALID_SETTING', 'Signup bonus must be 0 – 100,000.');
+      if (typeof value !== 'number' || value < 0 || value > 100000) throw badRequest('INVALID_SETTING', 'Signup bonus must be 0 to 100,000.');
       return Math.round(value * 100) / 100;
     case 'max_deposit':
     case 'min_withdrawal':
@@ -64,12 +64,12 @@ function validate(key, value) {
       return Math.round(value * 100) / 100;
     case 'football_supported_competitions': {
       if (!Array.isArray(value) || value.length === 0 || value.length > 20 || !value.every((v) => typeof v === 'string' && /^[A-Z0-9]{2,10}$/.test(v))) {
-        throw badRequest('INVALID_SETTING', 'Provide 1–20 competition codes (letters/numbers only), e.g. PL, PD, SA.');
+        throw badRequest('INVALID_SETTING', 'Provide 1-20 competition codes (letters/numbers only), e.g. PL, PD, SA.');
       }
       return [...new Set(value.map((v) => v.toUpperCase()))];
     }
     default:
-      if (!Number.isInteger(value) || value < 1 || value > 10080) throw badRequest('INVALID_SETTING', `${key} must be a whole number of minutes (1 – 10080).`);
+      if (!Number.isInteger(value) || value < 1 || value > 10080) throw badRequest('INVALID_SETTING', `${key} must be a whole number of minutes (1 to 10080).`);
       return value;
   }
 }

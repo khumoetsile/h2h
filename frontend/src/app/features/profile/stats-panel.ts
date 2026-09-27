@@ -31,8 +31,8 @@ import { GameIcon } from '../../shared/ui';
                 <td class="right num">{{ g.played }}</td>
                 <td class="right num win">{{ g.wins }}</td>
                 <td class="right num">{{ g.losses }}</td>
-                <td class="right num">{{ g.wins + g.losses ? ((g.wins / (g.wins + g.losses)) * 100).toFixed(0) + '%' : '—' }}</td>
-                <td class="right num">{{ g.bestScore ?? '—' }}</td>
+                <td class="right num">{{ g.wins + g.losses ? ((g.wins / (g.wins + g.losses)) * 100).toFixed(0) + '%' : '-' }}</td>
+                <td class="right num">{{ g.bestScore ?? '-' }}</td>
                 <td class="right money">{{ g.winnings | money }}</td>
               </tr>
             }

@@ -82,7 +82,7 @@ const ACTOR_LABEL: Record<string, string> = { PLAYER: 'Player', ADMIN: 'Admin', 
                   <div class="tl-head">
                     <strong>{{ label(e.action) }}</strong>
                     <span class="chip" [class]="actorChip(e.actorType)">{{ actor(e.actorType) }}</span>
-                    @if (e.previousState || e.newState) { <span class="muted tiny">{{ e.previousState ?? '—' }} → {{ e.newState ?? '—' }}</span> }
+                    @if (e.previousState || e.newState) { <span class="muted tiny">{{ e.previousState ?? '-' }} to {{ e.newState ?? '-' }}</span> }
                   </div>
                   <div class="tl-meta small muted">
                     @if (e.actorUsername) { <span>User: {{ e.actorUsername }} ({{ e.actorUserId }})</span> }

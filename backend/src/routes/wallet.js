@@ -11,7 +11,7 @@ const router = Router();
 // A user can only ever see / modify their own wallet: the user id always
 // comes from the authenticated session, never from the request.
 router.get('/', ah(async (req, res) => {
-  res.json({ wallet: await getWallet(req.user.id), demoMode: true, notice: 'DEMO WALLET — NO REAL MONEY' });
+  res.json({ wallet: await getWallet(req.user.id), demoMode: true, notice: 'DEMO WALLET: NO REAL MONEY' });
 }));
 
 router.post('/demo-deposit', requirePlayer, validate(amountSchema), ah(async (req, res) => {

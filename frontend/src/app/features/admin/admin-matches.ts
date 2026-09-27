@@ -45,7 +45,7 @@ interface AdminMatch {
                   <td><app-match-status [status]="m.status" /></td>
                   <td class="right money">{{ m.stake | money }}</td>
                   <td class="right money">{{ (m.status === 'COMPLETED' && !m.isDraw ? m.fee : 0) | money }}</td>
-                  <td>{{ m.winner ? '@' + m.winner : m.isDraw ? 'Draw' : '—' }}</td>
+                  <td>{{ m.winner ? '@' + m.winner : m.isDraw ? 'Draw' : '-' }}</td>
                   <td class="muted">{{ m.createdAt | date: 'd MMM, HH:mm' }}</td>
                   <td class="right" (click)="$event.stopPropagation()">
                     @if (['WAITING','MATCHED','READY','IN_PROGRESS'].includes(m.status)) {

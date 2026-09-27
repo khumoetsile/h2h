@@ -67,16 +67,16 @@ export class MatchDetailPage implements OnInit {
     const s = p?.result?.summary ?? {};
     return Object.entries(s)
       .filter(([k]) => SUMMARY_LABELS[k] && !['totalRounds', 'totalWords', 'shots'].includes(k))
-      .map(([k, v]) => ({ label: SUMMARY_LABELS[k], value: v == null ? '—' : /Ms$/.test(k) ? `${v} ms` : /Pct$/.test(k) ? `${v}%` : String(v) }));
+      .map(([k, v]) => ({ label: SUMMARY_LABELS[k], value: v == null ? '-' : /Ms$/.test(k) ? `${v} ms` : /Pct$/.test(k) ? `${v}%` : String(v) }));
   }
 
   roundCell(r: Record<string, unknown> | undefined, slug: string) {
-    if (!r) return { main: '—', sub: '', ok: false };
+    if (!r) return { main: '-', sub: '', ok: false };
     const status = String(r['status'] ?? '');
     const ok = ['HIT', 'CORRECT', 'GOAL'].includes(status);
     let main = status.replace('_', ' ').toLowerCase();
     if (slug === 'reaction-rush' || slug === 'aim-challenge') main = ok ? `${r['reactionMs']} ms` : main;
-    if (slug === 'word-battle') main = ok ? String(r['answer']) : `${r['guess'] || '—'}`;
+    if (slug === 'word-battle') main = ok ? String(r['answer']) : `${r['guess'] || '-'}`;
     if (slug === 'memory-battle') main = ok ? `${r['length']} tiles` : `${r['correctPrefix']}/${r['length']}`;
     if (slug === 'penalty-shootout') main = status === 'GOAL' ? 'Goal' : status === 'SAVED' ? `Saved (${String(r['keeperDive']).toLowerCase()})` : 'Wide';
     return { main, sub: `${r['points']} pts`, ok };

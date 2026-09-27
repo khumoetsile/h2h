@@ -15,7 +15,7 @@
     <div class="spacer"></div>
 
     @if (!auth.isAdmin() && auth.wallet(); as w) {
-      <a class="wallet-chip" routerLink="/wallet" matTooltip="Demo wallet — no real money">
+      <a class="wallet-chip" routerLink="/wallet" matTooltip="Demo wallet: no real money">
         <span class="wc-label">DEMO</span>
         <span class="wc-amount money">{{ w.available | money }}</span>
       </a>

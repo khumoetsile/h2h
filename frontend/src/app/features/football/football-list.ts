@@ -66,7 +66,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         } @else if (visibleOpen().length === 0) {
           <div class="card empty-open">
             <mat-icon>group_off</mat-icon>
-            <div class="grow"><strong>No one is waiting right now</strong><p class="muted small">Start one — pick a fixture and choose <em>Find opponent</em>.</p></div>
+            <div class="grow"><strong>No one is waiting right now</strong><p class="muted small">Start one: pick a fixture and choose <em>Find opponent</em>.</p></div>
           </div>
         } @else {
           <div class="card-grid">
@@ -96,7 +96,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
                   @if (m.displayState === 'LOCKING_IN' && m.lockedIn === false) {
                     <span class="chip chip-accent">Your turn</span>
                   } @else if (m.displayState === 'IN_PROGRESS' && m.football?.fixtureStatus === 'LIVE') {
-                    <span class="chip chip-win"><span class="live-dot"></span> LIVE {{ m.football?.homeScore }}–{{ m.football?.awayScore }}</span>
+                    <span class="chip chip-win"><span class="live-dot"></span> LIVE {{ m.football?.homeScore }}-{{ m.football?.awayScore }}</span>
                   } @else {
                     <span [class]="state(m).chip">{{ state(m).label }}</span>
                   }
@@ -111,7 +111,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       <!-- ⚡ FIXTURES -->
       <section id="fixtures">
         <div class="section-title">
-          <div><h2>⚡ Starting soon</h2><p class="sub">Real fixtures — pick one to create a challenge</p></div>
+          <div><h2>⚡ Starting soon</h2><p class="sub">Real fixtures, pick one to create a challenge</p></div>
         </div>
         <div class="segmented tabs day-tabs">
           @for (t of dayTabs; track t.key) {
@@ -141,7 +141,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
                 </div>
                 <div class="teams-line">
                   <span class="team">{{ f.homeTeam.name }}</span>
-                  @if (f.status === 'LIVE') { <span class="score">{{ f.homeScore }} – {{ f.awayScore }}</span> } @else { <span class="vs">vs</span> }
+                  @if (f.status === 'LIVE') { <span class="score">{{ f.homeScore }} - {{ f.awayScore }}</span> } @else { <span class="vs">vs</span> }
                   <span class="team">{{ f.awayTeam.name }}</span>
                 </div>
                 <div class="fx-foot">

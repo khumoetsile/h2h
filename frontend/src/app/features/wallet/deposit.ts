@@ -19,7 +19,7 @@ import { DemoBadge } from '../../shared/ui';
     <div class="page page-narrow">
       <a class="back muted small" routerLink="/wallet"><mat-icon>arrow_back</mat-icon>Wallet</a>
       <div class="page-head"><div><h1>Add Demo Funds</h1><p class="sub">Top up your demo wallet instantly.</p></div><app-demo-badge label="Demo mode" size="lg" /></div>
-      <div class="demo-strip"><mat-icon>science</mat-icon> DEMO MODE — No real money is being deposited</div>
+      <div class="demo-strip"><mat-icon>science</mat-icon> DEMO MODE: No real money is being deposited</div>
 
       <div class="card panel">
         @if (success(); as s) {

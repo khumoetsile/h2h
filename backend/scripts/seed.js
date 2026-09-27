@@ -19,7 +19,7 @@ import { matchCode, txReference } from '../src/utils/ids.js';
 const GAMES = [
   {
     slug: 'reaction-rush', name: 'Reaction Rush', tagline: 'Test how fast you can react.', accent: '#22D3EE', duration: 45,
-    description: 'A target pops up on your screen — tap it before your opponent taps theirs. 10 rounds. Fastest total time wins.',
+    description: 'A target pops up on your screen, tap it before your opponent taps theirs. 10 rounds. Fastest total time wins.',
     how: 'Wait for the target to appear, then tap it as fast as you can. The quicker you react, the more points you score. Tap too early or miss and you score nothing for that round. After 10 rounds, whoever scored the most wins.',
   },
   {
@@ -30,17 +30,17 @@ const GAMES = [
   {
     slug: 'word-battle', name: 'Word Battle', tagline: 'Think faster than your opponent.', accent: '#A855F7', duration: 90,
     description: 'Unscramble 8 mixed-up words as quickly as you can. Faster, correct answers score more.',
-    how: 'The letters of a word are jumbled up — type the real word and hit enter. You have 20 seconds per word, and you can skip one if you\'re stuck. Whoever scores the most after 8 words wins.',
+    how: 'The letters of a word are jumbled up, type the real word and hit enter. You have 20 seconds per word, and you can skip one if you\'re stuck. Whoever scores the most after 8 words wins.',
   },
   {
     slug: 'memory-battle', name: 'Memory Battle', tagline: 'Remember more and score more.', accent: '#F97316', duration: 80,
     description: 'Watch the tiles light up, then repeat the pattern from memory. Patterns get longer each round.',
-    how: 'A sequence of tiles flashes on the grid — watch closely, then tap them back in the same order. Patterns start short and get longer each round. Whoever remembers the most wins.',
+    how: 'A sequence of tiles flashes on the grid, watch closely, then tap them back in the same order. Patterns start short and get longer each round. Whoever remembers the most wins.',
   },
   {
     slug: 'aim-challenge', name: 'Aim Challenge', tagline: 'Hit more targets than your opponent.', accent: '#EF4444', duration: 35,
-    description: '20 targets appear one after another and shrink fast — hit as many as you can, right in the centre.',
-    how: 'Targets pop up and shrink away quickly — tap each one before it disappears. Hitting the centre scores more than a glancing hit. Whoever hits the most (and most accurately) wins.',
+    description: '20 targets appear one after another and shrink fast, hit as many as you can, right in the centre.',
+    how: 'Targets pop up and shrink away quickly, tap each one before it disappears. Hitting the centre scores more than a glancing hit. Whoever hits the most (and most accurately) wins.',
   },
 ];
 
@@ -49,15 +49,15 @@ const GAMES = [
 // capabilities (see src/football/providerRegistry.js); the mock provider
 // (default in dev) supports all of them.
 const FOOTBALL_CHALLENGE_TYPES = [
-  { slug: 'match_winner', name: 'Who will win?', question: 'Who will win — {home} or {away}?', pickType: 'TEAM', requiresStats: false, noWinnerRule: 'DRAW', summary: 'Pick the match winner. If the match itself is a draw, both entries are refunded — no fee.' },
+  { slug: 'match_winner', name: 'Who will win?', question: 'Who will win: {home} or {away}?', pickType: 'TEAM', requiresStats: false, noWinnerRule: 'DRAW', summary: 'Pick the match winner. If the match itself is a draw, both entries are refunded, no fee.' },
   { slug: 'both_teams_score', name: 'Will both teams score?', question: 'Will both {home} and {away} score?', pickType: 'YES_NO', requiresStats: false, noWinnerRule: 'VOID', summary: 'Yes or no. Settled from the final score.' },
   { slug: 'over_under_2_5', name: 'Over/under 2.5 goals?', question: 'Will there be over 2.5 total goals in {home} vs {away}?', pickType: 'YES_NO', requiresStats: false, noWinnerRule: 'VOID', summary: 'Yes (3+ goals) or no (2 or fewer). Settled from the final score.' },
-  { slug: 'first_to_score', name: 'Who scores first?', question: 'Who will score first — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'VOID', summary: 'Pick who scores the opening goal. If neither team scores, both entries are refunded — no fee.' },
-  { slug: 'more_shots', name: 'Who will have more shots?', question: 'Who will have more shots — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more shots. An equal count is a draw — full refund, no fee.' },
-  { slug: 'more_corners', name: 'Who will have more corners?', question: 'Who will win more corners — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more corners. An equal count is a draw — full refund, no fee.' },
-  { slug: 'more_cards', name: 'Who gets more cards?', question: 'Which team will receive more cards — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team shown more cards. An equal count is a draw — full refund, no fee.' },
-  { slug: 'more_possession', name: 'Who will have more possession?', question: 'Who will have more possession — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more possession. An equal split is a draw — full refund, no fee.' },
-  { slug: 'more_shots_on_target', name: 'Who will have more shots on target?', question: 'Who will have more shots on target — {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more shots on target. An equal count is a draw — full refund, no fee.' },
+  { slug: 'first_to_score', name: 'Who scores first?', question: 'Who will score first: {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'VOID', summary: 'Pick who scores the opening goal. If neither team scores, both entries are refunded, no fee.' },
+  { slug: 'more_shots', name: 'Who will have more shots?', question: 'Who will have more shots: {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more shots. An equal count is a draw: full refund, no fee.' },
+  { slug: 'more_corners', name: 'Who will have more corners?', question: 'Who will win more corners: {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more corners. An equal count is a draw: full refund, no fee.' },
+  { slug: 'more_cards', name: 'Who gets more cards?', question: 'Which team will receive more cards: {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team shown more cards. An equal count is a draw: full refund, no fee.' },
+  { slug: 'more_possession', name: 'Who will have more possession?', question: 'Who will have more possession: {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more possession. An equal split is a draw: full refund, no fee.' },
+  { slug: 'more_shots_on_target', name: 'Who will have more shots on target?', question: 'Who will have more shots on target: {home} or {away}?', pickType: 'TEAM', requiresStats: true, noWinnerRule: 'DRAW', summary: 'Pick the team with more shots on target. An equal count is a draw: full refund, no fee.' },
 ];
 
 const PASSWORD_PLAYER = 'Player123!';
@@ -89,7 +89,7 @@ async function insertTx(tx, { userId, walletId, type, direction, amount, avail, 
 export async function seed({ log = console.log } = {}) {
   const [[existing]] = await pool.query('SELECT COUNT(*) AS n FROM users');
   if (existing.n > 0) {
-    log('Database already has users — skipping seed. Run "npm run db:reset" to start fresh.');
+    log('Database already has users, skipping seed. Run "npm run db:reset" to start fresh.');
     return;
   }
   const hashes = {
@@ -146,7 +146,7 @@ export async function seed({ log = console.log } = {}) {
         users[u.username].avail = toCents(u.balance);
         await insertTx(tx, {
           userId: r.insertId, walletId: w.insertId, type: 'DEPOSIT', direction: 'CREDIT', amount: u.balance, avail: toCents(u.balance), locked: 0,
-          description: u.bot ? 'House bot float — DEMO FUNDS' : 'Welcome bonus + demo deposit — DEMO FUNDS (no real money)', status: 'DEMO_COMPLETED', at: new Date(start),
+          description: u.bot ? 'House bot float, DEMO FUNDS' : 'Welcome bonus + demo deposit, DEMO FUNDS (no real money)', status: 'DEMO_COMPLETED', at: new Date(start),
         });
       }
     }
@@ -226,7 +226,7 @@ export async function seed({ log = console.log } = {}) {
       p.avail += type === 'DEPOSIT' ? toCents(amt) : -toCents(amt);
       await insertTx(tx, {
         userId: p.id, walletId: p.walletId, type, direction: type === 'DEPOSIT' ? 'CREDIT' : 'DEBIT', amount: amt, avail: p.avail, locked: p.locked,
-        description: type === 'DEPOSIT' ? 'Demo deposit — DEMO FUNDS (no real money)' : 'Demo withdrawal — no real money transferred', status: 'DEMO_COMPLETED', at: new Date(Date.now() - off * day),
+        description: type === 'DEPOSIT' ? 'Demo deposit, DEMO FUNDS (no real money)' : 'Demo withdrawal, no real money transferred', status: 'DEMO_COMPLETED', at: new Date(Date.now() - off * day),
       });
     }
 

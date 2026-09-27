@@ -53,7 +53,7 @@ export function startSweeper() {
         // Anything that was running while this server was down gets the
         // outage added back before it can be judged as timed out.
         const extended = await compensateDowntime({ thresholdMs: Math.max(30000, config.sweeperIntervalSeconds * 3000) });
-        if (extended) console.log(`  Server was down ~${extended}s — extended running challenge timers by that amount.`);
+        if (extended) console.log(`  Server was down ~${extended}s. Extended running challenge timers by that amount.`);
         booted = true;
       }
       await expireChallenges();
@@ -82,7 +82,7 @@ if (isMain) {
   startSweeper();
   startFootballSync(config.football.syncIntervalSeconds);
   server.listen(config.port, () => {
-    console.log(`\n  ${config.appName} API (DEMO MODE — simulated funds only)`);
+    console.log(`\n  ${config.appName} API (DEMO MODE: simulated funds only)`);
     console.log(`  Listening on http://localhost:${config.port}/api\n`);
   });
 }

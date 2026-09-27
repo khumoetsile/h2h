@@ -96,7 +96,7 @@ export function challengeStanding(m: MatchView): { headline: string; tone: 'me' 
   const team = leader === 'HOME' ? f.homeTeam : leader === 'AWAY' ? f.awayTeam : null;
   const ahead = leader === myPick;
   const who = ahead ? `Your pick (${mine})` : `Your opponent's pick (${theirs})`;
-  if (team && subject) return { headline: `${team} ${m.status === 'COMPLETED' ? 'finished' : 'is currently'} ahead ${subject} — ${ahead ? 'your' : "your opponent's"} pick.`, tone: ahead ? 'me' : 'them' };
+  if (team && subject) return { headline: `${team} ${m.status === 'COMPLETED' ? 'finished' : 'is currently'} ahead ${subject}: ${ahead ? 'your' : "your opponent's"} pick.`, tone: ahead ? 'me' : 'them' };
   return { headline: `${who} is currently ahead.`, tone: ahead ? 'me' : 'them' };
 }
 

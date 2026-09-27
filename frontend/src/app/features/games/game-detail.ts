@@ -49,7 +49,7 @@ import { GameIcon, LoadError, Spinner } from '../../shared/ui';
               <h3><mat-icon>menu_book</mat-icon> How to play</h3>
               <p class="text-2">{{ g.howToPlay }}</p>
               <ul class="rules muted small">
-                <li>Both players get exactly the same challenge — it's fair for everyone.</li>
+                <li>Both players get exactly the same challenge, so it's fair for everyone.</li>
                 <li>If it's an exact tie, you get your entry back.</li>
                 <li>Changed your mind? Leave before the game starts and get your entry back.</li>
               </ul>
@@ -72,13 +72,13 @@ import { GameIcon, LoadError, Spinner } from '../../shared/ui';
                   <div class="pb-row"><span>You pay</span><strong class="money">{{ s.stake | money }}</strong></div>
                   <div class="pb-row win-row"><span>You could win</span><strong class="money accent">{{ s.prize | money }}</strong></div>
                   @if (waitingFor(s.stake) > 0) {
-                    <p class="win small instant"><mat-icon inline>bolt</mat-icon> Someone's ready to play now — you'll be matched instantly.</p>
+                    <p class="win small instant"><mat-icon inline>bolt</mat-icon> Someone's ready to play now. You'll be matched instantly.</p>
                   }
                   <button type="button" class="link tiny how-link" (click)="showBreakdown.set(!showBreakdown())">
                     {{ showBreakdown() ? 'Hide' : 'How is the prize worked out?' }}
                   </button>
                   @if (showBreakdown()) {
-                    <p class="muted tiny breakdown-note">Both entries go into one prize pool. A small platform fee ({{ g.feePercent }}%) is taken out, and the winner gets the rest — {{ s.pool | money }} pool − {{ s.fee | money }} fee = {{ s.prize | money }}.</p>
+                    <p class="muted tiny breakdown-note">Both entries go into one prize pool. A small platform fee ({{ g.feePercent }}%) is taken out, and the winner gets the rest: {{ s.pool | money }} pool minus {{ s.fee | money }} fee equals {{ s.prize | money }}.</p>
                   }
                 </div>
               }
@@ -110,13 +110,14 @@ import { GameIcon, LoadError, Spinner } from '../../shared/ui';
   `,
   styles: [`
     .back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 16px; min-height: 32px; mat-icon { font-size: 18px; width: 18px; height: 18px; } &:hover { color: var(--text); } }
-    .layout { display: grid; gap: 20px; grid-template-columns: 1fr; }
-    @media (min-width: 960px) { .layout { grid-template-columns: 1fr 400px; align-items: start; } .entry { position: sticky; top: 84px; } }
+    .layout { display: grid; gap: 20px; grid-template-columns: 1fr; max-width: 880px; }
+    @media (min-width: 960px) { .layout { grid-template-columns: 1fr 340px; align-items: start; } .entry { position: sticky; top: 84px; } }
     .head { display: flex; gap: 16px; align-items: center; h1 { font-size: 28px; } }
     @media (min-width: 640px) { .head h1 { font-size: 32px; } }
     .meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; }
     .how h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; mat-icon { color: var(--muted); } }
-    .rules { margin: 12px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.4; }
+    .how .text-2 { max-width: 56ch; }
+    .rules { margin: 12px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.4; max-width: 56ch; }
     .entry { padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
     .entry h2 { font-size: 18px; margin-bottom: 4px; }
     .stake-tiles { margin-top: 10px; }

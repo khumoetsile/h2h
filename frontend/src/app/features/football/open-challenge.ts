@@ -122,12 +122,12 @@ export class JoinSheet {
     this.error.set('');
     try {
       const { match } = await this.api.post<{ match: MatchView }>(`/football/open-challenges/${c.matchId}/join`);
-      this.toast.success(`You're in — you and ${c.creator.username} are both locked in.`);
+      this.toast.success(`You're in, you and ${c.creator.username} are both locked in.`);
       await this.router.navigate(['/match', match.code]);
     } catch (err) {
       const e = apiError(err);
       if (e.code === 'CHALLENGE_ALREADY_TAKEN' || e.code === 'CHALLENGE_EXPIRED' || e.code === 'MATCH_ALREADY_STARTED' || e.code === 'MATCH_CANCELLED') {
-        this.toast.info(e.code === 'CHALLENGE_EXPIRED' ? 'That challenge just expired — no one joined in time.' : 'Another player already took that challenge.');
+        this.toast.info(e.code === 'CHALLENGE_EXPIRED' ? 'That challenge just expired. No one joined in time.' : 'Another player already took that challenge.');
         this.busy.set(false);
         this.closed.emit({ refresh: true });
         return;

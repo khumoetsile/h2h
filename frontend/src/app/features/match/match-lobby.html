@@ -45,12 +45,12 @@
             <span class="tp-note">Another player must join before the timer expires.</span>
           </div>
           @if (isFootball()) {
-            <p class="text-2 small">Your challenge is listed in <strong>Open Challenges</strong>. You picked <strong>{{ picks().mine }}</strong> — whoever joins takes the other side.</p>
+            <p class="text-2 small">Your challenge is listed in <strong>Open Challenges</strong>. You picked <strong>{{ picks().mine }}</strong>: whoever joins takes the other side.</p>
             @if (me()?.lockedIn) { <p class="locked-note"><mat-icon>lock</mat-icon> You're locked in. It starts the moment someone joins.</p> }
           } @else {
             <p class="text-2 small">We'll pair you with someone playing <strong>{{ m.game.name }}</strong> for <strong class="money">{{ m.stake | money }}</strong>.</p>
           }
-          <p class="muted tiny">Your {{ m.stake | money }} is set aside. If nobody joins in time it's returned in full — no fee.</p>
+          <p class="muted tiny">Your {{ m.stake | money }} is set aside. If nobody joins in time it's returned in full, with no fee.</p>
           <div class="actions">
             <button class="btn btn-danger" [disabled]="!!busy()" (click)="openLeave()"><mat-icon>close</mat-icon> Cancel challenge</button>
             @if (!isFootball() && config.config()?.demoBotsEnabled) {
@@ -115,7 +115,7 @@
                 <button class="btn btn-primary btn-lg btn-block" [disabled]="!!busy()" (click)="lockIn()">
                   @if (busy() === 'lock') { <mat-spinner diameter="20" /> } @else { <mat-icon>lock</mat-icon> } Lock in {{ m.stake | money }}
                 </button>
-                <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="openLeave()">Leave (no fee — not locked yet)</button>
+                <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="openLeave()">Leave (no fee, not locked yet)</button>
               </section>
             } @else {
               <section class="card state fade-in">
@@ -125,7 +125,7 @@
                   <span class="tp-note">You're locked in. {{ opponent()?.username }} has not locked in yet.</span>
                 </div>
                 <p class="muted tiny">If they don't lock in before the timer runs out, the challenge is cancelled and you get your full stake back.</p>
-                <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="openLeave()">Leave (no fee — not locked yet)</button>
+                <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="openLeave()">Leave (no fee, not locked yet)</button>
               </section>
             }
           }
@@ -173,7 +173,7 @@
                 }
                 <div class="scoreline">
                   <span class="team">{{ f.homeTeam }}</span>
-                  <strong class="score">{{ f.homeScore ?? 0 }} – {{ f.awayScore ?? 0 }}</strong>
+                  <strong class="score">{{ f.homeScore ?? 0 }} - {{ f.awayScore ?? 0 }}</strong>
                   <span class="team">{{ f.awayTeam }}</span>
                 </div>
                 <div class="picks-row">
@@ -183,8 +183,8 @@
                 @if (stat(); as s) {
                   <div class="stat-block">
                     <span class="tp-label">{{ s.label }}</span>
-                    <div class="stat-row" [class.lead]="(s.home ?? -1) > (s.away ?? -1)"><span>{{ f.homeTeam }}</span><strong>{{ s.home ?? '–' }}</strong></div>
-                    <div class="stat-row" [class.lead]="(s.away ?? -1) > (s.home ?? -1)"><span>{{ f.awayTeam }}</span><strong>{{ s.away ?? '–' }}</strong></div>
+                    <div class="stat-row" [class.lead]="(s.home ?? -1) > (s.away ?? -1)"><span>{{ f.homeTeam }}</span><strong>{{ s.home ?? '-' }}</strong></div>
+                    <div class="stat-row" [class.lead]="(s.away ?? -1) > (s.home ?? -1)"><span>{{ f.awayTeam }}</span><strong>{{ s.away ?? '-' }}</strong></div>
                   </div>
                 }
                 @if (standing().headline) {

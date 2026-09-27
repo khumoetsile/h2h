@@ -208,7 +208,7 @@ export async function acceptChallenge(userId, id) {
     await recordLockIn(tx, match.id, userId);
     await notify(tx, c.challenger_id, {
       type: 'CHALLENGE_ACCEPTED',
-      title: 'Challenge accepted — lock in now',
+      title: 'Challenge accepted, lock in now',
       message: `${me.username} accepted and locked in to your ${game.name} challenge. Lock in before the timer runs out.`,
       link: `/match/${match.code}`,
     });
@@ -269,7 +269,7 @@ export async function expireChallenges(now = new Date()) {
         actorType: 'SYSTEM', action: 'CHALLENGE_EXPIRED', entityType: 'CHALLENGE', entityId: id,
         challengeId: id, previousState: 'PENDING', newState: 'EXPIRED', reason: 'no response before the acceptance timer ran out',
       });
-      await notify(tx, c.challenger_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `Your ${c.game_name} challenge to ${c.opp} expired — they didn't accept in time.`, link: '/challenges' });
+      await notify(tx, c.challenger_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `Your ${c.game_name} challenge to ${c.opp} expired. They didn't accept in time.`, link: '/challenges' });
       await notify(tx, c.opponent_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `${c.challenger}'s ${c.game_name} challenge expired before you accepted.`, link: '/challenges' });
       for (const uid of [c.challenger_id, c.opponent_id]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id }));
     });
