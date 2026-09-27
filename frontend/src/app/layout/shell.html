@@ -71,7 +71,8 @@
   <button mat-menu-item routerLink="/profile"><mat-icon>person</mat-icon>Profile</button>
   @if (!auth.isAdmin()) {
     <button mat-menu-item routerLink="/wallet"><mat-icon>account_balance_wallet</mat-icon>Balance</button>
-    <button mat-menu-item routerLink="/matches"><mat-icon>history</mat-icon>Match history</button>
+    <button mat-menu-item routerLink="/matches"><mat-icon>history</mat-icon>My challenges</button>
+    <button mat-menu-item routerLink="/leaderboard"><mat-icon>leaderboard</mat-icon>Rankings</button>
     <button mat-menu-item routerLink="/wallet/transactions"><mat-icon>receipt_long</mat-icon>Activity</button>
   }
   <button mat-menu-item routerLink="/notifications"><mat-icon>notifications</mat-icon>Notifications</button>

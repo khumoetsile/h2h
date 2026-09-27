@@ -34,3 +34,15 @@
 
 .right { text-align: right; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
 .li-title { font-weight: 600; font-size: 14px; }
+
+.football-hero { display: flex; align-items: center; gap: 16px; padding: 18px; margin-top: 16px; text-decoration: none; color: inherit; flex-wrap: wrap;
+  border-color: rgba(61, 220, 151, .45); background: linear-gradient(135deg, rgba(61, 220, 151, .12), var(--surface) 60%);
+  .grow { flex: 1; min-width: 200px; display: flex; flex-direction: column; gap: 4px; }
+  h2 { font-size: 19px; }
+  .fh-icon { width: 56px; height: 56px; border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+    background: var(--win-soft); color: var(--win); mat-icon { font-size: 32px; width: 32px; height: 32px; } }
+  .fh-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; color: var(--win); }
+  .fh-live { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--demo); margin-top: 2px; }
+  .fh-go { flex-shrink: 0; }
+}
+@media (max-width: 520px) { .football-hero .fh-go { width: 100%; justify-content: center; } }

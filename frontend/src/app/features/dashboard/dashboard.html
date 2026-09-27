@@ -29,6 +29,20 @@
       </a>
     </section>
 
+    <!-- Football PvP: the headline mode, one tap away. -->
+    <a class="card football-hero card-interactive fade-in" routerLink="/football">
+      <div class="fh-icon"><mat-icon>sports_soccer</mat-icon></div>
+      <div class="grow">
+        <span class="fh-eyebrow">Football</span>
+        <h2>Challenge a player on real matches</h2>
+        <p class="muted small">Pick a fixture, pick a side, and play another person — never the house.</p>
+        @if (openCount() > 0) {
+          <span class="fh-live"><span class="live-dot"></span> {{ openCount() }} player{{ openCount() === 1 ? '' : 's' }} looking for an opponent</span>
+        }
+      </div>
+      <span class="btn btn-primary fh-go">Play football <mat-icon>chevron_right</mat-icon></span>
+    </a>
+
     <!-- Anything mid-game takes priority over browsing. -->
     @if (data()?.activeMatches?.length) {
       <section class="block">
@@ -38,7 +52,7 @@
             <a class="card card-interactive active-match" [routerLink]="matchLink(m)">
               <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="44" />
               <div class="grow">
-                <div class="am-title">{{ m.game.name }}</div>
+                <div class="am-title">{{ m.football ? m.football.homeTeam + ' vs ' + m.football.awayTeam : m.game.name }}</div>
                 <div class="muted small">{{ m.opponent ? 'vs ' + m.opponent.username : 'Waiting for an opponent…' }}</div>
               </div>
               <span class="btn btn-primary btn-sm">Continue</span>
@@ -58,11 +72,11 @@
               <app-avatar [name]="c.challenger.username" [color]="c.challenger.avatarColor" [size]="40" />
               <div class="grow">
                 <div class="am-title">{{ c.challenger.username }} challenged you</div>
-                <div class="muted small">{{ c.game.name }} · {{ c.stake | money }} to enter</div>
+                <div class="muted small">{{ c.football ? c.football.homeTeam + ' vs ' + c.football.awayTeam : c.game.name }} · {{ c.stake | money }} stake</div>
               </div>
               <div class="ch-actions">
                 <button class="btn btn-ghost btn-sm" [disabled]="busy() === c.id" (click)="respond(c, 'decline')">Decline</button>
-                <button class="btn btn-primary btn-sm" [disabled]="busy() === c.id" (click)="respond(c, 'accept')">Accept</button>
+                <a class="btn btn-primary btn-sm" routerLink="/challenges" [queryParams]="{ tab: 'incoming' }">Review</a>
               </div>
             </div>
           }
@@ -106,7 +120,7 @@
               <a class="list-item" [routerLink]="['/matches', m.code]">
                 <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="36" />
                 <div class="grow">
-                  <div class="li-title">{{ m.game.name }} <span class="muted small">vs {{ m.opponent?.username }}</span></div>
+                  <div class="li-title">{{ m.football ? m.football.homeTeam + ' vs ' + m.football.awayTeam : m.game.name }} <span class="muted small">vs {{ m.opponent?.username }}</span></div>
                   <div class="muted small">{{ m.completedAt | ago }}</div>
                 </div>
                 <div class="right">

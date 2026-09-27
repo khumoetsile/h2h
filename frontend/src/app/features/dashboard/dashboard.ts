@@ -44,6 +44,8 @@ export class DashboardPage implements OnInit {
   protected data = signal<Dashboard | null>(null);
   protected error = signal('');
   protected busy = signal<number | null>(null);
+  /** Players currently waiting for a football opponent — shown on the Football card. */
+  protected openCount = signal(0);
 
   protected incomingChallenges() {
     return (this.data()?.activeChallenges ?? []).filter((c) => c.direction === 'INCOMING');
@@ -60,6 +62,7 @@ export class DashboardPage implements OnInit {
     if (!silent) this.error.set('');
     try {
       const d = await this.api.get<Dashboard>('/dashboard');
+      this.api.get<{ challenges: unknown[] }>('/football/open-challenges').then((r) => this.openCount.set(r.challenges.length)).catch(() => {});
       this.data.set(d);
       this.auth.wallet.set(d.wallet);
     } catch (err) {
