@@ -134,6 +134,10 @@
                 }
 
                 @if (formError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ formError() }}</div> }
+
+                @if (mode()) {
+                  <p class="fee-disclosure muted tiny"><mat-icon inline>info</mat-icon> Leaving after the challenge is locked will incur a P0.50 abandonment fee.</p>
+                }
               }
             </div>
 

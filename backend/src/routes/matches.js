@@ -12,6 +12,7 @@ const view = (req, id) => svc.getMatchView(id, req.user.id);
 const listQuery = z.object({
   filter: z.enum(['all', 'wins', 'losses', 'cancelled', 'completed']).optional(),
   status: z.enum(['active']).optional(),
+  category: z.enum(['FOOTBALL', 'SKILL_GAME']).optional(),
   page: z.coerce.number().int().min(1).optional(),
   pageSize: z.coerce.number().int().min(1).max(100).optional(),
 });

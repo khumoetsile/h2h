@@ -146,6 +146,17 @@ export class MatchResultPage implements OnInit {
     const f = this.match()?.football;
     return f ? relevantStat(f) : null;
   });
+  /** cancelMatchTx sets cancel_reason to "<username> left the challenge" specifically for a locked-football abandonment — distinct from any other cancellation reason. */
+  protected abandonedByMe = computed(() => {
+    const m = this.match();
+    const mine = this.me();
+    return !!m?.cancelReason && !!mine && m.cancelReason === `${mine.username} left the challenge`;
+  });
+  protected abandonedByOpponent = computed(() => {
+    const m = this.match();
+    const opp = this.opponent();
+    return !!m?.cancelReason && !!opp && m.cancelReason === `${opp.username} left the challenge`;
+  });
 
   protected icon = computed(() => {
     const m = this.match();
@@ -159,6 +170,8 @@ export class MatchResultPage implements OnInit {
   protected headline = computed(() => {
     const m = this.match();
     if (!m) return '';
+    if (m.status === 'CANCELLED' && this.abandonedByMe()) return 'You left the challenge';
+    if (m.status === 'CANCELLED' && this.abandonedByOpponent()) return 'Opponent left the challenge';
     if (m.status === 'CANCELLED') return this.isFootball() ? 'Challenge cancelled' : 'Match cancelled';
     if (m.status === 'VOID') return "Result couldn't be verified";
     if (m.isDraw) return "IT'S A DRAW";
@@ -168,6 +181,8 @@ export class MatchResultPage implements OnInit {
   protected subline = computed(() => {
     const m = this.match();
     if (!m) return '';
+    if (m.status === 'CANCELLED' && this.abandonedByMe()) return 'Your entry was refunded, minus a P0.50 abandonment fee for leaving after the challenge was locked.';
+    if (m.status === 'CANCELLED' && this.abandonedByOpponent()) return 'Your opponent left after the challenge was locked. Your entry was refunded in full — no fee for you.';
     if (m.status === 'CANCELLED') return 'Your entry was refunded.';
     if (m.status === 'VOID') return 'We could not fairly determine a result, so your entry was refunded in full — no fee.';
     if (m.isDraw) return this.isFootball() ? "The match ended in a draw — your entry was refunded." : 'It was a tie — your entry was refunded.';

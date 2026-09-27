@@ -21,3 +21,4 @@
   &:disabled { opacity: .45; cursor: not-allowed; }
 }
 .taken { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .03em; }
+.fee-disclosure { display: flex; align-items: center; gap: 4px; margin-top: 6px; }

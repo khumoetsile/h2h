@@ -178,7 +178,19 @@ export function forfeitStake(tx, userId, match) {
   });
 }
 
-const TX_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT'];
+/** Flat fee for voluntarily leaving an already-locked 1v1 challenge — never charged for a disconnect, only an explicit confirmed Leave action. */
+export const ABANDONMENT_FEE_AMOUNT = 0.50;
+
+/** Charged to the player who leaves a locked challenge, on top of (not instead of) the normal full-refund cancellation. Idempotent — safe to attempt more than once. */
+export function chargeAbandonmentFee(tx, userId, match) {
+  return applyMovement(tx, userId, {
+    availableDelta: -toCents(ABANDONMENT_FEE_AMOUNT), type: 'ABANDONMENT_FEE', direction: 'DEBIT', amount: ABANDONMENT_FEE_AMOUNT,
+    description: 'Abandonment fee — left a locked 1v1 challenge', matchId: match.id,
+    idempotencyKey: `match:${match.id}:abandon:${userId}`,
+  });
+}
+
+const TX_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT', 'ABANDONMENT_FEE'];
 
 export async function listTransactions({ userId = null, type, from, to, search, page = 1, pageSize = 20 }) {
   const where = [];

@@ -17,7 +17,7 @@ import { getEngine } from '../games/index.js';
 import { createRng } from '../games/rng.js';
 import { getSettings } from './settingsService.js';
 import { notify } from './notificationService.js';
-import { forfeitStake, houseBotFloat, lockStake, payWinner, refundStake } from './walletService.js';
+import { chargeAbandonmentFee, forfeitStake, houseBotFloat, lockStake, payWinner, refundStake, ABANDONMENT_FEE_AMOUNT } from './walletService.js';
 import { recordAudit } from './auditService.js';
 import { config } from '../config.js';
 
@@ -487,6 +487,25 @@ export async function cancelMatch(userId, matchIdOrCode) {
   return withTransaction(async (tx) => {
     const { m, players, me } = await lockMatchForPlayer(tx, userId, matchIdOrCode);
     assertNotFinished(m);
+
+    // Football has no "started_at"/gameplay step — once MATCHED, both stakes
+    // are locked and the challenge is considered LOCKED. Leaving at that
+    // point is a real abandonment (see abandonLockedFootballMatch), not a
+    // free, no-consequence cancel. Once the real fixture has kicked off
+    // (IN_PROGRESS), there is nothing left to "leave" — settlement now
+    // depends only on the real result.
+    if (m.category === 'FOOTBALL') {
+      if (m.status === 'WAITING') {
+        await cancelMatchTx(tx, m, 'cancelled by player before an opponent joined', { actorType: me.is_bot ? 'BOT' : 'PLAYER', actorUserId: userId });
+        return m.id;
+      }
+      if (m.status === 'MATCHED') {
+        await abandonLockedFootballMatch(tx, m, me);
+        return m.id;
+      }
+      throw conflict('MATCH_ALREADY_STARTED', 'This challenge has already kicked off and can no longer be left.');
+    }
+
     if (m.status === 'IN_PROGRESS' || players.some((p) => p.started_at)) {
       throw conflict('MATCH_ALREADY_STARTED', 'The match has already started and can no longer be cancelled.');
     }
@@ -494,6 +513,28 @@ export async function cancelMatch(userId, matchIdOrCode) {
     await cancelMatchTx(tx, m, reason, { actorType: me.is_bot ? 'BOT' : 'PLAYER', actorUserId: userId });
     return m.id;
   });
+}
+
+/**
+ * A player voluntarily leaves an already-LOCKED football challenge. Reuses
+ * cancelMatchTx exactly as-is for the stake side (both players fully
+ * refunded, zero platform fee — the existing cancellation rule is not
+ * changed), then separately charges the leaver a flat, disclosed
+ * abandonment fee and records a distinct audit event so it's always
+ * possible to answer "who left, when, and were they charged". Never
+ * triggered by a disconnect — only this explicit, confirmed action.
+ */
+async function abandonLockedFootballMatch(tx, m, leaver) {
+  const ok = await cancelMatchTx(tx, m, `${leaver.username} left the challenge`, { actorType: leaver.is_bot ? 'BOT' : 'PLAYER', actorUserId: leaver.user_id });
+  if (!ok) return false; // already settled by someone else — idempotent no-op, no double charge
+  await chargeAbandonmentFee(tx, leaver.user_id, m);
+  await recordAudit(tx, {
+    actorType: leaver.is_bot ? 'BOT' : 'PLAYER', actorUserId: leaver.user_id, action: 'CHALLENGE_ABANDONED',
+    entityType: 'MATCH', entityId: m.id, matchId: m.id, previousState: 'MATCHED', newState: 'CANCELLED',
+    reason: `${leaver.username} left a locked challenge`,
+    metadata: { abandonmentFee: ABANDONMENT_FEE_AMOUNT },
+  });
+  return true;
 }
 
 // ---------------------------------------------------------------------------
@@ -667,9 +708,10 @@ export async function getMatchView(matchIdOrCode, viewerId, { admin = false } = 
   };
 }
 
-export async function listMatchesForUser(userId, { filter = 'all', page = 1, pageSize = 20, active = false } = {}) {
+export async function listMatchesForUser(userId, { filter = 'all', page = 1, pageSize = 20, active = false, category = null } = {}) {
   const where = ['mp.user_id = ?'];
   const params = [userId];
+  if (category === 'FOOTBALL' || category === 'SKILL_GAME') { where.push('m.category = ?'); params.push(category); }
   if (active) where.push(`m.status IN ('WAITING','MATCHED','READY','IN_PROGRESS')`);
   else if (filter === 'wins') where.push(`mp.outcome = 'WIN'`);
   else if (filter === 'losses') where.push(`mp.outcome = 'LOSS'`);

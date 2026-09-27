@@ -246,6 +246,22 @@ export interface FootballFixture {
   stakes?: number[];
 }
 
+/** A publicly discoverable "Find an opponent" challenge, waiting for a second player to join. */
+export interface OpenFootballChallenge {
+  matchId: number;
+  code: string;
+  stake: number;
+  createdAt: string;
+  creator: { username: string; avatarColor: string };
+  fixtureId: number;
+  competition: { name: string; code: string };
+  homeTeam: string;
+  awayTeam: string;
+  challengeType: { slug: string; name: string; question: string; pickType: PickType };
+  creatorPick: Pick;
+  creatorPickLabel: string;
+}
+
 export interface LeaderboardEntry {
   rank: number;
   userId: number;

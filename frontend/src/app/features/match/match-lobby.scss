@@ -4,6 +4,18 @@
 .live-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; animation: blink 1.4s infinite; }
 @keyframes blink { 50% { opacity: .3; } }
 .kickoff-icon { font-size: 32px; width: 32px; height: 32px; color: var(--muted); margin-bottom: 4px; }
+
+.confirm-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.6); display: flex; align-items: flex-end; justify-content: center; z-index: 200; }
+@media (min-width: 640px) { .confirm-backdrop { align-items: center; } }
+.confirm-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius) var(--radius) 0 0; padding: 24px 20px calc(20px + env(safe-area-inset-bottom)); width: 100%; max-width: 440px; }
+@media (min-width: 640px) { .confirm-card { border-radius: var(--radius); } }
+.leave-fee-box {
+  background: rgba(234,179,8,.1); border-radius: var(--radius-sm); padding: 12px 14px; margin: 14px 0; font-size: 13px; color: var(--text-2);
+  p { display: flex; align-items: center; gap: 6px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+  ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+  strong { color: var(--text); }
+}
+.confirm-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .stake-bar { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; padding: 16px; margin-bottom: 16px;
   div { display: flex; flex-direction: column; gap: 2px; } strong { font-size: 20px; font-family: var(--font-display); } }
 .state { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 32px 20px; margin-bottom: 16px; }

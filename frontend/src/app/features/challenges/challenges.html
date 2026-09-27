@@ -66,6 +66,9 @@
                       }
                     </div>
                     @if (acceptError()[c.id]) { <div class="form-error tiny"><mat-icon>error</mat-icon>{{ acceptError()[c.id] }}</div> }
+                    @if (myPick()[c.id]) {
+                      <p class="fee-disclosure muted tiny"><mat-icon inline>info</mat-icon> Accepting locks you in. Leaving afterwards incurs a P0.50 abandonment fee.</p>
+                    }
                   </div>
                 }
               } @else {

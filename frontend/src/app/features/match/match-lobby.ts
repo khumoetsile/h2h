@@ -34,6 +34,7 @@ export class MatchLobbyPage implements OnInit {
   protected error = signal('');
   protected busy = signal<string | null>(null);
   protected now = signal(Date.now());
+  protected showLeaveConfirm = signal(false);
 
   protected me = computed(() => this.match()?.players.find((p) => p.userId === this.match()?.viewerId) ?? null);
   protected opponent = computed(() => this.match()?.players.find((p) => p.userId !== this.match()?.viewerId) ?? null);
@@ -122,4 +123,12 @@ export class MatchLobbyPage implements OnInit {
   }
   demoOpponent() { return this.act('bot', 'demo-opponent'); }
   play() { this.router.navigate(['/match', this.code(), 'play']); }
+
+  /** Football, once locked (MATCHED): leaving now has a real financial consequence, so it gets an explicit confirm step instead of a bare browser confirm(). */
+  requestLeaveFootball() { this.showLeaveConfirm.set(true); }
+  closeLeaveConfirm() { if (!this.busy()) this.showLeaveConfirm.set(false); }
+  async confirmLeaveFootball() {
+    this.showLeaveConfirm.set(false);
+    return this.act('cancel', 'cancel', "You left the challenge. A P0.50 abandonment fee was charged and your remaining stake was refunded.");
+  }
 }

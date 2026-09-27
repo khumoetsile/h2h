@@ -87,7 +87,7 @@
               <p class="text-2">Both entries are locked in. {{ m.football?.homeTeam }} vs {{ m.football?.awayTeam }} kicks off {{ m.football?.kickoffAt ? (m.football!.kickoffAt | date: 'EEE d MMM, HH:mm') : 'soon' }}.</p>
             }
             @if (m.status !== 'IN_PROGRESS' && m.football?.fixtureStatus !== 'LIVE') {
-              <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="cancel()">Leave challenge</button>
+              <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="requestLeaveFootball()">Leave challenge</button>
             }
           </section>
         } @else {
@@ -131,3 +131,25 @@
     <p class="muted tiny center"><a routerLink="/games" class="link">Back to games</a> · Match {{ m.code }}</p>
   }
 </div>
+
+@if (showLeaveConfirm()) {
+  <div class="confirm-backdrop" (click)="closeLeaveConfirm()">
+    <div class="confirm-card fade-in" (click)="$event.stopPropagation()">
+      <h2>Leave challenge?</h2>
+      <p class="text-2">You are already locked into this 1v1 challenge.</p>
+      <div class="leave-fee-box">
+        <p><mat-icon inline>info</mat-icon> If you leave now:</p>
+        <ul>
+          <li>A <strong>P0.50</strong> abandonment fee will be charged.</li>
+          <li>Your opponent will remain in the challenge and receive their entry back in full.</li>
+        </ul>
+      </div>
+      <div class="confirm-actions">
+        <button class="btn btn-primary btn-block" [disabled]="!!busy()" (click)="closeLeaveConfirm()">Stay in Challenge</button>
+        <button class="btn btn-danger btn-block" [disabled]="!!busy()" (click)="confirmLeaveFootball()">
+          @if (busy() === 'cancel') { <mat-spinner diameter="18" /> } @else { Leave and Pay P0.50 }
+        </button>
+      </div>
+    </div>
+  </div>
+}

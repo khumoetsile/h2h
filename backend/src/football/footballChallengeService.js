@@ -126,6 +126,85 @@ async function validateStakeAmount(stake) {
 }
 
 // ---------------------------------------------------------------------------
+// Open Challenges — publicly discoverable 1v1s waiting for a second player
+// ---------------------------------------------------------------------------
+
+const OPEN_CHALLENGE_SELECT = `
+  SELECT m.id AS match_id, m.code, m.stake, m.created_at, m.created_by,
+         u.username AS creator_username, u.avatar_color AS creator_color,
+         fc.fixture_id, fc.creator_pick, ct.slug AS type_slug, ct.name AS type_name, ct.question_template, ct.pick_type,
+         comp.name AS competition_name, comp.code AS competition_code,
+         ht.name AS home_name, ht.short_name AS home_short, at.name AS away_name, at.short_name AS away_short
+  FROM matches m
+  JOIN football_challenges fc ON fc.match_id = m.id
+  JOIN users u ON u.id = m.created_by
+  JOIN football_challenge_types ct ON ct.id = fc.challenge_type_id
+  JOIN football_fixtures fx ON fx.id = fc.fixture_id
+  JOIN football_competitions comp ON comp.id = fx.competition_id
+  JOIN football_teams ht ON ht.id = fx.home_team_id
+  JOIN football_teams at ON at.id = fx.away_team_id
+  WHERE m.category = 'FOOTBALL' AND m.status = 'WAITING' AND m.source = 'MATCHMAKING'
+    AND fx.status = 'SCHEDULED' AND fx.kickoff_at > NOW()`;
+
+function mapOpenChallenge(r) {
+  const pickLabel = (pick) => (pick === 'HOME' ? (r.home_short || r.home_name) : pick === 'AWAY' ? (r.away_short || r.away_name) : pick);
+  return {
+    matchId: r.match_id,
+    code: r.code,
+    stake: Number(r.stake),
+    createdAt: r.created_at,
+    creator: { username: r.creator_username, avatarColor: r.creator_color },
+    fixtureId: r.fixture_id,
+    competition: { name: r.competition_name, code: r.competition_code },
+    homeTeam: r.home_name, awayTeam: r.away_name,
+    challengeType: { slug: r.type_slug, name: r.type_name, question: fillQuestion(r.question_template, r.home_short, r.away_short), pickType: r.pick_type },
+    creatorPick: r.creator_pick,
+    creatorPickLabel: pickLabel(r.creator_pick),
+  };
+}
+
+/** Every open (WAITING, not yet matched) football challenge — visible to any player except its own creator, who instead sees it under "My Challenges". */
+export async function listOpenChallenges(viewerId) {
+  const rows = await query(`${OPEN_CHALLENGE_SELECT} AND m.created_by <> ? ORDER BY m.created_at DESC LIMIT 100`, [viewerId]);
+  return rows.map(mapOpenChallenge);
+}
+
+/**
+ * Join a specific publicly-listed open challenge — this IS the explicit
+ * "take the opposing side" action (there is only one side left once the
+ * creator has picked), so no separate pick input is required here, unlike
+ * a direct-by-username challenge. Race-safe: the row lock means if two
+ * players hit this at once, only the first commits; the second sees the
+ * row is no longer WAITING and gets a clear "already taken" error — the
+ * match can never end up with more than 2 players.
+ */
+export async function joinOpenChallenge(userId, matchId) {
+  const resultMatchId = await withTransaction(async (tx) => {
+    const m = await tx.one(`SELECT * FROM matches WHERE id = ? FOR UPDATE`, [matchId]);
+    if (!m || m.category !== 'FOOTBALL') throw notFound('Challenge not found.');
+    if (m.created_by === userId) throw badRequest('CANNOT_JOIN_OWN_MATCH', "You can't join your own challenge.");
+    if (m.status !== 'WAITING') {
+      throw conflict('CHALLENGE_ALREADY_TAKEN', 'This challenge has already been taken by another player.');
+    }
+    const fc = await tx.one(`SELECT fc.*, ct.pick_type FROM football_challenges fc JOIN football_challenge_types ct ON ct.id = fc.challenge_type_id WHERE fc.match_id = ?`, [matchId]);
+    if (!fc) throw notFound('Challenge not found.');
+    const fixture = await tx.one('SELECT * FROM football_fixtures WHERE id = ?', [fc.fixture_id]);
+    if (fixture.status !== 'SCHEDULED' || new Date(fixture.kickoff_at) <= new Date()) {
+      throw conflict('CHALLENGE_CLOSED', 'This match has already kicked off, so this challenge is no longer available.');
+    }
+    await joinLockedMatch(tx, m, userId);
+    const opponentPick = opposite(fc.pick_type, fc.creator_pick);
+    await tx.q('UPDATE football_challenges SET opponent_pick = ? WHERE match_id = ?', [opponentPick, matchId]);
+    await recordAudit(tx, {
+      actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_ACCEPTED', entityType: 'MATCH', entityId: matchId, matchId,
+      previousState: 'WAITING', newState: 'MATCHED', metadata: { fixtureId: fc.fixture_id, opponentPick, source: 'OPEN_CHALLENGE' },
+    });
+    return matchId;
+  });
+  return getMatchView(resultMatchId, userId);
+}
+
+// ---------------------------------------------------------------------------
 // Matchmaking ("find an opponent")
 // ---------------------------------------------------------------------------
 
