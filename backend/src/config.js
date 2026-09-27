@@ -8,6 +8,12 @@ function num(name, fallback) {
   return n;
 }
 
+function positive(name, fallback) {
+  const n = num(name, fallback);
+  if (!(n > 0)) throw new Error(`Env var ${name} must be greater than zero`);
+  return n;
+}
+
 const env = process.env.NODE_ENV || 'development';
 
 export const config = {
@@ -29,7 +35,29 @@ export const config = {
   currencySymbol: process.env.CURRENCY_SYMBOL || 'P',
   currencyCode: process.env.CURRENCY_CODE || 'BWP',
   demoBotsEnabled: (process.env.DEMO_BOTS_ENABLED || 'true') === 'true',
-  sweeperIntervalSeconds: num('SWEEPER_INTERVAL_SECONDS', 15),
+  sweeperIntervalSeconds: num('SWEEPER_INTERVAL_SECONDS', 5),
+  // Every PvP timer lives here and only here. The server stamps absolute
+  // deadlines onto the match/challenge row at each state transition using
+  // these durations; clients only ever render the remaining time against
+  // those stored deadlines. See README "Timers".
+  timers: {
+    // Find Opponent (open) and direct challenges: time for someone to accept.
+    challengeAcceptanceSeconds: positive('CHALLENGE_ACCEPTANCE_TIMEOUT_SECONDS', 300),
+    // Once two players are matched: time for both to press Lock In.
+    lockInSeconds: positive('LOCK_IN_TIMEOUT_SECONDS', 120),
+    // Once both are locked in (skill games): time to complete the game.
+    lockedGameSeconds: positive('LOCKED_GAME_TIMEOUT_SECONDS', 600),
+    // Once one player has acted (locked in / finished): time for the other.
+    playerActionSeconds: positive('PLAYER_ACTION_TIMEOUT_SECONDS', 120),
+    // Grace for a player whose connection drops before their deadline.
+    reconnectionSeconds: positive('RECONNECTION_TIMEOUT_SECONDS', 60),
+    // Football: how long after kickoff we wait for a verifiable result before voiding.
+    footballResultTimeoutMinutes: positive('FOOTBALL_RESULT_TIMEOUT_MINUTES', 240),
+    // Network allowance for a request that was sent just before a deadline.
+    latencyGraceMs: num('TIMER_LATENCY_GRACE_MS', 2000),
+  },
+  // Flat fee for leaving a challenge after both players locked in. Server-side only.
+  abandonmentFee: positive('ABANDONMENT_FEE', 0.5),
   // The platform is a prototype: money is ALWAYS simulated. There is intentionally
   // no runtime switch to turn this off — enabling real money is a deliberate
   // future code change made only after the relevant Botswana regulatory and

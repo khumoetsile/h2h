@@ -8,6 +8,7 @@ import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { ah } from './utils/errors.js';
 import { getSettings } from './services/settingsService.js';
 import { computePrize } from './utils/money.js';
+import { publicTimerConfig } from './timers.js';
 import authRoutes from './routes/auth.js';
 import meRoutes from './routes/me.js';
 import walletRoutes from './routes/wallet.js';
@@ -29,6 +30,9 @@ export function createApp() {
   if (!config.isTest) app.use(morgan('dev'));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true, app: config.appName, demoMode: true, time: new Date().toISOString() }));
+  // Server clock for countdown display. Clients estimate their offset from
+  // this; they never use their own clock to decide whether time is up.
+  app.get('/api/time', (_req, res) => res.json({ serverNow: new Date().toISOString() }));
 
   // Public runtime configuration (app name, demo flags, stakes, fee).
   app.get('/api/config', ah(async (_req, res) => {
@@ -46,6 +50,9 @@ export function createApp() {
       maxDeposit: s.max_deposit,
       minWithdrawal: s.min_withdrawal,
       demoBotsEnabled: config.demoBotsEnabled,
+      abandonmentFee: config.abandonmentFee,
+      timers: publicTimerConfig(),
+      serverNow: new Date().toISOString(),
     });
   }));
 

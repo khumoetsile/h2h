@@ -28,7 +28,7 @@ export interface Wallet {
   updatedAt: string;
 }
 
-export type TxType = 'DEPOSIT' | 'WITHDRAWAL' | 'GAME_ENTRY' | 'GAME_WIN' | 'REFUND' | 'FORFEIT';
+export type TxType = 'DEPOSIT' | 'WITHDRAWAL' | 'GAME_ENTRY' | 'GAME_WIN' | 'REFUND' | 'FORFEIT' | 'ABANDONMENT_FEE';
 
 export interface Transaction {
   id: number;
@@ -73,6 +73,23 @@ export interface Game {
 export type MatchStatus = 'WAITING' | 'MATCHED' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'VOID';
 export type MatchCategory = 'SKILL_GAME' | 'FOOTBALL';
 
+/** Why an active challenge ended other than by a normal result. */
+export type EndReason = 'NO_OPPONENT' | 'LOCK_IN_TIMEOUT' | 'ACTION_TIMEOUT' | 'GAME_TIMEOUT' | 'RESULT_TIMEOUT' | 'ABANDONED' | 'PLAYER_CANCELLED' | 'FIXTURE' | null;
+
+/** One unambiguous, player-facing state per challenge (computed server-side). */
+export type DisplayState = 'WAITING_FOR_OPPONENT' | 'LOCKING_IN' | 'LOCKED_IN' | 'IN_PROGRESS' | 'WON' | 'LOST' | 'DRAW' | 'VOID' | 'EXPIRED' | 'TIMED_OUT' | 'LEFT' | 'OPPONENT_LEFT' | 'CANCELLED';
+
+/** Authoritative deadlines stamped by the server. Render them against ServerClock — never decide anything from them client-side. */
+export interface MatchTimers {
+  serverNow?: string;
+  acceptanceDeadline: string | null;
+  lockInDeadline: string | null;
+  playerActionDeadline: string | null;
+  completionDeadline: string | null;
+  kickoffAt?: string | null;
+  myDeadline: string | null;
+}
+
 export interface FootballPick { HOME: string; AWAY: string; YES: string; NO: string }
 export type PickType = 'TEAM' | 'YES_NO';
 export type Pick = 'HOME' | 'AWAY' | 'YES' | 'NO';
@@ -88,6 +105,7 @@ export interface FootballMatchInfo {
   minute?: number | null;
   homeScore?: number | null;
   awayScore?: number | null;
+  firstGoalTeam?: 'HOME' | 'AWAY' | 'NONE' | null;
   stats?: {
     shots: { home: number | null; away: number | null };
     shotsOnTarget: { home: number | null; away: number | null };
@@ -112,8 +130,16 @@ export interface MatchPlayer {
   isBot: boolean;
   slot: number;
   ready: boolean;
+  lockedIn: boolean;
   started: boolean;
   submitted: boolean;
+  /** True while this player still has to act (lock in / finish) in the current phase. */
+  owesAction: boolean;
+  /** This player's own deadline, including any reconnection grace. */
+  deadline: string | null;
+  connected: boolean;
+  /** Set only while they are offline with a reconnection window running. */
+  reconnectDeadline: string | null;
   outcome: Outcome;
   payout: number;
   result: {
@@ -143,13 +169,16 @@ export interface MatchView {
   isDraw: boolean;
   resultReason: string | null;
   cancelReason: string | null;
+  endReason: EndReason;
+  abandonedBy: number | null;
   createdBy: number;
   createdAt: string;
   matchedAt: string | null;
+  lockedAt: string | null;
   startedAt: string | null;
   completedAt: string | null;
   cancelledAt: string | null;
-  deadlines: { waitingExpiresAt: string | null; startBy: string | null };
+  timers: MatchTimers;
   viewerId: number;
   players: MatchPlayer[];
 }
@@ -158,9 +187,19 @@ export interface MatchSummary {
   id: number;
   code: string;
   status: MatchStatus;
+  displayState: DisplayState;
+  endReason: EndReason;
+  abandonedBy: number | null;
   source: string;
   category: MatchCategory;
-  football: { competition: string; homeTeam: string; awayTeam: string; questionName: string } | null;
+  football: {
+    fixtureId: number | null; competition: string; homeTeam: string; awayTeam: string; questionName: string;
+    challengeTypeSlug: string | null; question: string | null; kickoffAt: string | null; fixtureStatus: FixtureStatus | null; minute: number | null;
+    homeScore: number | null; awayScore: number | null; myPickLabel: string | null; opponentPickLabel: string | null;
+  } | null;
+  timers: Omit<MatchTimers, 'serverNow' | 'kickoffAt'> | null;
+  lockedIn: boolean | null;
+  opponentLockedIn: boolean | null;
   game: { id: number; slug: string; name: string; accentColor: string };
   stake: number;
   prize: number;
@@ -183,6 +222,8 @@ export interface UserStats {
   wins: number;
   losses: number;
   draws: number;
+  h2hScore: number;
+  currentWinStreak: number;
   cancelled: number;
   winRate: number;
   streak: Streak;
@@ -252,6 +293,8 @@ export interface OpenFootballChallenge {
   code: string;
   stake: number;
   createdAt: string;
+  acceptanceDeadline: string;
+  kickoffAt: string;
   creator: { username: string; avatarColor: string };
   fixtureId: number;
   competition: { name: string; code: string };
@@ -299,6 +342,21 @@ export interface PublicConfig {
   maxDeposit: number;
   minWithdrawal: number;
   demoBotsEnabled: boolean;
+  abandonmentFee: number;
+  timers: {
+    challengeAcceptanceSeconds: number; lockInSeconds: number; lockedGameSeconds: number;
+    playerActionSeconds: number; reconnectionSeconds: number; footballResultTimeoutMinutes: number;
+  };
+}
+
+/** The viewer's own completed-challenge record against another player. */
+export interface Rivalry {
+  played: number;
+  myWins: number;
+  theirWins: number;
+  draws: number;
+  isRivalry: boolean;
+  recent: { code: string; category: MatchCategory; completedAt: string; stake: number; myOutcome: Outcome; label: string }[];
 }
 
 export interface PlayerSearchResult { id: number; username: string; displayName: string; avatarColor: string; isBot: boolean; online: boolean; }

@@ -9,10 +9,8 @@ export const SETTING_DEFAULTS = {
   deposit_presets: [10, 20, 50, 100, 200, 500, 1000],
   max_deposit: 10000,
   min_withdrawal: 10,
-  challenge_expiry_minutes: 60,
-  waiting_match_timeout_minutes: 30,
-  match_start_timeout_minutes: 10,
-  match_play_timeout_minutes: 10,
+  // Challenge/match timers are NOT admin settings — they live in
+  // config.timers (env vars), the single source of truth. See src/timers.js.
   football_supported_competitions: ['PL', 'PD', 'SA', 'BL1', 'FL1', 'CL'],
 };
 
@@ -23,10 +21,6 @@ export const SETTING_DESCRIPTIONS = {
   deposit_presets: 'Preset amounts shown on the demo deposit screen.',
   max_deposit: 'Maximum single demo deposit.',
   min_withdrawal: 'Minimum demo withdrawal.',
-  challenge_expiry_minutes: 'Minutes before a pending challenge expires.',
-  waiting_match_timeout_minutes: 'Minutes a match waits for an opponent before auto-cancel + refund.',
-  match_start_timeout_minutes: 'Minutes a matched game may sit un-started before auto-cancel + refund.',
-  match_play_timeout_minutes: 'Minutes a player has to finish once the game has started (also the reconnection window used to decide a disconnected skill-game match fairly).',
   football_supported_competitions: 'Football competitions synced and offered to players (provider competition codes).',
 };
 

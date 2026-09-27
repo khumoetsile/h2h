@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { query, queryOne } from '../db.js';
 import { ah, notFound } from '../utils/errors.js';
-import { getUserStats } from '../services/statsService.js';
+import { getUserStats, headToHead } from '../services/statsService.js';
 import { isUserOnline } from '../realtime.js';
 
 const router = Router();
@@ -27,6 +27,8 @@ router.get('/:username', ah(async (req, res) => {
   res.json({
     user: { id: u.id, username: u.username, displayName: `${u.first_name} ${u.last_name}`, avatarColor: u.avatar_color, bio: u.bio, isBot: !!u.is_bot, memberSince: u.created_at, online: isUserOnline(u.id) },
     stats: await getUserStats(u.id),
+    // The viewer's own record against this player (null when viewing yourself).
+    rivalry: u.id === req.user.id ? null : await headToHead(req.user.id, u.id),
   });
 }));
 

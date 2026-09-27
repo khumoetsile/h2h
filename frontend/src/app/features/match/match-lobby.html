@@ -5,151 +5,254 @@
     <app-spinner />
   } @else {
     @let m = match()!;
+    @let t = m.timers;
     <div class="lobby-head">
       <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="44" />
       <div class="grow">
-        @if (m.category === 'FOOTBALL' && m.football) {
-          <h2>{{ m.football.homeTeam }} vs {{ m.football.awayTeam }}</h2>
-          <div class="muted small">{{ competitionName(m.football.competition) }} · {{ m.football.challengeType?.question }}</div>
+        @if (isFootball() && m.football) {
+          <h2 class="title">{{ m.football.homeTeam }} vs {{ m.football.awayTeam }}</h2>
+          <div class="muted small">{{ competition(m.football.competition) }} · {{ m.football.challengeType?.question }}</div>
         } @else {
-          <h2>{{ m.game.name }}</h2>
-          @if (m.source === 'CHALLENGE') { <div class="muted small">Direct challenge</div> }
+          <h2 class="title">{{ m.game.name }}</h2>
+          <div class="muted small">1v1 · {{ m.source === 'CHALLENGE' ? 'Direct challenge' : 'Matchmaking' }}</div>
         }
       </div>
-      <app-match-status [status]="m.status" />
+      @if (state(); as s) { <span [class]="s.chip">{{ s.label }}</span> }
     </div>
 
     <div class="stake-bar card">
-      <div><span class="muted tiny">YOUR ENTRY</span><strong class="money">{{ m.stake | money }}</strong></div>
-      <div><span class="muted tiny">POTENTIAL PRIZE</span><strong class="money accent">{{ m.prize | money }}</strong></div>
+      <div><span class="muted tiny">STAKE</span><strong class="money">{{ m.stake | money }}</strong></div>
+      <div><span class="muted tiny">WINNER RECEIVES</span><strong class="money accent">{{ m.prize | money }}</strong></div>
     </div>
 
+    <!-- Opponent's connection dropped while they owe an action -->
+    @if (opponent()?.reconnectDeadline) {
+      <div class="card conn-card fade-in" role="status">
+        <span class="spin"></span>
+        <div class="grow"><strong>{{ opponent()!.username }}'s connection dropped</strong>
+          <p class="muted small">They have <app-countdown [deadline]="opponent()!.reconnectDeadline" [icon]="false" (expired)="onTimerExpired()" /> to reconnect. If they don't, the timeout rules apply.</p></div>
+      </div>
+    }
+
     @switch (m.status) {
+      <!-- ============ WAITING: acceptance timer ============ -->
       @case ('WAITING') {
         <section class="card state fade-in">
           <div class="radar"><span></span><span></span><span></span><mat-icon>search</mat-icon></div>
-          <h2>Looking for an opponent…</h2>
-          <p class="text-2">We'll match you with someone playing <strong>{{ m.game.name }}</strong> for <strong class="money">{{ m.stake | money }}</strong>.</p>
-          @if (m.deadlines.waitingExpiresAt) { <p class="muted small">This usually only takes a moment.</p> }
-          <div class="locked-note"><mat-icon>info</mat-icon> Your {{ m.stake | money }} is set aside for this match. Cancel any time and get it straight back.</div>
+          <div class="timer-panel" [class.urgent]="false">
+            <span class="tp-label">Waiting for opponent</span>
+            <app-countdown [deadline]="t.acceptanceDeadline" size="big" (expired)="onTimerExpired()" />
+            <span class="tp-note">Another player must join before the timer expires.</span>
+          </div>
+          @if (isFootball()) {
+            <p class="text-2 small">Your challenge is listed in <strong>Open Challenges</strong>. You picked <strong>{{ picks().mine }}</strong> — whoever joins takes the other side.</p>
+            @if (me()?.lockedIn) { <p class="locked-note"><mat-icon>lock</mat-icon> You're locked in. It starts the moment someone joins.</p> }
+          } @else {
+            <p class="text-2 small">We'll pair you with someone playing <strong>{{ m.game.name }}</strong> for <strong class="money">{{ m.stake | money }}</strong>.</p>
+          }
+          <p class="muted tiny">Your {{ m.stake | money }} is set aside. If nobody joins in time it's returned in full — no fee.</p>
           <div class="actions">
-            <button class="btn btn-danger" [disabled]="!!busy()" (click)="cancel()">
-              @if (busy() === 'cancel') { <mat-spinner diameter="18" /> } @else { <mat-icon>close</mat-icon> } Cancel
-            </button>
-            @if (configStore.config()?.demoBotsEnabled) {
+            <button class="btn btn-danger" [disabled]="!!busy()" (click)="openLeave()"><mat-icon>close</mat-icon> Cancel challenge</button>
+            @if (!isFootball() && config.config()?.demoBotsEnabled) {
               <button class="btn" [disabled]="!!busy()" (click)="demoOpponent()">
-                @if (busy() === 'bot') { <mat-spinner diameter="18" /> } @else { <mat-icon>smart_toy</mat-icon> } Play a practice opponent
+                @if (busy() === 'bot') { <mat-spinner diameter="18" /> } @else { <mat-icon>smart_toy</mat-icon> } Practice opponent
               </button>
             }
           </div>
         </section>
       }
+
       @default {
-        <section class="card versus fade-in">
+        <!-- Versus card: both players, who's locked in -->
+        <section class="card versus fade-in" [class.locked]="m.status !== 'MATCHED'">
+          @if (m.status !== 'MATCHED') { <div class="locked-banner"><mat-icon>lock</mat-icon> LOCKED IN</div> }
           <div class="player">
-            <app-avatar [name]="me()?.username ?? ''" [color]="me()?.avatarColor ?? '#3B82F6'" [size]="64" />
+            <app-avatar [name]="me()?.username ?? ''" [color]="me()?.avatarColor ?? '#3B82F6'" [size]="56" />
             <strong>{{ me()?.username }}</strong>
-            <span class="muted small">You</span>
-            @if (isFootball()) {
-              <span class="chip chip-accent pick-chip">{{ pickLabelFor(m, m.viewerId) }}</span>
-            } @else {
-              <span class="chip" [class.chip-win]="me()?.ready">{{ me()?.submitted ? 'Finished' : me()?.ready ? 'Ready' : 'Not ready' }}</span>
+            <span class="muted tiny">You</span>
+            @if (isFootball()) { <span class="chip chip-accent pick-chip">{{ picks().mine }}</span> }
+            @else {
+              <span class="chip" [class.chip-win]="me()?.lockedIn">
+                {{ me()?.submitted ? 'Finished' : m.status === 'MATCHED' ? (me()?.lockedIn ? 'Locked in' : 'Not locked in') : me()?.started ? 'Playing' : 'Locked in' }}
+              </span>
             }
           </div>
           <div class="vs">VS</div>
           <div class="player">
-            <app-avatar [name]="opponent()?.username ?? '?'" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="64" />
-            <strong>{{ opponent()?.username }}</strong>
-            <span class="muted small">{{ opponent()?.isBot ? 'Practice opponent' : 'Opponent' }}</span>
-            @if (isFootball()) {
-              <span class="chip chip-loss pick-chip">{{ opponent() ? pickLabelFor(m, opponent()!.userId) : '' }}</span>
-            } @else {
-              <span class="chip" [class.chip-win]="opponent()?.ready">{{ opponent()?.submitted ? 'Finished' : opponent()?.started ? 'Playing' : opponent()?.ready ? 'Ready' : 'Not ready' }}</span>
+            <app-avatar [name]="opponent()?.username ?? '?'" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="56" />
+            <a class="opp-name" [routerLink]="['/players', opponent()?.username]">{{ opponent()?.username }}</a>
+            <span class="muted tiny">{{ opponent()?.isBot ? 'Practice opponent' : 'Opponent' }}</span>
+            @if (isFootball()) { <span class="chip pick-chip">{{ picks().theirs }}</span> }
+            @else {
+              <span class="chip" [class.chip-win]="opponent()?.lockedIn">
+                {{ opponent()?.submitted ? 'Finished' : m.status === 'MATCHED' ? (opponent()?.lockedIn ? 'Locked in' : 'Not locked in') : opponent()?.started ? 'Playing' : 'Locked in' }}
+              </span>
             }
           </div>
         </section>
 
-        @if (isFootball()) {
-          <section class="card state fade-in">
-            @if (m.football?.fixtureStatus === 'LIVE') {
-              <span class="chip chip-win live-chip"><span class="live-dot"></span>LIVE @if (m.football?.minute) { {{ m.football!.minute }}' }</span>
-              <h2>{{ m.football?.homeScore }} – {{ m.football?.awayScore }}</h2>
-              @if (liveStat(); as stat) {
-                <p class="text-2">{{ stat.label }}: {{ m.football?.homeTeam }} {{ stat.home ?? '–' }} · {{ m.football?.awayTeam }} {{ stat.away ?? '–' }}</p>
-              }
-            } @else if (m.status === 'IN_PROGRESS') {
-              <mat-spinner diameter="28" />
-              <h2>Match under way</h2>
-              <p class="text-2">{{ m.football?.homeTeam }} vs {{ m.football?.awayTeam }} has kicked off. We'll settle this challenge automatically once the real match finishes.</p>
-            } @else {
-              <mat-icon class="kickoff-icon">schedule</mat-icon>
-              <h2>Challenge locked — waiting for kickoff</h2>
-              <p class="text-2">Both entries are locked in. {{ m.football?.homeTeam }} vs {{ m.football?.awayTeam }} kicks off {{ m.football?.kickoffAt ? (m.football!.kickoffAt | date: 'EEE d MMM, HH:mm') : 'soon' }}.</p>
-            }
-            @if (m.status !== 'IN_PROGRESS' && m.football?.fixtureStatus !== 'LIVE') {
-              <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="requestLeaveFootball()">Leave challenge</button>
-            }
-          </section>
-        } @else {
-          <section class="card state fade-in">
-            @if (m.status === 'MATCHED') {
-              @if (!me()?.ready) {
-                <h2>Opponent found!</h2>
-                <p class="text-2">Tap ready when you're set to play.</p>
-                <div class="actions">
-                  <button class="btn btn-primary btn-play" [disabled]="!!busy()" (click)="ready()">
-                    @if (busy() === 'ready') { <mat-spinner diameter="20" /> } @else { <mat-icon>check</mat-icon> } I'm ready
-                  </button>
+        @switch (m.status) {
+          <!-- ============ MATCHED: lock-in phase (skill games) ============ -->
+          @case ('MATCHED') {
+            @if (me()?.owesAction) {
+              <section class="card state lockin fade-in">
+                <div class="timer-panel mine">
+                  <span class="tp-label">{{ opponent()?.lockedIn ? 'Your turn' : 'Lock in within' }}</span>
+                  <app-countdown [deadline]="t.myDeadline" size="big" (expired)="onTimerExpired()" />
+                  <span class="tp-note">{{ opponent()?.lockedIn ? 'Your opponent is locked in and waiting for you.' : 'Both players must lock in to start the challenge.' }}</span>
                 </div>
-              } @else {
-                <mat-spinner diameter="28" />
-                <h2>Waiting for {{ opponent()?.username }}…</h2>
-              }
-              <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="cancel()">Leave match</button>
+                <h2>You're locking in</h2>
+                <div class="confirm-summary">
+                  <div class="cs-row"><span>Game</span><strong>{{ m.game.name }}</strong></div>
+                  <div class="cs-row"><span>Stake</span><strong class="money">{{ m.stake | money }}</strong></div>
+                  <div class="cs-row"><span>Opponent</span><strong>{{ opponent()?.username }}</strong></div>
+                  <div class="cs-row"><span>Once locked, time to finish</span><strong>{{ (config.timers()?.lockedGameSeconds ?? 600) / 60 }} min</strong></div>
+                </div>
+                <div class="fee-box">
+                  <mat-icon>warning</mat-icon>
+                  <div><strong>Important:</strong> once this challenge is locked, leaving it will incur a <strong>{{ config.abandonmentFee() }} abandonment fee</strong>.</div>
+                </div>
+                <button class="btn btn-primary btn-lg btn-block" [disabled]="!!busy()" (click)="lockIn()">
+                  @if (busy() === 'lock') { <mat-spinner diameter="20" /> } @else { <mat-icon>lock</mat-icon> } Lock in {{ m.stake | money }}
+                </button>
+                <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="openLeave()">Leave (no fee — not locked yet)</button>
+              </section>
+            } @else {
+              <section class="card state fade-in">
+                <div class="timer-panel">
+                  <span class="tp-label">Waiting for opponent</span>
+                  <app-countdown [deadline]="opponent()?.deadline" size="big" (expired)="onTimerExpired()" />
+                  <span class="tp-note">You're locked in. {{ opponent()?.username }} has not locked in yet.</span>
+                </div>
+                <p class="muted tiny">If they don't lock in before the timer runs out, the challenge is cancelled and you get your full stake back.</p>
+                <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="openLeave()">Leave (no fee — not locked yet)</button>
+              </section>
             }
-            @if (m.status === 'READY') {
-              <h2>Both players are ready</h2>
-              <p class="text-2">Good luck!</p>
-              <div class="actions"><button class="btn btn-primary btn-play" (click)="play()"><mat-icon>play_arrow</mat-icon> Start game</button></div>
-              <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="cancel()">Leave match</button>
+          }
+
+          <!-- ============ READY: LOCKED — game timer / kickoff countdown ============ -->
+          @case ('READY') {
+            @if (isFootball()) {
+              <section class="card state fade-in">
+                <p class="text-2">Both players have committed.</p>
+                @if (!kickedOff()) {
+                  <div class="timer-panel">
+                    <span class="tp-label">Kickoff {{ t.kickoffAt | date: 'EEE HH:mm' }}</span>
+                    <app-countdown [deadline]="t.kickoffAt" size="big" (expired)="onTimerExpired()" />
+                    <span class="tp-note">The challenge becomes active when the match begins.</span>
+                  </div>
+                } @else {
+                  <mat-spinner diameter="28" />
+                  <p class="text-2">Kickoff! Going live…</p>
+                }
+                <p class="muted tiny">Settles automatically from the official result. If no verifiable result exists by {{ t.completionDeadline | date: 'EEE HH:mm' }}, it's voided and both stakes are refunded.</p>
+                @if (!kickedOff()) { <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="openLeave()">Leave challenge</button> }
+              </section>
+            } @else {
+              <section class="card state fade-in">
+                <div class="timer-panel mine">
+                  <span class="tp-label">Complete your challenge</span>
+                  <app-countdown [deadline]="t.myDeadline" size="big" [urgentUnder]="60" (expired)="onTimerExpired()" />
+                  <span class="tp-note">Complete the challenge before the timer expires.</span>
+                </div>
+                <div class="actions"><button class="btn btn-primary btn-lg btn-play" (click)="play()"><mat-icon>play_arrow</mat-icon> Start game</button></div>
+                <button class="btn btn-ghost btn-sm" [disabled]="!!busy()" (click)="openLeave()">Leave challenge</button>
+              </section>
             }
-            @if (m.status === 'IN_PROGRESS') {
-              @if (!me()?.submitted) {
-                <h2>Your turn to play</h2>
-                <p class="text-2">{{ me()?.started ? "You've already started — jump back in." : 'Play now before time runs out.' }}</p>
-                <div class="actions"><button class="btn btn-primary btn-play" (click)="play()"><mat-icon>play_arrow</mat-icon> {{ me()?.started ? 'Resume game' : 'Start game' }}</button></div>
-              } @else {
-                <mat-spinner diameter="28" />
-                <h2>Nice work — you're done!</h2>
-                <p class="text-2">Waiting for {{ opponent()?.username }} to finish. We'll show your result the moment they're done.</p>
-              }
+          }
+
+          <!-- ============ IN_PROGRESS ============ -->
+          @case ('IN_PROGRESS') {
+            @if (isFootball() && m.football) {
+              @let f = m.football;
+              <section class="card live fade-in">
+                @if (f.fixtureStatus === 'LIVE') {
+                  <span class="chip chip-loss live-chip"><span class="live-dot"></span> LIVE @if (f.minute) { · {{ f.minute }}' }</span>
+                } @else {
+                  <span class="chip chip-accent live-chip">Match under way</span>
+                }
+                <div class="scoreline">
+                  <span class="team">{{ f.homeTeam }}</span>
+                  <strong class="score">{{ f.homeScore ?? 0 }} – {{ f.awayScore ?? 0 }}</strong>
+                  <span class="team">{{ f.awayTeam }}</span>
+                </div>
+                <div class="picks-row">
+                  <div><span class="muted tiny">YOUR PICK</span><strong class="accent">{{ picks().mine }}</strong></div>
+                  <div><span class="muted tiny">OPPONENT</span><strong>{{ picks().theirs }}</strong></div>
+                </div>
+                @if (stat(); as s) {
+                  <div class="stat-block">
+                    <span class="tp-label">{{ s.label }}</span>
+                    <div class="stat-row" [class.lead]="(s.home ?? -1) > (s.away ?? -1)"><span>{{ f.homeTeam }}</span><strong>{{ s.home ?? '–' }}</strong></div>
+                    <div class="stat-row" [class.lead]="(s.away ?? -1) > (s.home ?? -1)"><span>{{ f.awayTeam }}</span><strong>{{ s.away ?? '–' }}</strong></div>
+                  </div>
+                }
+                @if (standing().headline) {
+                  <p class="standing" [class.me]="standing().tone === 'me'" [class.them]="standing().tone === 'them'">{{ standing().headline }}</p>
+                } @else if (stat() && stat()!.home === null) {
+                  <p class="muted small">Live {{ stat()!.label.toLowerCase() }} will appear here as soon as our data source reports them.</p>
+                }
+                <p class="muted tiny">Settles automatically at full time from the official result. Draw or no verifiable result = full refund, no fee.</p>
+              </section>
+            } @else {
+              <section class="card state fade-in">
+                @if (!me()?.submitted) {
+                  <div class="timer-panel mine">
+                    <span class="tp-label">{{ opponent()?.submitted ? 'Your turn' : 'Complete your challenge' }}</span>
+                    <app-countdown [deadline]="t.myDeadline" size="big" [urgentUnder]="60" (expired)="onTimerExpired()" />
+                    <span class="tp-note">{{ opponent()?.submitted ? 'Your opponent is waiting for you.' : 'Complete the challenge before the timer expires.' }}</span>
+                  </div>
+                  <div class="actions"><button class="btn btn-primary btn-lg btn-play" (click)="play()"><mat-icon>play_arrow</mat-icon> {{ me()?.started ? 'Resume game' : 'Start game' }}</button></div>
+                } @else {
+                  <div class="timer-panel">
+                    <span class="tp-label">Waiting for opponent</span>
+                    <app-countdown [deadline]="opponent()?.deadline" size="big" (expired)="onTimerExpired()" />
+                    <span class="tp-note">Your opponent has not completed their action yet.</span>
+                  </div>
+                  <p class="muted tiny">If they don't finish in time, they forfeit and you win.</p>
+                }
+              </section>
             }
-          </section>
+          }
         }
       }
     }
-    <p class="muted tiny center"><a routerLink="/games" class="link">Back to games</a> · Match {{ m.code }}</p>
+    <p class="muted tiny center"><a [routerLink]="isFootball() ? '/football' : '/games'" class="link">{{ isFootball() ? 'Football' : 'Games' }}</a> · Challenge {{ m.code }}</p>
   }
 </div>
 
-@if (showLeaveConfirm()) {
-  <div class="confirm-backdrop" (click)="closeLeaveConfirm()">
-    <div class="confirm-card fade-in" (click)="$event.stopPropagation()">
-      <h2>Leave challenge?</h2>
-      <p class="text-2">You are already locked into this 1v1 challenge.</p>
-      <div class="leave-fee-box">
-        <p><mat-icon inline>info</mat-icon> If you leave now:</p>
-        <ul>
-          <li>A <strong>P0.50</strong> abandonment fee will be charged.</li>
-          <li>Your opponent will remain in the challenge and receive their entry back in full.</li>
-        </ul>
-      </div>
-      <div class="confirm-actions">
-        <button class="btn btn-primary btn-block" [disabled]="!!busy()" (click)="closeLeaveConfirm()">Stay in Challenge</button>
-        <button class="btn btn-danger btn-block" [disabled]="!!busy()" (click)="confirmLeaveFootball()">
-          @if (busy() === 'cancel') { <mat-spinner diameter="18" /> } @else { Leave and Pay P0.50 }
-        </button>
-      </div>
+@if (leaveOpen() && match(); as m) {
+  <div class="confirm-backdrop" (click)="closeLeave()">
+    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="leave-title" (click)="$event.stopPropagation()">
+      @if (isLocked()) {
+        <h2 id="leave-title">Leave challenge?</h2>
+        <p class="text-2">You are already locked into this 1v1 challenge.</p>
+        <div class="fee-box" style="margin-top:14px">
+          <mat-icon>warning</mat-icon>
+          <div>Leaving now will result in:
+            <ul>
+              <li>A <strong>{{ config.abandonmentFee() }} abandonment fee</strong> charged to you.</li>
+              <li>Your {{ m.stake | money }} stake returned to you.</li>
+              <li>{{ opponent()?.username }} gets their full stake back and is not charged.</li>
+            </ul>
+          </div>
+        </div>
+        <div class="confirm-actions">
+          <button class="btn btn-primary btn-lg btn-block" [disabled]="!!busy()" (click)="closeLeave()">Stay</button>
+          <button class="btn btn-danger btn-block" [disabled]="!!busy()" (click)="confirmLeave()">
+            @if (busy() === 'cancel') { <mat-spinner diameter="18" /> } @else { Leave &amp; pay {{ config.abandonmentFee() }} }
+          </button>
+        </div>
+      } @else {
+        <h2 id="leave-title">{{ m.status === 'WAITING' ? 'Cancel this challenge?' : 'Leave before locking in?' }}</h2>
+        <p class="text-2">The challenge isn't locked yet, so there's <strong>no fee</strong>. {{ m.status === 'WAITING' ? 'Your' : 'Both' }} {{ m.stake | money }} stake{{ m.status === 'WAITING' ? ' is' : 's are' }} returned in full.</p>
+        <div class="confirm-actions">
+          <button class="btn btn-primary btn-lg btn-block" [disabled]="!!busy()" (click)="closeLeave()">Keep it</button>
+          <button class="btn btn-danger btn-block" [disabled]="!!busy()" (click)="confirmLeave()">
+            @if (busy() === 'cancel') { <mat-spinner diameter="18" /> } @else { {{ m.status === 'WAITING' ? 'Cancel challenge' : 'Leave' }} }
+          </button>
+        </div>
+      }
     </div>
   </div>
 }

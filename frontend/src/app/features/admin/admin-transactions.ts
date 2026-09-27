@@ -43,7 +43,7 @@ export class AdminTransactionsPage implements OnInit {
   private api = inject(Api);
   private route = inject(ActivatedRoute);
   private destroyRef = inject(DestroyRef);
-  protected types: TxType[] = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT'];
+  protected types: TxType[] = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT', 'ABANDONMENT_FEE'];
   protected type = signal<TxType | null>(null);
   protected data = signal<Paged<Transaction> | null>(null);
   protected error = signal('');

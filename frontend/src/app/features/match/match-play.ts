@@ -13,6 +13,7 @@ import { MemoryBattleGame } from '../../games/memory-battle';
 import { WordBattleGame } from '../../games/word-battle';
 import { PenaltyShootoutGame } from '../../games/penalty-shootout';
 import { GameIcon, Spinner } from '../../shared/ui';
+import { Countdown } from '../../shared/countdown';
 
 interface StartResponse { matchId: number; code: string; game: string; spec: any; startedAt: string; deadline: string; resumed: boolean; }
 
@@ -27,7 +28,7 @@ const MAX_AUTO_RETRIES = 3;
  */
 @Component({
   selector: 'app-match-play',
-  imports: [MatIconModule, MatProgressSpinnerModule, GameIcon, Spinner,
+  imports: [MatIconModule, MatProgressSpinnerModule, GameIcon, Spinner, Countdown,
     ReactionRushGame, AimChallengeGame, MemoryBattleGame, WordBattleGame, PenaltyShootoutGame],
   template: `
     <div class="play-screen">
@@ -47,6 +48,7 @@ const MAX_AUTO_RETRIES = 3;
             <strong>{{ match()?.game?.name }}</strong>
             <div class="muted tiny">vs {{ opponentName() }}</div>
           </div>
+          <app-countdown [deadline]="start()!.deadline" [urgentUnder]="60" [attr.title]="'Time left to finish'" />
           <app-game-icon [slug]="start()!.game" [color]="match()?.game?.accentColor ?? '#22D3EE'" [size]="32" />
         </div>
 
@@ -129,7 +131,7 @@ export class MatchPlayPage implements OnInit {
   exit() { this.router.navigate(['/match', this.code()], { replaceUrl: true }); }
 
   confirmExit() {
-    if (confirm("Leave this game? If you don't come back in time, you may lose by forfeit.")) this.exit();
+    if (confirm("Leave this game screen? The timer keeps running — if you don't finish before it runs out, you forfeit.")) this.exit();
   }
 
   async submit(result: GameFinish, isRetry = false) {

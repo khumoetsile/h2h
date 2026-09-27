@@ -7,17 +7,25 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { interval } from 'rxjs';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
+import { challengeStanding, competitionName, DISPLAY_STATE, picksFor, viewDisplayState } from '../../core/challenge-state';
 import { ConfigStore } from '../../core/config.store';
-import { MatchView } from '../../core/models';
 import { relevantStat } from '../../core/football-stat';
+import { MatchView } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
+import { ServerClock } from '../../core/server-clock';
 import { Toast } from '../../core/toast.service';
+import { Countdown } from '../../shared/countdown';
 import { MoneyPipe } from '../../shared/pipes';
-import { Avatar, GameIcon, LoadError, MatchStatusChip, Spinner } from '../../shared/ui';
+import { Avatar, GameIcon, LoadError, Spinner } from '../../shared/ui';
 
+/**
+ * The live state of one 1v1 challenge. Every timer shown here is a deadline
+ * the server stamped; when one reaches zero the page simply asks the server
+ * what happened — it never decides an outcome itself.
+ */
 @Component({
   selector: 'app-match-lobby',
-  imports: [RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, MatchStatusChip, Spinner],
+  imports: [RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, Spinner, Countdown],
   templateUrl: './match-lobby.html',
   styleUrl: './match-lobby.scss',
 })
@@ -27,64 +35,47 @@ export class MatchLobbyPage implements OnInit {
   private router = inject(Router);
   private toast = inject(Toast);
   private realtime = inject(RealtimeService);
-  protected configStore = inject(ConfigStore);
+  private clock = inject(ServerClock);
+  protected config = inject(ConfigStore);
   private destroyRef = inject(DestroyRef);
 
   protected match = signal<MatchView | null>(null);
   protected error = signal('');
   protected busy = signal<string | null>(null);
-  protected now = signal(Date.now());
-  protected showLeaveConfirm = signal(false);
+  protected leaveOpen = signal(false);
 
   protected me = computed(() => this.match()?.players.find((p) => p.userId === this.match()?.viewerId) ?? null);
   protected opponent = computed(() => this.match()?.players.find((p) => p.userId !== this.match()?.viewerId) ?? null);
-  protected elapsed = computed(() => {
-    const m = this.match();
-    if (!m) return '0:00';
-    const s = Math.max(0, Math.floor((this.now() - new Date(m.createdAt).getTime()) / 1000));
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  });
   protected isFootball = computed(() => this.match()?.category === 'FOOTBALL');
-  protected liveStat = computed(() => {
-    const f = this.match()?.football;
-    return f ? relevantStat(f) : null;
+  protected state = computed(() => { const m = this.match(); return m ? DISPLAY_STATE[viewDisplayState(m)] : null; });
+  protected picks = computed(() => { const m = this.match(); return m ? picksFor(m) : { mine: '', theirs: '' }; });
+  protected stat = computed(() => { const f = this.match()?.football; return f ? relevantStat(f) : null; });
+  protected standing = computed(() => { const m = this.match(); return m ? challengeStanding(m) : { headline: '', tone: 'none' as const }; });
+  /** LOCKED = both players locked in. Leaving from here on costs the abandonment fee. */
+  protected isLocked = computed(() => this.match()?.status === 'READY');
+  protected kickedOff = computed(() => {
+    const k = this.match()?.timers.kickoffAt;
+    return !!k && this.clock.remainingMs(k) === 0;
   });
-
-  competitionName(c: { name: string; code: string } | string) {
-    return typeof c === 'string' ? c : c.name;
-  }
-  /** The pick belonging to whichever player `userId` is (creator or opponent) — used to label each side of the versus card. */
-  pickLabelFor(m: MatchView, userId: number) {
-    const f = m.football;
-    if (!f) return '';
-    return m.createdBy === userId ? f.creatorPickLabel : (f.opponentPickLabel ?? '');
-  }
-  protected countdownTo = (iso: string | null) => {
-    if (!iso) return '';
-    const s = Math.max(0, Math.floor((new Date(iso).getTime() - this.now()) / 1000));
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  };
+  protected competition = competitionName;
 
   ngOnInit() {
     this.load();
     this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((m) => {
       if (m.code === this.code()) this.apply(m);
     });
-    // If we drop offline and come back, re-sync straight away rather than
-    // waiting for the next poll tick — the match state on the server is
-    // authoritative, so this always shows the true, current position.
+    // Back online: re-sync straight away — the server state is authoritative.
     this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
-    // Polling fallback + clock tick
-    interval(1000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((i) => {
-      this.now.set(Date.now());
-      if (i % 4 === 3) this.load(true);
-    });
+    interval(4000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
   }
 
   private apply(m: MatchView) {
     const prev = this.match();
     this.match.set(m);
-    if (prev && prev.status === 'WAITING' && m.status === 'MATCHED') this.toast.success(`Opponent found: ${this.opponent()?.username}`);
+    if (prev && prev.status === 'WAITING' && m.status !== 'WAITING' && ['MATCHED', 'READY'].includes(m.status)) {
+      const opp = m.players.find((p) => p.userId !== m.viewerId);
+      this.toast.success(m.status === 'READY' ? `${opp?.username} joined — you're both locked in!` : `Opponent found: ${opp?.username}. Lock in now.`);
+    }
     if (m.status === 'COMPLETED' || m.status === 'CANCELLED' || m.status === 'VOID') {
       this.router.navigate(['/match', m.code, 'result'], { replaceUrl: true });
     }
@@ -100,35 +91,38 @@ export class MatchLobbyPage implements OnInit {
     }
   }
 
+  /** A countdown hit zero: ask the server for its verdict (it may already have applied the timeout). */
+  onTimerExpired() {
+    setTimeout(() => this.load(true), 1200);
+  }
+
   private async act(name: string, path: string, success?: string) {
     this.busy.set(name);
     try {
       const { match } = await this.api.post<{ match: MatchView }>(`/matches/${this.code()}/${path}`);
       if (success) this.toast.success(success);
       this.apply(match);
+      return true;
     } catch (err) {
       this.toast.error(err);
       this.load(true);
+      return false;
     } finally {
       this.busy.set(null);
     }
   }
 
-  ready() { return this.act('ready', 'ready'); }
-  cancel() {
-    const m = this.match();
-    const msg = m?.status === 'WAITING' ? "Stop looking for an opponent? You'll get your entry back." : "Leave this match? You'll both get your entry back.";
-    if (!confirm(msg)) return;
-    return this.act('cancel', 'cancel', 'Match cancelled — your entry was refunded.');
-  }
+  lockIn() { return this.act('lock', 'ready'); }
   demoOpponent() { return this.act('bot', 'demo-opponent'); }
   play() { this.router.navigate(['/match', this.code(), 'play']); }
 
-  /** Football, once locked (MATCHED): leaving now has a real financial consequence, so it gets an explicit confirm step instead of a bare browser confirm(). */
-  requestLeaveFootball() { this.showLeaveConfirm.set(true); }
-  closeLeaveConfirm() { if (!this.busy()) this.showLeaveConfirm.set(false); }
-  async confirmLeaveFootball() {
-    this.showLeaveConfirm.set(false);
-    return this.act('cancel', 'cancel', "You left the challenge. A P0.50 abandonment fee was charged and your remaining stake was refunded.");
+  openLeave() { this.leaveOpen.set(true); }
+  closeLeave() { if (!this.busy()) this.leaveOpen.set(false); }
+  async confirmLeave() {
+    const locked = this.isLocked();
+    const ok = await this.act('cancel', 'cancel', locked
+      ? `You left the challenge. Your stake was refunded and the ${this.config.abandonmentFee()} abandonment fee was charged.`
+      : 'Challenge cancelled — your stake was returned in full.');
+    if (ok) this.leaveOpen.set(false);
   }
 }

@@ -7,9 +7,10 @@ import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js';
 import { formatMoney, toCents } from '../utils/money.js';
 import { getSettings } from './settingsService.js';
 import { notify } from './notificationService.js';
-import { createMatchTx, getMatchView, ACTIVE_STATUSES } from './matchService.js';
+import { createMatchTx, getMatchView, recordLockIn, ACTIVE_STATUSES } from './matchService.js';
 import { lockStake } from './walletService.js';
 import { recordAudit } from './auditService.js';
+import { acceptanceDeadline, isPast } from '../timers.js';
 
 const PENDING_LIMIT = 10;
 
@@ -137,8 +138,8 @@ export async function createChallenge(challengerId, { opponent, gameId, stake, m
     const me = await tx.one('SELECT username FROM users WHERE id = ?', [challengerId]);
     const res = await tx.q(
       `INSERT INTO challenges (challenger_id, opponent_id, game_id, stake, message, expires_at)
-       VALUES (?, ?, ?, ?, ?, NOW() + INTERVAL ? MINUTE)`,
-      [challengerId, opp.id, gameId, stake, message ? String(message).slice(0, 140) : null, settings.challenge_expiry_minutes],
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [challengerId, opp.id, gameId, stake, message ? String(message).slice(0, 140) : null, acceptanceDeadline()],
     );
     await notify(tx, opp.id, {
       type: 'CHALLENGE_RECEIVED',
@@ -162,8 +163,10 @@ async function lockChallenge(tx, id) {
   return c;
 }
 
-function assertPending(c) {
-  if (c.status === 'PENDING' && new Date(c.expires_at) <= new Date()) throw conflict('CHALLENGE_EXPIRED', 'This challenge has expired.');
+/** Checked inside the row-locked transaction against the stored deadline, so an accept that arrives after expiry is refused even if the sweeper hasn't marked it EXPIRED yet. */
+export function assertPending(c) {
+  if (c.status === 'PENDING' && isPast(c.expires_at)) throw conflict('CHALLENGE_EXPIRED', 'This challenge has expired.');
+  if (c.status === 'EXPIRED') throw conflict('CHALLENGE_EXPIRED', 'This challenge has expired.');
   if (c.status !== 'PENDING') throw conflict('CHALLENGE_CLOSED', `This challenge is already ${c.status.toLowerCase()}.`);
 }
 
@@ -195,16 +198,18 @@ export async function acceptChallenge(userId, id) {
     // …then locks the accepting player's stake (throws INSUFFICIENT_BALANCE -> full rollback).
     await lockStake(tx, userId, match, game.name);
     await tx.q('INSERT INTO match_players (match_id, user_id, slot, stake) VALUES (?, ?, 2, ?)', [match.id, userId, c.stake]);
-    await tx.q('UPDATE matches SET matched_at = NOW() WHERE id = ?', [match.id]);
     await tx.q(`UPDATE challenges SET status = 'ACCEPTED', responded_at = NOW(), match_id = ? WHERE id = ?`, [match.id, c.id]);
     await recordAudit(tx, {
       actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_ACCEPTED', entityType: 'CHALLENGE', entityId: c.id,
       challengeId: c.id, matchId: match.id, previousState: 'PENDING', newState: 'ACCEPTED',
     });
+    // "Accept & Lock In": the accepting player confirmed the lock-in terms,
+    // so they're locked in now; the challenger's lock-in timer is running.
+    await recordLockIn(tx, match.id, userId);
     await notify(tx, c.challenger_id, {
       type: 'CHALLENGE_ACCEPTED',
-      title: 'Challenge accepted',
-      message: `${me.username} accepted your ${game.name} challenge. Your match is ready to start.`,
+      title: 'Challenge accepted — lock in now',
+      message: `${me.username} accepted and locked in to your ${game.name} challenge. Lock in before the timer runs out.`,
       link: `/match/${match.code}`,
     });
     for (const uid of [c.challenger_id, userId]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));
@@ -248,20 +253,25 @@ export async function cancelChallenge(userId, id) {
   return getChallenge(id, userId);
 }
 
-export async function expireChallenges() {
+/** Direct challenges nobody answered in time. No stake is ever reserved for a pending direct challenge, so expiry moves no money. */
+export async function expireChallenges(now = new Date()) {
   const rows = await query(
-    `SELECT c.id FROM challenges c WHERE c.status = 'PENDING' AND c.expires_at <= NOW() LIMIT 100`,
+    `SELECT c.id FROM challenges c WHERE c.status = 'PENDING' AND c.expires_at <= ? LIMIT 100`,
+    [now],
   );
   for (const { id } of rows) {
     await withTransaction(async (tx) => {
-      const c = await tx.one(`SELECT c.*, g.name AS game_name, ou.username AS opp FROM challenges c JOIN games g ON g.id = c.game_id JOIN users ou ON ou.id = c.opponent_id WHERE c.id = ? FOR UPDATE`, [id]);
-      if (!c || c.status !== 'PENDING') return;
-      await tx.q(`UPDATE challenges SET status = 'EXPIRED' WHERE id = ?`, [id]);
+      const c = await tx.one(`SELECT c.*, g.name AS game_name, ou.username AS opp, cu.username AS challenger FROM challenges c JOIN games g ON g.id = c.game_id
+                              JOIN users ou ON ou.id = c.opponent_id JOIN users cu ON cu.id = c.challenger_id WHERE c.id = ? FOR UPDATE`, [id]);
+      if (!c || c.status !== 'PENDING' || !isPast(c.expires_at, now)) return;
+      await tx.q(`UPDATE challenges SET status = 'EXPIRED' WHERE id = ? AND status = 'PENDING'`, [id]);
       await recordAudit(tx, {
         actorType: 'SYSTEM', action: 'CHALLENGE_EXPIRED', entityType: 'CHALLENGE', entityId: id,
-        challengeId: id, previousState: 'PENDING', newState: 'EXPIRED', reason: 'no response before expiry',
+        challengeId: id, previousState: 'PENDING', newState: 'EXPIRED', reason: 'no response before the acceptance timer ran out',
       });
-      await notify(tx, c.challenger_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `Your ${c.game_name} challenge to ${c.opp} expired without a response.`, link: '/challenges' });
+      await notify(tx, c.challenger_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `Your ${c.game_name} challenge to ${c.opp} expired — they didn't accept in time.`, link: '/challenges' });
+      await notify(tx, c.opponent_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: `${c.challenger}'s ${c.game_name} challenge expired before you accepted.`, link: '/challenges' });
+      for (const uid of [c.challenger_id, c.opponent_id]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id }));
     });
   }
   return rows.length;

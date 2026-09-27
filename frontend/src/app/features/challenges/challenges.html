@@ -1,6 +1,7 @@
 <div class="page">
   <div class="page-head">
-    <div><h1>Challenges</h1><p class="sub">Take on someone directly.</p></div>
+    <div><h1>Challenges</h1><p class="sub">Invites to and from specific players. Each one has a timer to accept.</p></div>
+    <a class="btn btn-ghost btn-sm" routerLink="/matches"><mat-icon>history</mat-icon>My challenges</a>
   </div>
 
   <a class="btn btn-primary btn-lg btn-block new-btn" routerLink="/challenges/new">
@@ -43,7 +44,7 @@
                   <span class="muted">{{ c.direction === 'OUTGOING' ? 'Your pick' : c.challenger.username + '\'s pick' }}</span>
                   <strong class="pvp-pick opp-pick">{{ c.football.creatorPickLabel }}</strong>
                 </div>
-                @if (c.status === 'PENDING' && c.direction === 'INCOMING') {
+                @if (isLive(c) && c.direction === 'INCOMING') {
                   <div class="choose-side">
                     <span class="muted small">Choose your side</span>
                     <div class="side-tiles">
@@ -67,7 +68,7 @@
                     </div>
                     @if (acceptError()[c.id]) { <div class="form-error tiny"><mat-icon>error</mat-icon>{{ acceptError()[c.id] }}</div> }
                     @if (myPick()[c.id]) {
-                      <p class="fee-disclosure muted tiny"><mat-icon inline>info</mat-icon> Accepting locks you in. Leaving afterwards incurs a P0.50 abandonment fee.</p>
+                      <p class="fee-disclosure muted tiny"><mat-icon inline>info</mat-icon> Accepting locks you in. Leaving afterwards incurs a {{ config.abandonmentFee() }} abandonment fee.</p>
                     }
                   </div>
                 }
@@ -79,13 +80,17 @@
                 </div>
               }
               @if (c.message) { <div class="quote small">"{{ c.message }}"</div> }
-              <div class="muted tiny">{{ c.status === 'PENDING' ? expiresIn(c) : (c.createdAt | ago) }}</div>
+              @if (isLive(c)) {
+                <div class="accept-timer small"><app-countdown [deadline]="c.expiresAt" (expired)="load(true)" /> <span class="muted">{{ c.direction === 'INCOMING' ? 'to accept' : 'for them to accept' }}</span></div>
+              } @else {
+                <div class="muted tiny">{{ c.createdAt | ago }}</div>
+              }
             </div>
             <div class="acts">
-              @if (c.status === 'PENDING' && c.direction === 'INCOMING') {
+              @if (isLive(c) && c.direction === 'INCOMING') {
                 <button class="btn btn-sm btn-ghost" [disabled]="busy() === c.id" (click)="decline(c)">Decline</button>
-                <button class="btn btn-sm btn-primary" [disabled]="busy() === c.id || (!!c.football && !myPick()[c.id])" (click)="accept(c)">Accept</button>
-              } @else if (c.status === 'PENDING') {
+                <button class="btn btn-sm btn-primary" [disabled]="busy() === c.id || (!!c.football && !myPick()[c.id])" (click)="openAccept(c)">Accept</button>
+              } @else if (isLive(c)) {
                 <button class="btn btn-sm btn-ghost" [disabled]="busy() === c.id" (click)="cancel(c)">Cancel</button>
               } @else {
                 <span class="chip" [class.chip-win]="c.status === 'ACCEPTED'" [class.chip-loss]="c.status === 'DECLINED'">{{ statusLabel(c) }}</span>
@@ -98,3 +103,35 @@
     }
   </div>
 </div>
+
+@if (acceptTarget(); as c) {
+  <div class="confirm-backdrop" (click)="closeAccept()">
+    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="acc-title" (click)="$event.stopPropagation()">
+      <h2 id="acc-title">{{ c.challenger.username }} challenged you</h2>
+      <p class="text-2">You are accepting a <strong>1v1 challenge</strong>. Accepting locks you in.</p>
+      <div class="confirm-summary">
+        @if (c.football) {
+          <div class="cs-row"><span>Match</span><strong>{{ c.football.homeTeam }} vs {{ c.football.awayTeam }}</strong></div>
+          <div class="cs-row"><span>Question</span><strong>{{ c.football.question }}</strong></div>
+          <div class="cs-row"><span>{{ c.challenger.username }}'s pick</span><strong>{{ c.football.creatorPickLabel }}</strong></div>
+          <div class="cs-row"><span>Your pick</span><strong class="accent">{{ pickLabel(c) }}</strong></div>
+        } @else {
+          <div class="cs-row"><span>Game</span><strong>{{ c.game.name }}</strong></div>
+        }
+        <div class="cs-row"><span>Stake</span><strong class="money">{{ c.stake | money }}</strong></div>
+        <div class="cs-row"><span>Time left to accept</span><app-countdown [deadline]="c.expiresAt" (expired)="closeAccept(); load(true)" /></div>
+      </div>
+      <div class="fee-box">
+        <mat-icon>warning</mat-icon>
+        <div>Once this challenge is locked, leaving it will incur a <strong>{{ config.abandonmentFee() }} abandonment fee</strong>.
+          @if (!c.football) { After you both lock in you'll have {{ (config.timers()?.lockedGameSeconds ?? 600) / 60 }} minutes to play. }</div>
+      </div>
+      <div class="confirm-actions">
+        <button class="btn btn-primary btn-lg btn-block" [disabled]="busy() === c.id" (click)="accept(c)">
+          @if (busy() === c.id) { <mat-spinner diameter="20" /> } @else { <mat-icon>lock</mat-icon> } Accept &amp; lock in {{ c.stake | money }}
+        </button>
+        <button class="btn btn-ghost btn-block" [disabled]="busy() === c.id" (click)="closeAccept()">Not now</button>
+      </div>
+    </div>
+  </div>
+}

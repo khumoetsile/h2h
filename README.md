@@ -37,6 +37,7 @@ notifications and an admin panel.
 - [Development credentials](#development-credentials)
 - [How the demo wallet works](#how-the-demo-wallet-works)
 - [How matchmaking & the match lifecycle work](#how-matchmaking--the-match-lifecycle-work)
+- [Timers](#timers)
 - [How the games work (Reaction Rush and others)](#how-the-games-work)
 - [Challenges](#challenges)
 - [Football](#football)
@@ -143,7 +144,15 @@ Open **http://localhost:4200** and log in with a [development account](#developm
 | `SESSION_REMEMBER_TTL_DAYS` | `30` | Session length with "Keep me signed in" |
 | `CURRENCY_SYMBOL` / `CURRENCY_CODE` | `P` / `BWP` | Display currency (Botswana Pula) |
 | `DEMO_BOTS_ENABLED` | `true` | Lets a waiting player call in a house-bot opponent |
-| `SWEEPER_INTERVAL_SECONDS` | `15` | How often timeouts / challenge expiry are processed |
+| `SWEEPER_INTERVAL_SECONDS` | `5` | How often every timer below is enforced (a timeout lands within this many seconds of its deadline) |
+| `CHALLENGE_ACCEPTANCE_TIMEOUT_SECONDS` | `300` | Find Opponent / direct challenge: time for someone to accept (never past kickoff) |
+| `LOCK_IN_TIMEOUT_SECONDS` | `120` | Skill games: once matched, time for both players to press Lock In |
+| `LOCKED_GAME_TIMEOUT_SECONDS` | `600` | Skill games: once both are locked in, time to finish the game |
+| `PLAYER_ACTION_TIMEOUT_SECONDS` | `120` | Once one player has acted (locked in / finished), time for the other |
+| `RECONNECTION_TIMEOUT_SECONDS` | `60` | Grace for a player whose connection drops before their deadline |
+| `FOOTBALL_RESULT_TIMEOUT_MINUTES` | `240` | After kickoff: wait this long for a verifiable result, then void (full refunds) |
+| `TIMER_LATENCY_GRACE_MS` | `2000` | Allowance for a request sent just before a deadline |
+| `ABANDONMENT_FEE` | `0.50` | Fee charged to a player who leaves after BOTH players locked in |
 | `FOOTBALL_PROVIDER` | `mock` | `mock` (deterministic simulated fixtures, no API key needed) or `football-data` (real data from football-data.org) |
 | `FOOTBALL_API_KEY` | — | Required when `FOOTBALL_PROVIDER=football-data`; never sent to the browser — the backend is the only thing that ever calls the provider |
 | `FOOTBALL_API_BASE_URL` | `https://api.football-data.org/v4` | Provider base URL |
@@ -219,9 +228,11 @@ provider.**
 ## How matchmaking & the match lifecycle work
 
 ```
-WAITING ──(opponent joins)──▶ MATCHED ──(both ready)──▶ READY ──(first player starts)──▶ IN_PROGRESS ──(both submit)──▶ COMPLETED
-   └──────────────┴──────────────┴── cancel / timeout (before anyone starts) ──▶ CANCELLED (stakes refunded)
+WAITING ──(opponent joins)──▶ MATCHED ──(both LOCK IN)──▶ READY = LOCKED ──(first player starts / kickoff)──▶ IN_PROGRESS ──▶ COMPLETED
+ acceptance timer             lock-in timer               game timer / kickoff countdown      action timer
 ```
+
+Every phase has a server-owned timer — see [Timers](#timers) for the exact rules.
 
 1. The player picks a game and a stake and presses **FIND OPPONENT** (`POST /api/matches/find`).
 2. Inside one transaction the server looks for the oldest `WAITING` public match with the
@@ -230,16 +241,66 @@ WAITING ──(opponent joins)──▶ MATCHED ──(both ready)──▶ READ
    locked → `MATCHED`. Otherwise a new `WAITING` match is created with their stake locked.
 3. Both players get a realtime `match:update` (Socket.IO) plus a notification; the lobby also
    polls every few seconds as a fallback.
-4. Each player presses **I'm ready**; when both are ready the match is `READY`.
+4. Each player presses **Lock In** (the screen discloses the abandonment fee); when both have,
+   the challenge is **LOCKED** (`READY`) and the game timer starts.
 5. **Start game** calls `POST /api/matches/:id/start`, which reveals the game spec (the same
    seeded sequence for both players) and records the server start time. The match becomes
    `IN_PROGRESS`.
 6. Each client submits its raw gameplay actions (`POST /api/matches/:id/result`). When both
    are in, the server scores them, decides the winner and settles the wallets atomically.
 
-Timeouts (defaults, configurable in admin): a `WAITING` match auto-cancels after 30 min, a
-matched game that nobody starts after 10 min, and once started each player has 10 min to
-finish — if only one player submitted, the other forfeits; if neither did, stakes are refunded.
+Timeouts are covered in [Timers](#timers): in short, if only one player finished before the
+timer ran out the other forfeits; if neither did, both stakes are refunded with no fee.
+
+## Timers
+
+All durations live in one place — `config.timers` in `backend/src/config.js`, driven by the
+env vars above — and the policy that uses them lives in `backend/src/timers.js`. Nothing else
+in the code base contains a timer value.
+
+**Server-authoritative.** When a phase starts, the server stamps an absolute deadline on the
+row (`matches.acceptance_deadline`, `lock_in_deadline`, `locked_at`, `completion_deadline`,
+`player_action_deadline`, `match_players.reconnect_deadline`, `challenges.expires_at`).
+Every API response carries these deadlines plus `serverNow`; the frontend's `ServerClock`
+syncs to `/api/time` and counts down on a monotonic clock, so changing the device clock or
+editing JavaScript can't add time. Every action (join, accept, lock in, start, submit) is
+re-checked against the stored deadline inside the row-locked transaction, and the background
+sweeper applies the outcome even if nobody has the page open. Changing an env value only
+affects timers started afterwards.
+
+| Phase | Timer | If it runs out |
+|---|---|---|
+| Find Opponent (`WAITING`) | acceptance (capped at kickoff) | **Expired** — cancelled, creator's stake refunded in full, **no fee** |
+| Direct challenge (pending) | acceptance (capped at kickoff) | **Expired** — no money was ever reserved |
+| Skill game `MATCHED` | lock-in; once one player locks in, the other gets the (shorter of the) player-action timer | **Timed out** — cancelled, both refunded in full, **no fee** (the challenge was never locked) |
+| Skill game `READY` / `IN_PROGRESS` | game timer; once one player finishes, the other gets the player-action timer | one finished → the other **forfeits** (their stake goes to the winner as a normal result, minus the platform fee); neither finished → cancelled, both refunded, **no fee** |
+| Football `READY` → `IN_PROGRESS` | kickoff countdown, then result deadline (kickoff + `FOOTBALL_RESULT_TIMEOUT_MINUTES`) | **Void** — both refunded in full, **no fee** |
+
+**Lock In.** Football: the creator locks in on the "You're locking in" screen when creating a
+Find Opponent or sending a direct challenge; the other player locks in with **Accept & Lock
+In** — so a football challenge is LOCKED the moment the second player joins. Skill games: after
+matchmaking both players press **Lock In** in the lobby (accepting a direct skill-game
+challenge counts as the acceptor's lock-in).
+
+**Leaving.** Before both players are locked in, leaving is free and everyone is refunded. After
+(`READY`), leaving is an **abandonment**: both stakes are refunded, and only the leaver pays
+the `ABANDONMENT_FEE` (a separate `ABANDONMENT_FEE` ledger row tied to the match, charged once
+via an idempotency key, audited as `CHALLENGE_ABANDONED`). Once a skill game has started or a
+fixture has kicked off, there is nothing to leave — the timers decide it. The fee is never
+charged for a timeout or a disconnect.
+
+**Reconnection.** When a player's last connection drops while they owe an action, they get a
+`RECONNECTION_TIMEOUT_SECONDS` window (opponent sees "connection dropped — 00:42 to
+reconnect"; they see "CONNECTION LOST"). If their deadline passes inside that window, the
+timeout waits until the window closes; reconnecting in time simply continues the challenge.
+Repeated drops can't stack — a new window only opens once the previous one has closed — so
+the most anyone can gain is one window past their deadline.
+
+**Server restarts.** The sweeper writes a heartbeat every tick. On boot, if the last heartbeat
+is older than 3 sweeper intervals (min 30s), every player-driven timer that was still running
+is extended by the outage, so nobody is timed out for the platform's downtime. Deadlines that
+had already passed before the outage are not extended. Football result deadlines follow the
+real match and are never extended.
 
 **Demo opponents:** while waiting, a player can press **Play a demo opponent**; a house bot
 joins, stakes demo funds like anyone else, and plays using the same engine with human-like
@@ -282,10 +343,24 @@ breakdown, prize and Match ID.
 
 Search a player by username (`@Kabelo`), choose game + stake (+ optional message) and send.
 The opponent sees "Kabelo challenged you" (notification + Challenges page) with **Accept /
-Decline**. No money moves when a challenge is sent; on **accept**, both stakes are locked in a
-single transaction and a real match is created in `MATCHED`. If either player can't cover the
-stake, nothing is locked. Duplicate pending challenges (same pair + game) are rejected;
-challenges expire after 60 minutes (configurable); the sender can cancel while pending.
+Decline** and a live countdown. No money moves when a challenge is sent; on **Accept & Lock
+In**, both stakes are locked in a single transaction and a real match is created. If either
+player can't cover the stake, nothing is locked. Duplicate pending challenges (same pair +
+game) are rejected; an unanswered challenge expires when its acceptance timer runs out; the
+sender can cancel while pending.
+
+**Rematch** always creates a brand-new challenge (new id, picks, stake, transactions,
+settlement and audit trail). A football rematch keeps the opponent, question and stake and
+asks for a new fixture, since the old one has been played.
+
+**Profiles & rivalries.** `/players/:username` shows the player's H2H Score (1000 + 25 per
+win + 5 per draw − 15 per loss, floor 0; completed challenges only), record and current win
+streak, plus your own head-to-head record against them — labelled a **Rivalry** after 3
+completed challenges. Rivalries are derived from `match_players`, so there's no extra table.
+
+**My Challenges** (`/matches`) shows one unambiguous state per challenge: Waiting for
+opponent, Lock in now, Locked in, In progress, Won, Lost, Draw, Void, Expired, Timed out,
+You left, Opponent left, Cancelled.
 
 ## Football
 

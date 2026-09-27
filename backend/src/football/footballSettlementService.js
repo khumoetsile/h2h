@@ -50,7 +50,7 @@ export async function settleMatchesForFixture(fixtureId) {
 }
 
 /** Void every open football match tied to a fixture that can never produce a fair result (postponed/cancelled/abandoned). */
-export async function voidMatchesForFixture(fixtureId, reason, { toStatus = 'CANCELLED' } = {}) {
+export async function voidMatchesForFixture(fixtureId, reason, { toStatus = 'CANCELLED', endReason = 'FIXTURE' } = {}) {
   const rows = await query(
     `SELECT m.id FROM matches m JOIN football_challenges fc ON fc.match_id = m.id
      WHERE fc.fixture_id = ? AND m.status IN ('WAITING','MATCHED','READY','IN_PROGRESS') AND m.settled_at IS NULL`,
@@ -62,7 +62,7 @@ export async function voidMatchesForFixture(fixtureId, reason, { toStatus = 'CAN
       await withTransaction(async (tx) => {
         const m = await tx.one('SELECT * FROM matches WHERE id = ? FOR UPDATE', [id]);
         if (!m || m.settled_at) return;
-        const ok = await cancelMatchTx(tx, m, reason, { toStatus });
+        const ok = await cancelMatchTx(tx, m, reason, { toStatus, endReason });
         if (ok) count++;
       });
     } catch (err) {

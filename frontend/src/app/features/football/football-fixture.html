@@ -1,5 +1,5 @@
 <div class="page">
-  <a class="back muted small" routerLink="/football"><mat-icon>arrow_back</mat-icon>All fixtures</a>
+  <a class="back muted small" routerLink="/football"><mat-icon>arrow_back</mat-icon>Football</a>
   @if (error()) {
     <app-load-error [message]="error()" (retry)="load()" />
   } @else if (!fixture()) {
@@ -13,9 +13,7 @@
             <span class="muted small">{{ f.competition.name }}</span>
             @if (f.status === 'LIVE') {
               <span class="chip chip-win"><span class="live-dot"></span>LIVE @if (f.minute) { {{ f.minute }}' }</span>
-            } @else if (f.status === 'SCHEDULED') {
-              <span class="muted small">{{ kickoffLabel(f.kickoffAt) }}</span>
-            } @else {
+            } @else if (f.status !== 'SCHEDULED') {
               <span class="chip">{{ f.status }}</span>
             }
           </div>
@@ -28,13 +26,20 @@
             }
             <span class="team">{{ f.awayTeam.name }}</span>
           </div>
+          @if (f.status === 'SCHEDULED' && !closed()) {
+            <div class="kickoff-row">
+              <div><span class="muted tiny">KICKOFF</span><strong>{{ f.kickoffAt | date: 'EEE d MMM, HH:mm' }}</strong></div>
+              <div class="right"><span class="muted tiny">STARTS IN</span><app-countdown [deadline]="f.kickoffAt" [urgentUnder]="600" (expired)="load()" /></div>
+            </div>
+            <p class="muted tiny">Challenges on this match close at kickoff. The challenge becomes active when the match begins.</p>
+          }
           @if (f.isSimulated) { <p class="muted tiny">Simulated demo fixture — for testing only.</p> }
         </div>
 
-        @if (rematchNote()) {
+        @if (target()) {
           <div class="card notice rematch-notice">
             <mat-icon>swords</mat-icon>
-            <div><strong>Rematch</strong><p class="text-2">{{ rematchNote() }}</p></div>
+            <div><strong>Challenging {{ target()!.username }}</strong><p class="text-2">Pick a question, your side and a stake — they'll get a new challenge to accept.</p></div>
           </div>
         }
 
@@ -47,13 +52,24 @@
             </div>
           </div>
         } @else {
+          @if (visibleOpen().length) {
+            <div class="card waiting-card">
+              <h3><mat-icon>person_search</mat-icon> Players waiting on this match</h3>
+              <div class="waiting-list">
+                @for (c of visibleOpen(); track c.matchId) {
+                  <app-open-challenge-card [challenge]="c" (join)="joinTarget.set($event)" />
+                }
+              </div>
+            </div>
+          }
+
           <div class="card how">
-            <h3><mat-icon>quiz</mat-icon> Choose a question</h3>
+            <h3><span class="step">1</span> Choose a question</h3>
             <div class="type-list">
               @for (t of f.challengeTypes ?? []; track t.id) {
                 <button class="type-row" [class.selected]="type()?.id === t.id" (click)="chooseType(t)">
                   <span class="grow">{{ t.question }}</span>
-                  <mat-icon class="chev">chevron_right</mat-icon>
+                  <mat-icon class="chev">{{ type()?.id === t.id ? 'check_circle' : 'chevron_right' }}</mat-icon>
                 </button>
               }
             </div>
@@ -62,92 +78,101 @@
       </section>
 
       @if (!closed()) {
-        <aside class="screen entry">
+        <aside class="screen entry" id="builder">
           @if (!type()) {
             <div class="screen-body">
-              <p class="muted small center-note">Choose a question on the left to get started.</p>
+              <p class="muted small center-note">Choose a question to get started.</p>
             </div>
           } @else {
             @let t = type()!;
             <div class="screen-body">
-              <h2>{{ t.question }}</h2>
-
-              <div class="tiles pick-tiles">
-                @if (t.pickType === 'TEAM') {
-                  <button class="tile" [class.selected]="pick() === 'HOME'" (click)="choosePick('HOME')">{{ f.homeTeam.name }}</button>
-                  <button class="tile" [class.selected]="pick() === 'AWAY'" (click)="choosePick('AWAY')">{{ f.awayTeam.name }}</button>
-                } @else {
-                  <button class="tile" [class.selected]="pick() === 'YES'" (click)="choosePick('YES')">Yes</button>
-                  <button class="tile" [class.selected]="pick() === 'NO'" (click)="choosePick('NO')">No</button>
-                }
+              <div>
+                <h2><span class="step">2</span> Your pick</h2>
+                <p class="muted small q">{{ t.question }}</p>
+                <div class="tiles pick-tiles">
+                  @if (t.pickType === 'TEAM') {
+                    <button class="tile" [class.selected]="pick() === 'HOME'" (click)="choosePick('HOME')">{{ f.homeTeam.name }}</button>
+                    <button class="tile" [class.selected]="pick() === 'AWAY'" (click)="choosePick('AWAY')">{{ f.awayTeam.name }}</button>
+                  } @else {
+                    <button class="tile" [class.selected]="pick() === 'YES'" (click)="choosePick('YES')">Yes</button>
+                    <button class="tile" [class.selected]="pick() === 'NO'" (click)="choosePick('NO')">No</button>
+                  }
+                </div>
+                <p class="muted tiny rule">{{ t.settlementSummary }}</p>
               </div>
 
               @if (pick()) {
-                <h2 class="stake-h">Choose your entry</h2>
-                <div class="tiles stake-tiles">
-                  @for (s of f.stakes ?? []; track s) {
-                    <button class="tile" [class.selected]="stake() === s" [disabled]="s > available()" (click)="stake.set(s)">{{ s | money }}</button>
-                  }
-                </div>
-
-                @if (stake() && potentialPrize() !== null) {
-                  <div class="prize-box">
-                    <div class="pb-row"><span>You pay</span><strong class="money">{{ stake() | money }}</strong></div>
-                    <div class="pb-row win-row"><span>You could win</span><strong class="money accent">{{ potentialPrize() | money }}</strong></div>
-                    <p class="muted tiny">If the result is a draw or can't be fairly decided, you both get a full refund — no fee either way.</p>
+                <div>
+                  <h2><span class="step">3</span> Stake</h2>
+                  <div class="tiles stake-tiles">
+                    @for (s of f.stakes ?? []; track s) {
+                      <button class="tile" [class.selected]="stake() === s" [disabled]="s > available()" (click)="stake.set(s)">{{ s | money }}</button>
+                    }
                   </div>
-                }
-
-                <div class="mode-tabs">
-                  <button class="btn" [class.btn-primary]="mode() === 'find'" (click)="chooseMode('find')"><mat-icon>search</mat-icon>Find an opponent</button>
-                  <button class="btn" [class.btn-primary]="mode() === 'direct'" (click)="chooseMode('direct')"><mat-icon>swords</mat-icon>Challenge someone</button>
-                </div>
-
-                @if (mode() === 'direct') {
-                  <div class="search-box">
-                    <mat-icon>search</mat-icon>
-                    <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" autocomplete="off" />
-                    @if (searching()) { <mat-spinner diameter="18" /> }
-                  </div>
-                  @if (results().length > 0) {
-                    <div class="result-list">
-                      @for (u of results(); track u.id) {
-                        <button class="result-row" (click)="pickOpponent(u)">
-                          <app-avatar [name]="u.username" [color]="u.avatarColor" [size]="36" />
-                          <span class="grow">{{ u.username }}</span>
-                        </button>
-                      }
+                  @if (stake() && potentialPrize() !== null) {
+                    <div class="prize-box">
+                      <div class="pb-row"><span>Your stake</span><strong class="money">{{ stake() | money }}</strong></div>
+                      <div class="pb-row win-row"><span>Win the challenge and receive</span><strong class="money accent">{{ potentialPrize() | money }}</strong></div>
+                      <p class="muted tiny">Draw, void or cancelled: both players get their full stake back, platform fee {{ 0 | money }}.</p>
                     </div>
                   }
-                  @if (opponent()) {
-                    <label class="msg-label" for="msg">Add a message (optional)</label>
-                    <textarea id="msg" class="msg-box" [(ngModel)]="message" maxlength="140" rows="2" placeholder="Think Chelsea's got this?"></textarea>
-                  }
-                }
-
-                @if (readyToConfirm && pick()) {
-                  <div class="review-line">
-                    <span class="muted small">Your pick</span>
-                    <strong>{{ pickLabel() }}</strong>
-                    @if (mode() === 'direct' && opponent()) { <span class="muted small">vs {{ opponent()!.username }}</span> }
-                  </div>
-                }
-
-                @if (formError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ formError() }}</div> }
-
-                @if (mode()) {
-                  <p class="fee-disclosure muted tiny"><mat-icon inline>info</mat-icon> Leaving after the challenge is locked will incur a P0.50 abandonment fee.</p>
-                }
+                </div>
               }
+
+              @if (pick() && stake()) {
+                <div>
+                  <h2><span class="step">4</span> Who do you want to play?</h2>
+                  <div class="mode-cards" role="radiogroup" aria-label="How to find your opponent">
+                    <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'direct'" [class.selected]="mode() === 'direct'" (click)="chooseMode('direct')">
+                      <mat-icon>person_pin</mat-icon>
+                      <strong>Challenge someone</strong>
+                      <span>I already know who I want to play.</span>
+                    </button>
+                    <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'find'" [class.selected]="mode() === 'find'" (click)="chooseMode('find')">
+                      <mat-icon>travel_explore</mat-icon>
+                      <strong>Find opponent</strong>
+                      <span>Make it public — any available player can join.</span>
+                    </button>
+                  </div>
+
+                  @if (mode() === 'direct') {
+                    <div class="search-box">
+                      <mat-icon>search</mat-icon>
+                      <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" autocomplete="off" aria-label="Search for a player" />
+                      @if (searching()) { <mat-spinner diameter="18" /> }
+                    </div>
+                    @if (results().length > 0) {
+                      <div class="result-list">
+                        @for (u of results(); track u.id) {
+                          <button class="result-row" (click)="pickOpponent(u)">
+                            <app-avatar [name]="u.username" [color]="u.avatarColor" [size]="36" />
+                            <span class="grow">{{ u.username }}</span>
+                            @if (u.online) { <span class="chip chip-win">online</span> }
+                          </button>
+                        }
+                      </div>
+                    }
+                    @if (opponent()) {
+                      <label class="msg-label" for="msg">Add a message (optional)</label>
+                      <textarea id="msg" class="msg-box" [(ngModel)]="message" maxlength="140" rows="2" placeholder="Think you've got this one?"></textarea>
+                    }
+                  }
+                  @if (mode() === 'find') {
+                    <p class="muted small mode-note"><mat-icon inline>public</mat-icon> Your challenge appears in <strong>Open Challenges</strong>. Another player must join within {{ acceptWindow() }} or it expires and your stake is returned.</p>
+                  }
+                </div>
+              }
+
+              @if (formError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ formError() }}</div> }
             </div>
 
             <div class="screen-actions">
               @if (available() < (f.stakes?.[0] ?? 0)) {
-                <a class="btn btn-primary btn-lg btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add money to play</a>
+                <a class="btn btn-primary btn-lg btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add demo funds to play</a>
               } @else if (pick() && stake()) {
-                <button class="btn btn-primary btn-lg btn-block" [disabled]="!readyToConfirm || busy()" (click)="confirm()">
-                  @if (busy()) { <mat-spinner diameter="20" /> } @else { <mat-icon>check</mat-icon> }
-                  {{ mode() === 'direct' ? 'Send challenge' : mode() === 'find' ? 'Find an opponent' : 'Choose how to play' }}
+                <button class="btn btn-primary btn-lg btn-block" [disabled]="!readyToConfirm" (click)="reviewOpen.set(true)">
+                  <mat-icon>{{ mode() === 'direct' ? 'person_pin' : mode() === 'find' ? 'travel_explore' : 'arrow_downward' }}</mat-icon>
+                  {{ mode() === 'direct' ? (opponent() ? 'Review challenge' : 'Choose a player') : mode() === 'find' ? 'Review & find opponent' : 'Choose who to play' }}
                 </button>
               }
             </div>
@@ -157,3 +182,41 @@
     </div>
   }
 </div>
+
+@if (reviewOpen() && fixture() && type()) {
+  @let f = fixture()!;
+  <div class="confirm-backdrop" (click)="closeReview()">
+    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="lock-title" (click)="$event.stopPropagation()">
+      <p class="muted tiny eyebrow">{{ mode() === 'direct' ? 'CHALLENGE SOMEONE' : 'FIND OPPONENT' }}</p>
+      <h2 id="lock-title">You're locking in</h2>
+      <div class="lock-teams"><span>{{ f.homeTeam.name }}</span><small>vs</small><span>{{ f.awayTeam.name }}</span></div>
+      <div class="confirm-summary">
+        <div class="cs-row"><span>Question</span><strong>{{ type()!.question }}</strong></div>
+        <div class="cs-row"><span>Your pick</span><strong class="accent">{{ pickLabel() }}</strong></div>
+        <div class="cs-row"><span>Stake</span><strong class="money">{{ stake() | money }}</strong></div>
+        <div class="cs-row"><span>Opponent</span><strong>{{ mode() === 'direct' ? opponent()?.username : 'Another player' }}</strong></div>
+        <div class="cs-row"><span>{{ mode() === 'direct' ? 'They have' : 'Someone must join within' }}</span><strong>{{ acceptWindow() }}{{ mode() === 'direct' ? ' to accept' : '' }}</strong></div>
+      </div>
+      <div class="fee-box">
+        <mat-icon>warning</mat-icon>
+        <div>
+          <strong>Important:</strong> once this challenge is locked (both players locked in), leaving it will incur a <strong>{{ config.abandonmentFee() }} abandonment fee</strong>.
+          @if (mode() === 'find') { Your {{ stake() | money }} is set aside now and returned in full if no one joins in time. }
+          @else { Nothing is taken from your balance unless {{ opponent()?.username }} accepts. }
+        </div>
+      </div>
+      @if (formError()) { <div class="form-error" style="margin-top:12px"><mat-icon>error</mat-icon>{{ formError() }}</div> }
+      <div class="confirm-actions">
+        <button class="btn btn-primary btn-lg btn-block" [disabled]="busy()" (click)="confirm()">
+          @if (busy()) { <mat-spinner diameter="20" /> } @else { <mat-icon>lock</mat-icon> }
+          {{ mode() === 'direct' ? 'Send challenge' : 'Lock in & find opponent' }} · {{ stake() | money }}
+        </button>
+        <button class="btn btn-ghost btn-block" [disabled]="busy()" (click)="closeReview()">Back</button>
+      </div>
+    </div>
+  </div>
+}
+
+@if (joinTarget(); as c) {
+  <app-join-sheet [challenge]="c" (closed)="onJoinClosed($event)" />
+}

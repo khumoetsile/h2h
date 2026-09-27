@@ -397,7 +397,8 @@ describe('match lifecycle', () => {
     const aim = await gameId('aim-challenge');
     const A = await newPlayer('xA');
     const m = (await api().post('/api/matches/find').set(auth(A.token)).send({ gameId: aim, stake: 50 })).body.match;
-    await query('UPDATE matches SET created_at = NOW() - INTERVAL 2 HOUR WHERE id = ?', [m.id]);
+    // Deadlines are stamped on the row; expiring means the stored acceptance deadline has passed.
+    await query('UPDATE matches SET acceptance_deadline = ? WHERE id = ?', [new Date(Date.now() - 1000), m.id]);
     await sweepMatches();
     assert.equal((await wallet(A.token)).available, 250);
 
@@ -410,7 +411,8 @@ describe('match lifecycle', () => {
     await api().post(`/api/matches/${m2.id}/start`).set(auth(B.token));
     await backdateStart(m2.id, B.user.id);
     await api().post(`/api/matches/${m2.id}/result`).set(auth(B.token)).send({ actions: { targets: [] } });
-    await query('UPDATE matches SET started_at = NOW() - INTERVAL 1 HOUR WHERE id = ?', [m2.id]);
+    // B finished, so C is on the player-action timer; let it run out.
+    await query('UPDATE matches SET player_action_deadline = ? WHERE id = ?', [new Date(Date.now() - 1000), m2.id]);
     await sweepMatches();
     const v = (await api().get(`/api/matches/${m2.id}`).set(auth(B.token))).body.match;
     assert.equal(v.status, 'COMPLETED');

@@ -84,7 +84,7 @@ describe('Open Challenges: Find Opponent must be publicly discoverable', () => {
 
     const join = await api().post(`/api/football/open-challenges/${matchId}/join`).set(auth(B.token));
     assert.equal(join.status, 200, JSON.stringify(join.body));
-    assert.equal(join.body.match.status, 'MATCHED');
+    assert.equal(join.body.match.status, 'READY', 'creator locked in at creation + joiner via Accept & Lock In -> LOCKED');
     assert.equal(join.body.match.players.length, 2);
     assert.equal(join.body.match.football.opponentPick, 'AWAY');
 
@@ -157,7 +157,10 @@ describe('Abandonment fee: leaving a LOCKED football challenge', () => {
     const fixtureId = await makeFixture();
     const find = await api().post('/api/football/find').set(auth(A.token)).send({ fixtureId, challengeTypeSlug: 'match_winner', pick: 'HOME', stake: 20 });
     const matchId = find.body.match.id;
+    // B joins with "Accept & Lock In"; A then locks in too -> the challenge is LOCKED (READY).
     await api().post(`/api/football/open-challenges/${matchId}/join`).set(auth(B.token));
+    const lock = await api().post(`/api/matches/${matchId}/ready`).set(auth(A.token));
+    assert.equal(lock.body.match.status, 'READY', 'both players locked in = LOCKED');
 
     const beforeA = await wallet(A.token);
     const beforeB = await wallet(B.token);

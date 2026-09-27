@@ -9,6 +9,7 @@ import { txReference } from '../utils/ids.js';
 import { formatMoney, fromCents, toCents } from '../utils/money.js';
 import { getSettings } from './settingsService.js';
 import { notify } from './notificationService.js';
+import { config } from '../config.js';
 
 export function mapWallet(w) {
   const available = Number(w.available_balance);
@@ -178,10 +179,10 @@ export function forfeitStake(tx, userId, match) {
   });
 }
 
-/** Flat fee for voluntarily leaving an already-locked 1v1 challenge — never charged for a disconnect, only an explicit confirmed Leave action. */
-export const ABANDONMENT_FEE_AMOUNT = 0.50;
+/** Flat fee for voluntarily leaving a LOCKED 1v1 challenge (both players locked in) — never charged for a disconnect or a timeout, only an explicit confirmed Leave action. Fixed server-side; the client never supplies it. */
+export const ABANDONMENT_FEE_AMOUNT = config.abandonmentFee;
 
-/** Charged to the player who leaves a locked challenge, on top of (not instead of) the normal full-refund cancellation. Idempotent — safe to attempt more than once. */
+/** Charged to the player who leaves a locked challenge, on top of (not instead of) the normal full-refund cancellation. The idempotency key makes a second charge for the same player+match impossible. */
 export function chargeAbandonmentFee(tx, userId, match) {
   return applyMovement(tx, userId, {
     availableDelta: -toCents(ABANDONMENT_FEE_AMOUNT), type: 'ABANDONMENT_FEE', direction: 'DEBIT', amount: ABANDONMENT_FEE_AMOUNT,

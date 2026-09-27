@@ -6,10 +6,10 @@ import { Transaction, TxType } from '../../core/models';
 import { MoneyPipe } from '../../shared/pipes';
 
 export const TX_LABEL: Record<TxType, string> = {
-  DEPOSIT: 'Deposit', WITHDRAWAL: 'Withdrawal', GAME_ENTRY: 'Game entry', GAME_WIN: 'Game win', REFUND: 'Refund', FORFEIT: 'Stake forfeited',
+  DEPOSIT: 'Deposit', WITHDRAWAL: 'Withdrawal', GAME_ENTRY: 'Challenge stake', GAME_WIN: 'Challenge win', REFUND: 'Refund', FORFEIT: 'Stake lost', ABANDONMENT_FEE: 'Abandonment fee',
 };
 const TX_ICON: Record<TxType, string> = {
-  DEPOSIT: 'south_west', WITHDRAWAL: 'north_east', GAME_ENTRY: 'lock', GAME_WIN: 'emoji_events', REFUND: 'undo', FORFEIT: 'trending_down',
+  DEPOSIT: 'south_west', WITHDRAWAL: 'north_east', GAME_ENTRY: 'lock', GAME_WIN: 'emoji_events', REFUND: 'undo', FORFEIT: 'trending_down', ABANDONMENT_FEE: 'logout',
 };
 
 /** Transaction history: table on desktop, stacked list on mobile. */

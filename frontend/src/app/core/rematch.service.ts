@@ -1,21 +1,35 @@
 import { Injectable, signal } from '@angular/core';
 
+export interface RematchIntent {
+  username: string;
+  avatarColor: string;
+  /** Pre-select the same question on the next fixture, if it's offered there. */
+  challengeTypeSlug?: string | null;
+  /** Pre-select the same stake. */
+  stake?: number | null;
+}
+
 /**
- * Carries "rematch this opponent" intent from a completed football match's
- * result screen to the fixture picker. Football can't literally replay the
- * same fixture (its real match has already kicked off/finished), so a
- * rematch means: same opponent, a new fixture the player picks next —
- * this just pre-fills who that challenge should go to.
+ * Carries "challenge this player" intent (a rematch from a result screen, or
+ * "Challenge Khumo" from a profile) to the fixture picker. A football
+ * rematch can't replay the same fixture — its real match already happened —
+ * so it always becomes a brand-new challenge (new match, new picks, new
+ * stake, new transactions and settlement) on a fixture the player picks next.
  */
 @Injectable({ providedIn: 'root' })
 export class RematchService {
-  private pending = signal<{ username: string; avatarColor: string } | null>(null);
+  private pending = signal<RematchIntent | null>(null);
+  readonly current = this.pending.asReadonly();
 
-  setPending(opponent: { username: string; avatarColor: string }) {
-    this.pending.set(opponent);
+  setPending(intent: RematchIntent) {
+    this.pending.set(intent);
   }
 
-  /** Reads and clears the pending rematch target — a one-shot handoff. */
+  clear() {
+    this.pending.set(null);
+  }
+
+  /** Reads and clears the pending target — a one-shot handoff. */
   consume() {
     const v = this.pending();
     this.pending.set(null);

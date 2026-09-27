@@ -1,24 +1,28 @@
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
+import { picksFor, viewDisplayState } from '../../core/challenge-state';
+import { ConfigStore } from '../../core/config.store';
+import { relevantStat } from '../../core/football-stat';
+import { formatMoney } from '../../core/format';
 import { MatchView } from '../../core/models';
+import { RematchService } from '../../core/rematch.service';
 import { Toast } from '../../core/toast.service';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, LoadError, Spinner } from '../../shared/ui';
-import { relevantStat } from '../../core/football-stat';
-import { RematchService } from '../../core/rematch.service';
 
 /**
- * The moment right after a game ends. One screen, instantly understandable:
- * did you win or lose, and by how much — then "Play again" or "Back home".
- * The full round-by-round breakdown is one tap further, for anyone curious;
- * it is never the first thing shown.
+ * The moment a challenge ends. One screen, instantly understandable: what
+ * happened, what it meant for your money, and a one-tap Rematch that
+ * creates a completely new challenge (new id, picks, stake, transactions,
+ * settlement and audit trail) — never a replay of this record.
  */
 @Component({
   selector: 'app-match-result',
-  imports: [RouterLink, MatIconModule, MoneyPipe, Avatar, LoadError, Spinner],
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner],
   template: `
     <div class="result-screen">
       @if (error()) {
@@ -28,63 +32,58 @@ import { RematchService } from '../../core/rematch.service';
       } @else {
         @let m = match()!;
         @let mine = me()!;
-        <div class="result-body fade-in" [class.won]="mine.outcome === 'WIN'" [class.lost]="mine.outcome === 'LOSS'">
-          <div class="badge-icon">
-            <mat-icon>{{ icon() }}</mat-icon>
-          </div>
+        <div class="result-body fade-in" [class.won]="ds() === 'WON'" [class.lost]="ds() === 'LOST' || ds() === 'LEFT' || ds() === 'TIMED_OUT'">
+          <div class="badge-icon"><mat-icon>{{ icon() }}</mat-icon></div>
           <h1 class="result-hero">{{ headline() }}</h1>
-          @if (mine.outcome === 'WIN') {
-            <div class="result-amount win">+{{ (m.prize - m.stake) | money }}</div>
-          } @else {
-            <p class="sub">{{ subline() }}</p>
-          }
+          @if (ds() === 'WON') { <div class="result-amount win">+{{ (m.prize - m.stake) | money }}</div> }
+          <p class="sub">{{ subline() }}</p>
 
           @if (isFootball() && m.football) {
-            <div class="football-recap">
+            @let f = m.football;
+            <div class="football-recap card">
+              <div class="muted tiny">{{ f.challengeType?.question }} · {{ m.stake | money }}</div>
               <div class="fr-teams">
-                <span>{{ m.football.homeTeam }}</span>
-                @if (m.football.homeScore !== null && m.football.homeScore !== undefined) {
-                  <strong class="num">{{ m.football.homeScore }} – {{ m.football.awayScore }}</strong>
-                } @else {
-                  <span class="muted small">vs</span>
-                }
-                <span>{{ m.football.awayTeam }}</span>
+                <span>{{ f.homeTeam }}</span>
+                @if (f.homeScore !== null && f.homeScore !== undefined) { <strong class="num">{{ f.homeScore }} – {{ f.awayScore }}</strong> } @else { <span class="muted small">vs</span> }
+                <span>{{ f.awayTeam }}</span>
               </div>
               @if (stat(); as s) {
-                <p class="stat-line">{{ s.label }}: {{ m.football.homeTeam }} <strong>{{ s.home ?? '–' }}</strong> · {{ m.football.awayTeam }} <strong>{{ s.away ?? '–' }}</strong></p>
+                @if (s.home !== null) {
+                  <div class="final-stat">
+                    <span class="muted tiny">FINAL {{ s.label.toUpperCase() }}</span>
+                    <div><span>{{ f.homeTeam }}</span><strong>{{ s.home }}</strong></div>
+                    <div><span>{{ f.awayTeam }}</span><strong>{{ s.away }}</strong></div>
+                  </div>
+                }
               }
-              <p class="muted small">{{ m.football.challengeType?.question }}</p>
               <div class="pvp-recap">
-                <div class="pvp-side"><span class="muted tiny">YOU</span><strong>{{ myPick() }}</strong></div>
+                <div class="pvp-side"><span class="muted tiny">YOU</span><strong>{{ picks().mine }}</strong></div>
                 <div class="pvp-vs">vs</div>
-                <div class="pvp-side"><span class="muted tiny">{{ opponent()?.username ?? 'OPPONENT' }}</span><strong>{{ opponentPick() }}</strong></div>
+                <div class="pvp-side"><span class="muted tiny">{{ opponent()?.username ?? 'OPPONENT' }}</span><strong>{{ picks().theirs || '—' }}</strong></div>
               </div>
             </div>
-          } @else {
+          } @else if (m.status === 'COMPLETED') {
             <div class="vs-row">
-              <div class="vs-side">
-                <app-avatar [name]="mine.username" [color]="mine.avatarColor" [size]="48" />
-                <span>You</span>
-                <strong class="num">{{ mine.result?.score ?? '—' }}</strong>
-              </div>
+              <div class="vs-side"><app-avatar [name]="mine.username" [color]="mine.avatarColor" [size]="48" /><span>You</span><strong class="num">{{ mine.result?.score ?? '—' }}</strong></div>
               <div class="vs-mid">VS</div>
-              <div class="vs-side">
-                <app-avatar [name]="opponent()?.username ?? ''" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="48" />
-                <span>{{ opponent()?.username }}</span>
-                <strong class="num">{{ opponent()?.result?.score ?? '—' }}</strong>
-              </div>
+              <div class="vs-side"><app-avatar [name]="opponent()?.username ?? ''" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="48" /><span>{{ opponent()?.username }}</span><strong class="num">{{ opponent()?.result?.score ?? '—' }}</strong></div>
             </div>
           }
 
-          <div class="actions">
-            @if (isFootball() && opponent() && !opponent()!.isBot) {
-              <button class="btn btn-primary btn-lg btn-block" (click)="rematch()"><mat-icon>swords</mat-icon>Rematch {{ opponent()?.username }}</button>
-              <button class="btn btn-lg btn-block" (click)="playAgain()"><mat-icon>sports_soccer</mat-icon>Back to Football</button>
-            } @else {
-              <button class="btn btn-primary btn-lg btn-block" (click)="playAgain()"><mat-icon>replay</mat-icon>Play again</button>
+          <div class="money-lines card">
+            @for (l of moneyLines(); track l.label) {
+              <div class="ml"><span class="muted">{{ l.label }}</span><strong [class.win]="l.tone === 'win'" [class.loss]="l.tone === 'loss'">{{ l.value }}</strong></div>
             }
-            <a class="btn btn-lg btn-block" routerLink="/dashboard"><mat-icon>home</mat-icon>Back home</a>
-            <a class="link small" [routerLink]="['/matches', m.code]">View match details</a>
+          </div>
+
+          <div class="actions">
+            @if (canRematch()) {
+              <button class="btn btn-primary btn-lg btn-block" [disabled]="rematching()" (click)="rematch()">
+                @if (rematching()) { <mat-spinner diameter="20" /> } @else { <mat-icon>replay</mat-icon> } Rematch {{ opponent()?.username }}
+              </button>
+            }
+            <button class="btn btn-lg btn-block" [class.btn-primary]="!canRematch()" (click)="playAgain()"><mat-icon>{{ isFootball() ? 'sports_soccer' : 'sports_esports' }}</mat-icon>{{ isFootball() ? 'Back to Football' : 'Play again' }}</button>
+            <a class="link small" [routerLink]="['/matches', m.code]">View challenge details</a>
           </div>
         </div>
       }
@@ -92,28 +91,28 @@ import { RematchService } from '../../core/rematch.service';
   `,
   styles: [`
     .result-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px 16px calc(24px + env(safe-area-inset-bottom)); }
-    .result-body { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; max-width: 420px; width: 100%; }
-    .badge-icon {
-      width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 6px;
-      background: var(--surface-2); color: var(--muted);
-      mat-icon { font-size: 40px; width: 40px; height: 40px; }
-    }
+    .result-body { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 10px; max-width: 420px; width: 100%; min-width: 0; }
+    .badge-icon { width: 76px; height: 76px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin-bottom: 4px; background: var(--surface-2); color: var(--muted);
+      mat-icon { font-size: 40px; width: 40px; height: 40px; } }
     .won .badge-icon { background: var(--win-soft); color: var(--win); }
     .lost .badge-icon { background: var(--loss-soft); color: var(--loss); }
     .won .result-hero { color: var(--win); }
-    .sub { color: var(--text-2); font-size: 16px; margin-top: 2px; }
-    .vs-row { display: flex; align-items: center; gap: 18px; margin: 26px 0 8px; width: 100%; justify-content: center; }
-    .vs-side { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; color: var(--muted);
-      strong { font-family: var(--font-display); font-size: 22px; color: var(--text); } }
+    .sub { color: var(--text-2); font-size: 15px; }
+    .vs-row { display: flex; align-items: center; gap: 18px; margin: 16px 0 4px; width: 100%; justify-content: center; }
+    .vs-side { display: flex; flex-direction: column; align-items: center; gap: 6px; font-size: 13px; color: var(--muted); min-width: 0;
+      strong { font-family: var(--font-display); font-size: 22px; color: var(--text); } span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
     .vs-mid { font-family: var(--font-display); font-weight: 700; color: var(--muted); font-size: 14px; }
-    .football-recap { margin: 22px 0 8px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 6px; }
-    .fr-teams { display: flex; align-items: center; justify-content: center; gap: 12px; font-weight: 700; font-family: var(--font-display); font-size: 18px;
+    .football-recap { margin-top: 12px; width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 16px; }
+    .fr-teams { display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; font-family: var(--font-display); font-size: 17px; flex-wrap: wrap;
       .num { color: var(--accent); font-size: 22px; } }
-    .stat-line { font-size: 14px; color: var(--text-2); strong { color: var(--text); } }
-    .pvp-recap { display: flex; align-items: center; gap: 14px; margin-top: 8px; }
-    .pvp-side { display: flex; flex-direction: column; align-items: center; gap: 2px; strong { font-family: var(--font-display); font-size: 16px; } }
+    .final-stat { width: 100%; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; background: var(--bg-elev); border-radius: var(--radius-sm);
+      div { display: flex; justify-content: space-between; gap: 8px; } strong { font-family: var(--font-display); font-size: 18px; } }
+    .pvp-recap { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; width: 100%; }
+    .pvp-side { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; strong { font-family: var(--font-display); font-size: 15px; overflow-wrap: anywhere; } }
     .pvp-vs { color: var(--muted); font-size: 12px; font-weight: 700; }
-    .actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 22px; }
+    .money-lines { width: 100%; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+    .ml { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+    .actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 12px; }
   `],
 })
 export class MatchResultPage implements OnInit {
@@ -122,71 +121,75 @@ export class MatchResultPage implements OnInit {
   private router = inject(Router);
   private toast = inject(Toast);
   private rematchSvc = inject(RematchService);
+  private config = inject(ConfigStore);
 
   protected match = signal<MatchView | null>(null);
   protected error = signal('');
+  protected rematching = signal(false);
 
   protected me = computed(() => this.match()?.players.find((p) => p.userId === this.match()?.viewerId) ?? null);
   protected opponent = computed(() => this.match()?.players.find((p) => p.userId !== this.match()?.viewerId) ?? null);
-
   protected isFootball = computed(() => this.match()?.category === 'FOOTBALL');
-  protected myPick = computed(() => {
-    const m = this.match();
-    const f = m?.football;
-    if (!f) return '';
-    return m!.createdBy === m!.viewerId ? f.creatorPickLabel : (f.opponentPickLabel ?? f.creatorPickLabel);
-  });
-  protected opponentPick = computed(() => {
-    const m = this.match();
-    const f = m?.football;
-    if (!f) return '';
-    return m!.createdBy === m!.viewerId ? (f.opponentPickLabel ?? '') : f.creatorPickLabel;
-  });
-  protected stat = computed(() => {
-    const f = this.match()?.football;
-    return f ? relevantStat(f) : null;
-  });
-  /** cancelMatchTx sets cancel_reason to "<username> left the challenge" specifically for a locked-football abandonment — distinct from any other cancellation reason. */
-  protected abandonedByMe = computed(() => {
-    const m = this.match();
-    const mine = this.me();
-    return !!m?.cancelReason && !!mine && m.cancelReason === `${mine.username} left the challenge`;
-  });
-  protected abandonedByOpponent = computed(() => {
-    const m = this.match();
+  protected ds = computed(() => { const m = this.match(); return m ? viewDisplayState(m) : null; });
+  protected picks = computed(() => { const m = this.match(); return m ? picksFor(m) : { mine: '', theirs: '' }; });
+  protected stat = computed(() => { const f = this.match()?.football; return f ? relevantStat(f) : null; });
+  protected canRematch = computed(() => {
     const opp = this.opponent();
-    return !!m?.cancelReason && !!opp && m.cancelReason === `${opp.username} left the challenge`;
+    return !!opp && !opp.isBot && this.ds() !== 'EXPIRED';
   });
 
-  protected icon = computed(() => {
-    const m = this.match();
-    if (!m) return 'sports_esports';
-    if (m.status === 'CANCELLED') return 'undo';
-    if (m.status === 'VOID') return 'block';
-    if (m.isDraw) return 'balance';
-    return this.me()?.outcome === 'WIN' ? 'emoji_events' : 'sentiment_dissatisfied';
-  });
+  protected icon = computed(() => ({
+    WON: 'emoji_events', LOST: 'sentiment_dissatisfied', DRAW: 'balance', VOID: 'block', EXPIRED: 'timer_off', TIMED_OUT: 'timer_off',
+    LEFT: 'logout', OPPONENT_LEFT: 'person_off', CANCELLED: 'undo',
+  } as Record<string, string>)[this.ds() ?? ''] ?? 'sports_esports');
 
   protected headline = computed(() => {
     const m = this.match();
     if (!m) return '';
-    if (m.status === 'CANCELLED' && this.abandonedByMe()) return 'You left the challenge';
-    if (m.status === 'CANCELLED' && this.abandonedByOpponent()) return 'Opponent left the challenge';
-    if (m.status === 'CANCELLED') return this.isFootball() ? 'Challenge cancelled' : 'Match cancelled';
-    if (m.status === 'VOID') return "Result couldn't be verified";
-    if (m.isDraw) return "IT'S A DRAW";
-    return this.me()?.outcome === 'WIN' ? 'YOU WON!' : 'MATCH OVER';
+    switch (this.ds()) {
+      case 'WON': return 'YOU WON 🏆';
+      case 'LOST': return m.endReason === 'ACTION_TIMEOUT' ? 'TIMED OUT' : 'YOU LOST';
+      case 'DRAW': return 'DRAW';
+      case 'VOID': return 'VOID';
+      case 'EXPIRED': return 'Challenge expired';
+      case 'TIMED_OUT': return 'Timed out';
+      case 'LEFT': return 'You left the challenge';
+      case 'OPPONENT_LEFT': return 'Opponent left';
+      default: return 'Challenge cancelled';
+    }
   });
 
   protected subline = computed(() => {
     const m = this.match();
+    const opp = this.opponent()?.username ?? 'your opponent';
     if (!m) return '';
-    if (m.status === 'CANCELLED' && this.abandonedByMe()) return 'Your entry was refunded, minus a P0.50 abandonment fee for leaving after the challenge was locked.';
-    if (m.status === 'CANCELLED' && this.abandonedByOpponent()) return 'Your opponent left after the challenge was locked. Your entry was refunded in full — no fee for you.';
-    if (m.status === 'CANCELLED') return 'Your entry was refunded.';
-    if (m.status === 'VOID') return 'We could not fairly determine a result, so your entry was refunded in full — no fee.';
-    if (m.isDraw) return this.isFootball() ? "The match ended in a draw — your entry was refunded." : 'It was a tie — your entry was refunded.';
-    return 'You lost this round.';
+    const stake = formatMoney(m.stake);
+    switch (this.ds()) {
+      case 'WON': return m.endReason === 'ACTION_TIMEOUT' ? `You beat ${opp} — they didn't finish before the timer ran out.` : `You beat ${opp}.`;
+      case 'LOST': return m.endReason === 'ACTION_TIMEOUT' ? `You didn't finish before the timer ran out, so ${opp} won.` : `${opp} won this one.`;
+      case 'DRAW': return `${stake} refunded to both players.`;
+      case 'VOID': return `The result couldn't be fairly decided (${m.cancelReason ?? 'no verifiable result'}). ${stake} refunded to both players.`;
+      case 'EXPIRED': return `No opponent joined in time. Your ${stake} was returned — no fee.`;
+      case 'TIMED_OUT': return `${m.cancelReason ?? 'The timer ran out'}. Both stakes were returned in full — no fee.`;
+      case 'LEFT': return `You left after the challenge was locked. Your ${stake} was refunded and the ${this.config.abandonmentFee()} abandonment fee was charged.`;
+      case 'OPPONENT_LEFT': return `${opp} left after the challenge was locked. Your ${stake} was refunded in full — no fee for you.`;
+      default: return `${m.cancelReason ? m.cancelReason.charAt(0).toUpperCase() + m.cancelReason.slice(1) + '. ' : ''}Your ${stake} was returned — no fee.`;
+    }
+  });
+
+  /** Exactly what happened to the money — including an explicit zero platform fee when no one won. */
+  protected moneyLines = computed(() => {
+    const m = this.match();
+    if (!m) return [];
+    const zero = formatMoney(0);
+    const lines: { label: string; value: string; tone?: 'win' | 'loss' }[] = [{ label: 'Stake', value: formatMoney(m.stake) }];
+    switch (this.ds()) {
+      case 'WON': lines.push({ label: 'Platform fee', value: formatMoney(m.fee) }, { label: 'You received', value: formatMoney(m.prize), tone: 'win' }); break;
+      case 'LOST': lines.push({ label: 'Result', value: `−${formatMoney(m.stake)}`, tone: 'loss' }); break;
+      case 'LEFT': lines.push({ label: 'Refunded', value: formatMoney(m.stake) }, { label: 'Abandonment fee', value: `−${this.config.abandonmentFee()}`, tone: 'loss' }); break;
+      default: lines.push({ label: 'Refunded', value: formatMoney(m.stake) }, { label: 'Platform fee', value: zero });
+    }
+    return lines;
   });
 
   ngOnInit() {
@@ -210,21 +213,32 @@ export class MatchResultPage implements OnInit {
 
   playAgain() {
     const m = this.match();
-    if (m?.category === 'FOOTBALL') {
-      // The fixture just played is already kicked off/finished — a rematch
-      // has to be on a new fixture, so this goes to the Football list rather
-      // than back into the same (now closed) fixture.
-      this.router.navigate(['/football']);
-      return;
-    }
+    if (m?.category === 'FOOTBALL') { this.router.navigate(['/football']); return; }
     const slug = m?.game.slug;
     this.router.navigate(slug ? ['/games', slug] : ['/games']);
   }
 
-  /** Same opponent, a new fixture — pre-fills "Challenge someone" the next time they build a football challenge. */
-  rematch() {
+  /** A brand-new challenge — never a reuse of this record. */
+  async rematch() {
+    const m = this.match();
     const opp = this.opponent();
-    if (opp) this.rematchSvc.setPending({ username: opp.username, avatarColor: opp.avatarColor });
-    this.router.navigate(['/football']);
+    if (!m || !opp) return;
+    if (m.category === 'FOOTBALL') {
+      // The fixture has been played — same opponent, same question and stake, on a fixture they pick next.
+      this.rematchSvc.setPending({ username: opp.username, avatarColor: opp.avatarColor, challengeTypeSlug: m.football?.challengeType?.slug, stake: m.stake });
+      this.router.navigate(['/football']);
+      return;
+    }
+    this.rematching.set(true);
+    try {
+      await this.api.post('/challenges', { opponent: opp.username, gameId: m.game.id, stake: m.stake });
+      this.toast.success(`Rematch challenge sent to ${opp.username}.`);
+      this.router.navigate(['/challenges'], { queryParams: { tab: 'outgoing' } });
+    } catch (err) {
+      this.toast.error(err);
+    } finally {
+      this.rematching.set(false);
+    }
   }
 }
+

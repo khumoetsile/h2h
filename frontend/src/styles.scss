@@ -360,3 +360,67 @@ table.table {
 .cdk-overlay-dark-backdrop { background: rgba(4, 6, 10, .7); }
 .mat-mdc-dialog-container .mdc-dialog__surface { border: 1px solid var(--border); }
 input, textarea, select, .mat-mdc-form-field, .mat-mdc-input-element, .mat-mdc-option, .mat-mdc-menu-item { font-family: var(--font) !important; }
+
+// ---- PvP challenge building blocks -------------------------------------------
+// Bottom sheet on mobile, centered dialog on wider screens. Used for every
+// commitment step (join, accept, lock in, leave) so the P0.50 disclosure
+// always looks and reads the same.
+.confirm-backdrop {
+  position: fixed; inset: 0; background: rgba(0, 0, 0, .65); display: flex; align-items: flex-end; justify-content: center; z-index: 200;
+  animation: fadeIn .15s ease both;
+}
+@media (min-width: 640px) { .confirm-backdrop { align-items: center; padding: 16px; } }
+.confirm-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  padding: 22px 18px calc(18px + env(safe-area-inset-bottom)); width: 100%; max-width: 460px; max-height: 92vh; overflow-y: auto;
+  h2 { font-size: 20px; letter-spacing: .02em; }
+}
+@media (min-width: 640px) { .confirm-card { border-radius: var(--radius-lg); } }
+.confirm-summary {
+  background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 14px;
+  display: flex; flex-direction: column; gap: 8px; margin: 14px 0;
+}
+.cs-row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 14px;
+  > :first-child { color: var(--muted); font-size: 13px; flex-shrink: 0; }
+  > :last-child { text-align: right; min-width: 0; overflow-wrap: anywhere; } }
+.confirm-actions { display: flex; flex-direction: column; gap: 10px; margin-top: 16px; }
+
+// The abandonment-fee disclosure. Deliberately loud — never fine print.
+.fee-box {
+  display: flex; gap: 10px; align-items: flex-start; background: var(--demo-soft); border: 1px solid rgba(255, 176, 32, .4);
+  color: var(--text); border-radius: var(--radius-sm); padding: 12px 14px; font-size: 14px; line-height: 1.45; text-align: left;
+  mat-icon { color: var(--demo); flex-shrink: 0; }
+  strong { color: var(--demo); }
+  ul { margin: 6px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+}
+
+// A prominent server-driven timer block ("Waiting for opponent 04:32").
+.timer-panel {
+  display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; width: 100%;
+  padding: 16px 14px; border-radius: var(--radius); background: var(--bg-elev); border: 1px solid var(--border);
+  .tp-label { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+  .tp-note { font-size: 14px; color: var(--text-2); max-width: 340px; }
+  &.urgent { border-color: rgba(255, 84, 112, .45); }
+  &.mine { border-color: var(--accent); background: var(--accent-soft); .tp-label { color: var(--accent); } }
+}
+
+// Section headers on the football home ("🔥 OPEN CHALLENGES").
+.section-title {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 26px 0 10px;
+  h2 { font-size: 16px; letter-spacing: .06em; text-transform: uppercase; display: flex; align-items: center; gap: 8px; }
+  .sub { color: var(--muted); font-size: 13px; }
+}
+.live-dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; display: inline-block; animation: blink 1.4s infinite; }
+@keyframes blink { 50% { opacity: .3; } }
+
+// Cards in horizontal rails / grids never force horizontal page scroll.
+.card-grid { display: grid; gap: 12px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 640px) { .card-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (min-width: 1000px) { .card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+.teams-line {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; font-weight: 700; font-family: var(--font-display); font-size: 16px; min-width: 0;
+  .team { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .team:last-child { text-align: right; }
+  .vs { color: var(--muted); font-size: 12px; font-weight: 500; flex-shrink: 0; }
+  .score { color: var(--accent); flex-shrink: 0; font-size: 18px; }
+}

@@ -11,6 +11,54 @@ export function computeStreak(outcomes) {
   return { type, count, label: `${type}${count}` };
 }
 
+/**
+ * H2H Score — a simple, transparent competitive score shown on profiles:
+ * everyone starts at 1000; +25 per win, +5 per draw, −15 per loss, never
+ * below 0. Only completed challenges count (cancelled/void/expired never
+ * move it). Deliberately simple for now; can be swapped for Elo later
+ * without any schema change since it's derived from match_players.
+ */
+export const H2H_SCORE = { base: 1000, win: 25, draw: 5, loss: -15 };
+export function h2hScore({ wins = 0, draws = 0, losses = 0 }) {
+  return Math.max(0, H2H_SCORE.base + wins * H2H_SCORE.win + draws * H2H_SCORE.draw + losses * H2H_SCORE.loss);
+}
+
+/**
+ * Head-to-head record between two players, from completed challenges only.
+ * No extra table: rivalries are derived from match_players, so the data
+ * already exists for every past challenge. `isRivalry` once they've met
+ * RIVALRY_MIN_CHALLENGES times.
+ */
+export const RIVALRY_MIN_CHALLENGES = 3;
+export async function headToHead(userId, otherId) {
+  const rows = await query(
+    `SELECT m.code, m.category, m.completed_at, m.stake, a.outcome AS my_outcome, g.name AS game_name,
+            ht.short_name AS home, at.short_name AS away
+     FROM matches m
+     JOIN match_players a ON a.match_id = m.id AND a.user_id = ?
+     JOIN match_players b ON b.match_id = m.id AND b.user_id = ?
+     JOIN games g ON g.id = m.game_id
+     LEFT JOIN football_challenges fc ON fc.match_id = m.id
+     LEFT JOIN football_fixtures fx ON fx.id = fc.fixture_id
+     LEFT JOIN football_teams ht ON ht.id = fx.home_team_id
+     LEFT JOIN football_teams at ON at.id = fx.away_team_id
+     WHERE m.status = 'COMPLETED'
+     ORDER BY m.completed_at DESC, m.id DESC`,
+    [userId, otherId],
+  );
+  const myWins = rows.filter((r) => r.my_outcome === 'WIN').length;
+  const theirWins = rows.filter((r) => r.my_outcome === 'LOSS').length;
+  const draws = rows.filter((r) => r.my_outcome === 'DRAW').length;
+  return {
+    played: rows.length, myWins, theirWins, draws,
+    isRivalry: rows.length >= RIVALRY_MIN_CHALLENGES,
+    recent: rows.slice(0, 5).map((r) => ({
+      code: r.code, category: r.category, completedAt: r.completed_at, stake: Number(r.stake), myOutcome: r.my_outcome,
+      label: r.category === 'FOOTBALL' && r.home ? `${r.home} vs ${r.away}` : r.game_name,
+    })),
+  };
+}
+
 function bestWinStreak(outcomesOldestFirst) {
   let best = 0; let cur = 0;
   for (const o of outcomesOldestFirst) {
@@ -71,14 +119,18 @@ export async function getUserStats(userId) {
     [userId],
   );
   const decided = wins + losses;
+  const draws = Number(totals.draws || 0);
+  const streak = computeStreak(outcomes);
   return {
     played: Number(totals.played || 0),
     wins,
     losses,
-    draws: Number(totals.draws || 0),
+    draws,
+    h2hScore: h2hScore({ wins, draws, losses }),
+    currentWinStreak: streak.type === 'W' ? streak.count : 0,
     cancelled: Number(totals.cancelled || 0),
     winRate: decided ? Math.round((wins / decided) * 1000) / 10 : 0,
-    streak: computeStreak(outcomes),
+    streak,
     bestWinStreak: bestWinStreak([...outcomes].reverse()),
     totalWinnings: Number(totals.winnings || 0),
     totalStaked: Number(totals.staked || 0),

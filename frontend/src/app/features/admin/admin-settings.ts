@@ -12,12 +12,12 @@ import { DemoBadge, LoadError, Spinner } from '../../shared/ui';
 interface SettingRow { key: string; value: unknown; description: string; updatedAt: string | null; }
 interface AuditEntry { id: number; admin: string; action: string; targetType: string | null; targetId: string | null; details: unknown; createdAt: string; }
 
-const NUMERIC = ['signup_bonus', 'max_deposit', 'min_withdrawal', 'challenge_expiry_minutes', 'waiting_match_timeout_minutes', 'match_start_timeout_minutes', 'match_play_timeout_minutes'];
+const NUMERIC = ['signup_bonus', 'max_deposit', 'min_withdrawal'];
 const LABELS: Record<string, string> = {
   signup_bonus: 'Signup bonus (P, demo)', max_deposit: 'Max demo deposit (P)', min_withdrawal: 'Min demo withdrawal (P)',
-  challenge_expiry_minutes: 'Challenge expiry (min)', waiting_match_timeout_minutes: 'Matchmaking timeout (min)',
-  match_start_timeout_minutes: 'Start timeout (min)', match_play_timeout_minutes: 'Play timeout (min)',
 };
+// Challenge timers are not admin settings: they're env config (backend
+// config.timers) — see README "Timers".
 
 @Component({
   selector: 'app-admin-settings',

@@ -62,3 +62,30 @@
 .msg-box { width: 100%; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); padding: 10px; font: inherit; resize: none; }
 .review-line { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); font-size: 14px; }
 .fee-disclosure { display: flex; align-items: center; gap: 4px; margin-top: 12px; }
+
+.kickoff-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border);
+  div { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .right { align-items: flex-end; } strong { font-size: 15px; } }
+.step { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface-3); color: var(--text); font-size: 12px; font-weight: 700; margin-right: 6px; flex-shrink: 0; }
+.how h3 .step { margin-right: 0; }
+.q { margin: -4px 0 10px; }
+.rule { margin-top: 8px; }
+.waiting-card { margin-top: 16px; padding: 18px; h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; mat-icon { color: var(--demo); } } }
+.waiting-list { display: flex; flex-direction: column; gap: 10px; }
+
+// The two ways to play must be unmistakably different choices.
+.mode-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.mode-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 14px 12px; min-height: 120px;
+  border-radius: var(--radius); border: 2px solid var(--border-strong); background: var(--surface-2); color: var(--text); cursor: pointer; min-width: 0;
+  mat-icon { font-size: 28px; width: 28px; height: 28px; color: var(--muted); }
+  strong { font-family: var(--font-display); font-size: 15px; text-transform: uppercase; letter-spacing: .04em; }
+  span { font-size: 13px; color: var(--text-2); line-height: 1.35; }
+  &.selected { border-color: var(--accent); background: var(--accent-soft); mat-icon, strong { color: var(--accent); } }
+  &:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+}
+@media (max-width: 340px) { .mode-cards { grid-template-columns: minmax(0, 1fr); } .mode-card { min-height: 0; } }
+.mode-note { margin-top: 12px; line-height: 1.45; mat-icon { vertical-align: -3px; margin-right: 2px; } }
+.eyebrow { letter-spacing: .1em; font-weight: 700; margin-bottom: 2px; }
+.lock-teams { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; font-family: var(--font-display); font-weight: 700; font-size: 18px; text-align: center;
+  span { min-width: 0; overflow-wrap: anywhere; } small { color: var(--muted); font-size: 12px; } }

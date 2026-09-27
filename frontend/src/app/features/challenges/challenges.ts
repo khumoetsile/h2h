@@ -1,10 +1,14 @@
-import { Component, computed, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, computed, DestroyRef, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
 import { Challenge, Pick as FootballPick } from '../../core/models';
+import { ConfigStore } from '../../core/config.store';
+import { ServerClock } from '../../core/server-clock';
+import { Countdown } from '../../shared/countdown';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
@@ -19,11 +23,17 @@ type Tab = 'incoming' | 'outgoing' | 'history';
  */
 @Component({
   selector: 'app-challenges',
-  imports: [RouterLink, MatIconModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, SkeletonList],
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, SkeletonList, Countdown],
   templateUrl: './challenges.html',
   styleUrl: './challenges.scss',
 })
 export class ChallengesPage implements OnInit {
+  /** ?tab=incoming|outgoing|history */
+  readonly tabParam = input<string | undefined>(undefined, { alias: 'tab' });
+  protected config = inject(ConfigStore);
+  private clock = inject(ServerClock);
+  /** The incoming challenge whose Accept & Lock In sheet is open. */
+  protected acceptTarget = signal<Challenge | null>(null);
   private api = inject(Api);
   private toast = inject(Toast);
   private router = inject(Router);
@@ -38,12 +48,16 @@ export class ChallengesPage implements OnInit {
   protected myPick = signal<Record<number, FootballPick>>({});
   protected acceptError = signal<Record<number, string>>({});
 
-  protected incoming = computed(() => (this.challenges() ?? []).filter((c) => c.direction === 'INCOMING' && c.status === 'PENDING'));
-  protected outgoing = computed(() => (this.challenges() ?? []).filter((c) => c.direction === 'OUTGOING' && c.status === 'PENDING'));
-  protected history = computed(() => (this.challenges() ?? []).filter((c) => c.status !== 'PENDING'));
+  /** A pending challenge whose deadline has passed is shown as expired right away; the server has the final say. */
+  protected isLive = (c: Challenge) => c.status === 'PENDING' && this.clock.remainingMs(c.expiresAt) > 0;
+  protected incoming = computed(() => (this.challenges() ?? []).filter((c) => c.direction === 'INCOMING' && this.isLive(c)));
+  protected outgoing = computed(() => (this.challenges() ?? []).filter((c) => c.direction === 'OUTGOING' && this.isLive(c)));
+  protected history = computed(() => (this.challenges() ?? []).filter((c) => !this.isLive(c)));
   protected visible = computed(() => ({ incoming: this.incoming(), outgoing: this.outgoing(), history: this.history() })[this.tab()]);
 
   ngOnInit() {
+    const t = this.tabParam();
+    if (t === 'incoming' || t === 'outgoing' || t === 'history') { this.tab.set(t); this.tabFromUrl = true; }
     this.load();
     this.realtime.challenge$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
     this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
@@ -54,7 +68,7 @@ export class ChallengesPage implements OnInit {
     try {
       const { challenges } = await this.api.get<{ challenges: Challenge[] }>('/challenges', { status: 'all' });
       this.challenges.set(challenges);
-      if (!silent && this.incoming().length === 0 && this.outgoing().length > 0) this.tab.set('outgoing');
+      if (!silent && !this.tabFromUrl && this.incoming().length === 0 && this.outgoing().length > 0) this.tab.set('outgoing');
     } catch {
       if (!silent) this.error.set("We couldn't load your challenges.");
     }
@@ -65,19 +79,36 @@ export class ChallengesPage implements OnInit {
     this.acceptError.update((m) => ({ ...m, [c.id]: '' }));
   }
 
-  async accept(c: Challenge) {
-    const pick = this.myPick()[c.id];
-    if (c.football && !pick) {
+  private tabFromUrl = false;
+
+  /** Step 1: open the lock-in sheet (after a side is chosen, for football). */
+  openAccept(c: Challenge) {
+    if (c.football && !this.myPick()[c.id]) {
       this.acceptError.update((m) => ({ ...m, [c.id]: 'Choose your side before accepting.' }));
       return;
     }
+    this.acceptTarget.set(c);
+  }
+  closeAccept() { if (this.busy() === null) this.acceptTarget.set(null); }
+  pickLabel(c: Challenge) {
+    const p = this.myPick()[c.id];
+    if (!c.football || !p) return '';
+    return p === 'HOME' ? c.football.homePickLabel : p === 'AWAY' ? c.football.awayPickLabel : p === 'YES' ? 'Yes' : 'No';
+  }
+
+  /** Step 2: ACCEPT & LOCK IN — the server re-checks the deadline and everything else. */
+  async accept(c: Challenge) {
+    const pick = this.myPick()[c.id];
+    if (c.football && !pick) return;
     this.busy.set(c.id);
     this.acceptError.update((m) => ({ ...m, [c.id]: '' }));
     try {
       const { match } = await this.api.post<{ match: { code: string } }>(`/challenges/${c.id}/accept`, c.football ? { pick } : {});
-      this.toast.success('Challenge accepted! Get ready to play.');
+      this.toast.success(c.football ? "Accepted — you're both locked in!" : 'Accepted and locked in — waiting for ' + c.challenger.username + ' to lock in.');
+      this.acceptTarget.set(null);
       await this.router.navigate(['/match', match.code]);
     } catch (err) {
+      this.acceptTarget.set(null);
       if (c.football) this.acceptError.update((m) => ({ ...m, [c.id]: apiError(err).message }));
       else this.toast.error(err);
       await this.load(true);
@@ -102,14 +133,8 @@ export class ChallengesPage implements OnInit {
     } catch (err) { this.toast.error(err); await this.load(true); } finally { this.busy.set(null); }
   }
 
-  expiresIn(c: Challenge) {
-    const ms = new Date(c.expiresAt).getTime() - Date.now();
-    if (ms <= 0) return 'Expired';
-    const m = Math.round(ms / 60000);
-    return m >= 60 ? `${Math.round(m / 60)}h left to respond` : `${m}m left to respond`;
-  }
-
   statusLabel(c: Challenge) {
-    return ({ ACCEPTED: 'Accepted', DECLINED: 'Declined', CANCELLED: 'Cancelled', EXPIRED: 'Expired', PENDING: 'Pending' } as Record<string, string>)[c.status];
+    // A PENDING row can only be in history because its timer ran out (the sweeper marks it EXPIRED shortly).
+    return ({ ACCEPTED: 'Accepted', DECLINED: 'Declined', CANCELLED: 'Cancelled', EXPIRED: 'Expired', PENDING: 'Expired' } as Record<string, string>)[c.status];
   }
 }

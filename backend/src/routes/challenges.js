@@ -25,7 +25,7 @@ async function isFootballChallenge(id) {
 }
 
 router.get('/', validate(listQuery, 'query'), ah(async (req, res) => {
-  res.json({ challenges: await svc.listChallenges(req.user.id, req.validatedQuery) });
+  res.json({ challenges: await svc.listChallenges(req.user.id, req.validatedQuery), serverNow: new Date() });
 }));
 router.post('/', requirePlayer, validate(challengeSchema), ah(async (req, res) => {
   res.status(201).json({ challenge: await svc.createChallenge(req.user.id, req.body) });

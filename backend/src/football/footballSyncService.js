@@ -12,11 +12,12 @@ import { query, queryOne, withTransaction } from '../db.js';
 import { config } from '../config.js';
 import { getSettings } from '../services/settingsService.js';
 import { notify } from '../services/notificationService.js';
-import { emitAll } from '../realtime.js';
+import { emitAll, emitToUser } from '../realtime.js';
 import { getFootballProvider } from './providerRegistry.js';
 import { settleMatchesForFixture, voidMatchesForFixture } from './footballSettlementService.js';
 import { logSystemError } from '../services/systemErrorService.js';
 import { cancelMatchTx } from '../services/matchService.js';
+import { TIMERS } from '../timers.js';
 
 async function upsertCompetitions(provider) {
   const settings = await getSettings();
@@ -137,37 +138,45 @@ async function refreshFixture(provider, row) {
 }
 
 /** Kickoff has its own natural, unambiguous cutoff — enforce it here for anything that slipped through. */
-async function transitionAndExpireAtKickoff() {
-  // MATCHED football matches: kickoff has arrived, the "competition" begins.
-  await query(
+export async function transitionAndExpireAtKickoff() {
+  const now = new Date();
+  // LOCKED (READY — both players locked in) football challenges go live at
+  // kickoff. A MATCHED one (lock-in never completed) never goes live: its
+  // lock-in deadline is capped at kickoff, so the match sweeper cancels it
+  // with full refunds instead.
+  const live = await query(
     `UPDATE matches m JOIN football_challenges fc ON fc.match_id = m.id JOIN football_fixtures fx ON fx.id = fc.fixture_id
-     SET m.status = 'IN_PROGRESS', m.started_at = NOW()
-     WHERE m.category = 'FOOTBALL' AND m.status = 'MATCHED' AND fx.kickoff_at <= NOW()`,
+     SET m.status = 'IN_PROGRESS', m.started_at = ?, m.completion_deadline = fx.kickoff_at + INTERVAL ? MINUTE
+     WHERE m.category = 'FOOTBALL' AND m.status = 'READY' AND fx.kickoff_at <= ?`,
+    [now, TIMERS.footballResultTimeoutMinutes, now],
   );
-  emitAll('config:update', {}); // cheap nudge so open clients refetch queue/fixture state
+  if (live.affectedRows) emitAll('config:update', {}); // cheap nudge so open clients refetch live state
 
   // WAITING football matches that never found an opponent before kickoff.
   const stillWaiting = await query(
     `SELECT m.id, m.stake, m.pool, m.fee_percent FROM matches m JOIN football_challenges fc ON fc.match_id = m.id JOIN football_fixtures fx ON fx.id = fc.fixture_id
-     WHERE m.category = 'FOOTBALL' AND m.status = 'WAITING' AND fx.kickoff_at <= NOW() LIMIT 50`,
+     WHERE m.category = 'FOOTBALL' AND m.status = 'WAITING' AND fx.kickoff_at <= ? LIMIT 50`,
+    [now],
   );
   for (const row of stillWaiting) {
     await withTransaction(async (tx) => {
       const m = await tx.one('SELECT * FROM matches WHERE id = ? FOR UPDATE', [row.id]);
-      if (m && m.status === 'WAITING') await cancelMatchTx(tx, m, 'kickoff arrived before an opponent was found');
+      if (m && m.status === 'WAITING') await cancelMatchTx(tx, m, 'No opponent joined before kickoff', { endReason: 'NO_OPPONENT' });
     }).catch((err) => logSystemError('football-sync:waiting-timeout', err));
   }
 
   // Pending direct challenges for a fixture that has now kicked off.
   const staleChallenges = await query(
     `SELECT c.id, c.challenger_id, c.opponent_id FROM challenges c JOIN football_fixtures fx ON fx.id = c.fixture_id
-     WHERE c.status = 'PENDING' AND fx.kickoff_at <= NOW() LIMIT 50`,
+     WHERE c.status = 'PENDING' AND fx.kickoff_at <= ? LIMIT 50`,
+    [now],
   );
   for (const c of staleChallenges) {
     await withTransaction(async (tx) => {
       const upd = await tx.q(`UPDATE challenges SET status = 'EXPIRED' WHERE id = ? AND status = 'PENDING'`, [c.id]);
       if (upd.affectedRows === 1) {
         await notify(tx, c.challenger_id, { type: 'CHALLENGE_EXPIRED', title: 'Challenge expired', message: 'Your football challenge expired because the match kicked off before your opponent responded.', link: '/challenges' });
+        for (const uid of [c.challenger_id, c.opponent_id]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));
       }
     }).catch((err) => logSystemError('football-sync:challenge-expiry', err));
   }
@@ -175,10 +184,8 @@ async function transitionAndExpireAtKickoff() {
 
 // A provider outage must never silently settle a competition incorrectly.
 // If a fixture still hasn't produced a final result long after it should
-// have (kickoff + this grace period), stop waiting and void — full refund,
-// no fee — rather than leave players' stakes in limbo forever.
-const UNRESOLVED_GRACE_HOURS = 4;
-
+// have (kickoff + FOOTBALL_RESULT_TIMEOUT_MINUTES), stop waiting and void —
+// full refund, no fee — rather than leave players' stakes in limbo forever.
 export async function voidUnresolvedFixtures() {
   // Deliberately not filtered by fixture status: a fixture can be FINISHED
   // and still be "unresolved" for a stats-dependent challenge type whose
@@ -187,11 +194,12 @@ export async function voidUnresolvedFixtures() {
   // SCHEDULED/LIVE forever.
   const stuck = await query(
     `SELECT DISTINCT fc.fixture_id AS id FROM matches m JOIN football_challenges fc ON fc.match_id = m.id JOIN football_fixtures fx ON fx.id = fc.fixture_id
-     WHERE m.category = 'FOOTBALL' AND m.status = 'IN_PROGRESS' AND m.settled_at IS NULL
-       AND fx.kickoff_at <= NOW() - INTERVAL ${UNRESOLVED_GRACE_HOURS} HOUR`,
+     WHERE m.category = 'FOOTBALL' AND m.status IN ('READY','IN_PROGRESS') AND m.settled_at IS NULL
+       AND fx.kickoff_at + INTERVAL ? MINUTE <= ?`,
+    [TIMERS.footballResultTimeoutMinutes, new Date()],
   );
   for (const { id } of stuck) {
-    await voidMatchesForFixture(id, 'the result could not be verified in time', { toStatus: 'VOID' }).catch((err) => logSystemError('football-sync:unresolved', err));
+    await voidMatchesForFixture(id, 'the result could not be verified in time', { toStatus: 'VOID', endReason: 'RESULT_TIMEOUT' }).catch((err) => logSystemError('football-sync:unresolved', err));
   }
 }
 

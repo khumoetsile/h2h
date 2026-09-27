@@ -21,7 +21,7 @@ export const routes: Routes = [
       { path: 'football', canActivate: [playerGuard], title: 'Football', loadComponent: () => import('./features/football/football-list').then((m) => m.FootballListPage) },
       { path: 'football/:fixtureId', canActivate: [playerGuard], title: 'Fixture', loadComponent: () => import('./features/football/football-fixture').then((m) => m.FootballFixturePage) },
       { path: 'match/:code', canActivate: [playerGuard], title: 'Match', loadComponent: () => import('./features/match/match-lobby').then((m) => m.MatchLobbyPage) },
-      { path: 'matches', canActivate: [playerGuard], title: 'My matches', loadComponent: () => import('./features/matches/match-history').then((m) => m.MatchHistoryPage) },
+      { path: 'matches', canActivate: [playerGuard], title: 'My challenges', loadComponent: () => import('./features/matches/match-history').then((m) => m.MatchHistoryPage) },
       { path: 'matches/:code', title: 'Match details', loadComponent: () => import('./features/matches/match-detail').then((m) => m.MatchDetailPage) },
       { path: 'challenges', canActivate: [playerGuard], title: 'Challenges', loadComponent: () => import('./features/challenges/challenges').then((m) => m.ChallengesPage) },
       { path: 'challenges/new', canActivate: [playerGuard], title: 'New challenge', loadComponent: () => import('./features/challenges/challenge-new').then((m) => m.ChallengeNewPage) },

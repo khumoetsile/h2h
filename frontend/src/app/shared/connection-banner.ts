@@ -1,4 +1,6 @@
-import { Component, inject } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
+import { ConfigStore } from '../core/config.store';
+import { formatRemaining } from '../core/server-clock';
 import { RealtimeService } from '../core/realtime.service';
 
 /**
@@ -8,9 +10,10 @@ import { RealtimeService } from '../core/realtime.service';
  *
  * Never shows a technical detail (no WebSocket errors, HTTP codes, host
  * names). A brief blip shows a soft "unstable" notice; a longer outage
- * escalates to "interrupted" with a reconnecting timer. The match itself is
- * never abandoned client-side — the server's own timeouts are what decide
- * an outcome, so a short connection issue can't cost a player the match.
+ * shows CONNECTION LOST with the reconnection window counting down. That
+ * window is the server's: if you owe an action in a challenge, the server
+ * holds your timeout until it closes — a short drop is never treated as
+ * abandoning, and never costs the abandonment fee.
  */
 @Component({
   selector: 'app-connection-banner',
@@ -22,21 +25,23 @@ import { RealtimeService } from '../core/realtime.service';
     }
     @if (rt.connectionState() === 'lost') {
       <div class="conn-banner lost" role="status" aria-live="assertive">
-        <span class="spin"></span> Connection interrupted — we're trying to reconnect you…
-        <span class="clock">{{ clock() }}</span>
+        <span class="spin"></span>
+        <span><strong>CONNECTION LOST</strong> — we're trying to reconnect you.</span>
+        @if (windowLeft() > 0) { <span class="clock">{{ clock() }}</span> }
+        @else { <span>Still trying… your challenge timers keep running on the server.</span> }
       </div>
     }
     @if (rt.justRestored() && rt.connectionState() === 'online') {
       <div class="conn-banner restored" role="status" aria-live="polite">
-        You're back online.
+        You're back online — your challenge continues.
       </div>
     }
   `,
 })
 export class ConnectionBanner {
   protected rt = inject(RealtimeService);
-  protected clock() {
-    const s = this.rt.offlineSeconds();
-    return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
-  }
+  private config = inject(ConfigStore);
+  /** Seconds left of the reconnection window. Measured locally — while offline we can't ask the server. */
+  protected windowLeft = computed(() => (this.config.timers()?.reconnectionSeconds ?? 60) - this.rt.offlineSeconds());
+  protected clock = computed(() => formatRemaining(Math.max(0, this.windowLeft()) * 1000));
 }

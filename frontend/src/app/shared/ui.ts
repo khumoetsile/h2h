@@ -110,7 +110,7 @@ export class Spinner {
 }
 
 const STATUS_LABEL: Record<MatchStatus, string> = {
-  WAITING: 'Waiting', MATCHED: 'Matched', READY: 'Ready', IN_PROGRESS: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled', VOID: 'Voided',
+  WAITING: 'Waiting for opponent', MATCHED: 'Lock in', READY: 'Locked in', IN_PROGRESS: 'In progress', COMPLETED: 'Completed', CANCELLED: 'Cancelled', VOID: 'Void',
 };
 
 @Component({

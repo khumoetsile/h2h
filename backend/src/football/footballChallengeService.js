@@ -11,9 +11,11 @@ import { getSettings } from '../services/settingsService.js';
 import { notify } from '../services/notificationService.js';
 import { emitToUser } from '../realtime.js';
 import { lockStake } from '../services/walletService.js';
-import { createMatchTx, joinLockedMatch, getMatchView, ACTIVE_STATUSES } from '../services/matchService.js';
+import { createMatchTx, joinLockedMatch, getMatchView, recordLockIn, ACTIVE_STATUSES } from '../services/matchService.js';
+import { assertPending } from '../services/challengeService.js';
 import { getFootballProvider } from './providerRegistry.js';
 import { recordAudit } from '../services/auditService.js';
+import { acceptanceDeadline } from '../timers.js';
 
 const PICKS_BY_TYPE = { TEAM: ['HOME', 'AWAY'], YES_NO: ['YES', 'NO'] };
 const opposite = (pickType, pick) => PICKS_BY_TYPE[pickType].find((p) => p !== pick);
@@ -58,7 +60,7 @@ const FIXTURE_SELECT = `
          ht.name AS home_name, ht.short_name AS home_short, ht.crest_url AS home_crest,
          at.name AS away_name, at.short_name AS away_short, at.crest_url AS away_crest,
          (SELECT COUNT(*) FROM matches m JOIN football_challenges fc2 ON fc2.match_id = m.id
-          WHERE fc2.fixture_id = fx.id AND m.status = 'WAITING') AS open_count
+          WHERE fc2.fixture_id = fx.id AND m.status = 'WAITING' AND m.acceptance_deadline > NOW(3)) AS open_count
   FROM football_fixtures fx
   JOIN football_competitions comp ON comp.id = fx.competition_id
   JOIN football_teams ht ON ht.id = fx.home_team_id
@@ -71,7 +73,7 @@ export async function listFixtures({ competitionId, status } = {}) {
   if (status === 'live') where.push(`fx.status = 'LIVE'`);
   else if (status === 'upcoming') where.push(`fx.status = 'SCHEDULED'`);
   else where.push(`fx.status IN ('SCHEDULED','LIVE')`);
-  const rows = await query(`${FIXTURE_SELECT} WHERE ${where.join(' AND ')} ORDER BY fx.kickoff_at ASC LIMIT 60`, params);
+  const rows = await query(`${FIXTURE_SELECT} WHERE ${where.join(' AND ')} ORDER BY fx.kickoff_at ASC LIMIT 150`, params);
   return rows.map(mapFixtureRow);
 }
 
@@ -130,7 +132,7 @@ async function validateStakeAmount(stake) {
 // ---------------------------------------------------------------------------
 
 const OPEN_CHALLENGE_SELECT = `
-  SELECT m.id AS match_id, m.code, m.stake, m.created_at, m.created_by,
+  SELECT m.id AS match_id, m.code, m.stake, m.created_at, m.created_by, m.acceptance_deadline, fx.kickoff_at,
          u.username AS creator_username, u.avatar_color AS creator_color,
          fc.fixture_id, fc.creator_pick, ct.slug AS type_slug, ct.name AS type_name, ct.question_template, ct.pick_type,
          comp.name AS competition_name, comp.code AS competition_code,
@@ -153,6 +155,8 @@ function mapOpenChallenge(r) {
     code: r.code,
     stake: Number(r.stake),
     createdAt: r.created_at,
+    acceptanceDeadline: r.acceptance_deadline,
+    kickoffAt: r.kickoff_at,
     creator: { username: r.creator_username, avatarColor: r.creator_color },
     fixtureId: r.fixture_id,
     competition: { name: r.competition_name, code: r.competition_code },
@@ -164,8 +168,12 @@ function mapOpenChallenge(r) {
 }
 
 /** Every open (WAITING, not yet matched) football challenge — visible to any player except its own creator, who instead sees it under "My Challenges". */
-export async function listOpenChallenges(viewerId) {
-  const rows = await query(`${OPEN_CHALLENGE_SELECT} AND m.created_by <> ? ORDER BY m.created_at DESC LIMIT 100`, [viewerId]);
+export async function listOpenChallenges(viewerId, { fixtureId = null } = {}) {
+  // Only challenges whose acceptance timer is still running — an expired one
+  // disappears immediately, even before the sweeper has formally closed it.
+  const extra = fixtureId ? ' AND fc.fixture_id = ?' : '';
+  const params = fixtureId ? [new Date(), viewerId, fixtureId] : [new Date(), viewerId];
+  const rows = await query(`${OPEN_CHALLENGE_SELECT} AND m.acceptance_deadline > ? AND m.created_by <> ?${extra} ORDER BY m.acceptance_deadline ASC LIMIT 100`, params);
   return rows.map(mapOpenChallenge);
 }
 
@@ -192,12 +200,15 @@ export async function joinOpenChallenge(userId, matchId) {
     if (fixture.status !== 'SCHEDULED' || new Date(fixture.kickoff_at) <= new Date()) {
       throw conflict('CHALLENGE_CLOSED', 'This match has already kicked off, so this challenge is no longer available.');
     }
-    await joinLockedMatch(tx, m, userId);
     const opponentPick = opposite(fc.pick_type, fc.creator_pick);
     await tx.q('UPDATE football_challenges SET opponent_pick = ? WHERE match_id = ?', [opponentPick, matchId]);
+    // "Accept & Lock In": the joiner is locked in as part of joining; the
+    // creator's lock-in timer starts. Throws CHALLENGE_EXPIRED if the
+    // acceptance timer already ran out.
+    await joinLockedMatch(tx, m, userId, { lockIn: true });
     await recordAudit(tx, {
       actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_ACCEPTED', entityType: 'MATCH', entityId: matchId, matchId,
-      previousState: 'WAITING', newState: 'MATCHED', metadata: { fixtureId: fc.fixture_id, opponentPick, source: 'OPEN_CHALLENGE' },
+      previousState: 'WAITING', newState: 'MATCHED', metadata: { fixtureId: fc.fixture_id, opponentPick, source: 'OPEN_CHALLENGE', lockedIn: true },
     });
     return matchId;
   });
@@ -215,10 +226,11 @@ export async function findFootballOpponent(userId, { fixtureId, challengeTypeSlu
     validatePick(type, pick);
     const gameId = await footballGameId(tx.q);
 
+    const now = new Date();
     const own = await tx.one(
       `SELECT m.id FROM matches m JOIN football_challenges fc ON fc.match_id = m.id
-       WHERE m.created_by = ? AND m.status = 'WAITING' AND fc.fixture_id = ? AND fc.challenge_type_id = ? AND m.stake = ? LIMIT 1`,
-      [userId, fixtureId, type.id, stake],
+       WHERE m.created_by = ? AND m.status = 'WAITING' AND m.acceptance_deadline > ? AND fc.fixture_id = ? AND fc.challenge_type_id = ? AND m.stake = ? LIMIT 1`,
+      [userId, now, fixtureId, type.id, stake],
     );
     if (own) return { matchId: own.id, matched: false, alreadyQueued: true };
 
@@ -231,17 +243,21 @@ export async function findFootballOpponent(userId, { fixtureId, challengeTypeSlu
     const oppositePick = opposite(type.pick_type, pick);
     const candidate = await tx.one(
       `SELECT m.* FROM matches m JOIN football_challenges fc ON fc.match_id = m.id JOIN users u ON u.id = m.created_by AND u.status = 'ACTIVE'
-       WHERE m.status = 'WAITING' AND fc.fixture_id = ? AND fc.challenge_type_id = ? AND m.stake = ? AND fc.creator_pick = ? AND m.created_by <> ?
+       WHERE m.status = 'WAITING' AND m.acceptance_deadline > ? AND fc.fixture_id = ? AND fc.challenge_type_id = ? AND m.stake = ? AND fc.creator_pick = ? AND m.created_by <> ?
        ORDER BY m.created_at ASC LIMIT 1 FOR UPDATE SKIP LOCKED`,
-      [fixtureId, type.id, stake, oppositePick, userId],
+      [now, fixtureId, type.id, stake, oppositePick, userId],
     );
     if (candidate) {
-      await joinLockedMatch(tx, candidate, userId);
+      // An instant pairing: this player confirmed the lock-in terms before
+      // searching, so they join already locked in.
       await tx.q('UPDATE football_challenges SET opponent_pick = ? WHERE match_id = ?', [pick, candidate.id]);
+      await joinLockedMatch(tx, candidate, userId, { lockIn: true });
       return { matchId: candidate.id, matched: true };
     }
 
-    const { match } = await createMatchTx(tx, userId, gameId, stake, { source: 'MATCHMAKING', category: 'FOOTBALL' });
+    // The creator locks in as they create it (they confirmed the lock-in
+    // screen). When someone joins with Accept & Lock In, it's LOCKED at once.
+    const { match } = await createMatchTx(tx, userId, gameId, stake, { source: 'MATCHMAKING', category: 'FOOTBALL', kickoffAt: fixture.kickoff_at, lockIn: true });
     await tx.q(
       `INSERT INTO football_challenges (match_id, fixture_id, challenge_type_id, creator_pick, cutoff_at) VALUES (?, ?, ?, ?, ?)`,
       [match.id, fixtureId, type.id, pick, fixture.kickoff_at],
@@ -286,7 +302,7 @@ function mapFootballChallenge(c, viewerId) {
 export async function createFootballChallenge(challengerId, { opponent, fixtureId, challengeTypeSlug, pick, stake, message }) {
   await validateStakeAmount(stake);
   const id = await withTransaction(async (tx) => {
-    const { type } = await loadEligibleTypeAndFixture(tx.q, fixtureId, challengeTypeSlug);
+    const { type, fixture } = await loadEligibleTypeAndFixture(tx.q, fixtureId, challengeTypeSlug);
     validatePick(type, pick);
     const handle = String(opponent || '').replace(/^@/, '').trim();
     const opp = typeof opponent === 'number' ? await tx.one('SELECT * FROM users WHERE id = ?', [opponent]) : await tx.one('SELECT * FROM users WHERE username = ?', [handle]);
@@ -301,13 +317,13 @@ export async function createFootballChallenge(challengerId, { opponent, fixtureI
       [fixtureId, type.id, challengerId, opp.id, opp.id, challengerId],
     );
     if (dup) throw conflict('DUPLICATE_CHALLENGE', `There is already a pending challenge for this match between you and ${opp.username}.`);
-    const settings = await getSettings();
     const gameId = await footballGameId(tx.q);
     const me = await tx.one('SELECT username FROM users WHERE id = ?', [challengerId]);
+    // The opponent gets the standard acceptance window — never past kickoff.
     const res = await tx.q(
       `INSERT INTO challenges (challenger_id, opponent_id, game_id, fixture_id, challenge_type_id, creator_pick, stake, message, expires_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NOW() + INTERVAL ? MINUTE)`,
-      [challengerId, opp.id, gameId, fixtureId, type.id, pick, stake, message ? String(message).slice(0, 140) : null, settings.challenge_expiry_minutes],
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [challengerId, opp.id, gameId, fixtureId, type.id, pick, stake, message ? String(message).slice(0, 140) : null, acceptanceDeadline(new Date(), fixture.kickoff_at)],
     );
     await notify(tx, opp.id, {
       type: 'CHALLENGE_RECEIVED',
@@ -366,8 +382,7 @@ export async function acceptFootballChallenge(userId, id, { pick: opponentPick }
     const c = await tx.one('SELECT * FROM challenges WHERE id = ? FOR UPDATE', [id]);
     if (!c) throw notFound('Challenge not found.');
     if (c.opponent_id !== userId) throw forbidden('Only the challenged player can accept.');
-    if (c.status === 'PENDING' && new Date(c.expires_at) <= new Date()) throw conflict('CHALLENGE_EXPIRED', 'This challenge has expired.');
-    if (c.status !== 'PENDING') throw conflict('CHALLENGE_CLOSED', `This challenge is already ${c.status.toLowerCase()}.`);
+    assertPending(c);
     const fixture = await tx.one('SELECT * FROM football_fixtures WHERE id = ? FOR UPDATE', [c.fixture_id]);
     if (fixture.status !== 'SCHEDULED' || new Date(fixture.kickoff_at) <= new Date()) {
       throw conflict('CHALLENGE_CLOSED', 'This match has already kicked off, so this challenge is no longer available.');
@@ -389,10 +404,11 @@ export async function acceptFootballChallenge(userId, id, { pick: opponentPick }
     const cw = await tx.one('SELECT available_balance FROM wallets WHERE user_id = ?', [c.challenger_id]);
     if (toCents(cw.available_balance) < toCents(c.stake)) throw conflict('OPPONENT_INSUFFICIENT_BALANCE', `${challenger.username} no longer has enough demo funds for this challenge.`);
     const gameId = await footballGameId(tx.q);
-    const { match, game } = await createMatchTx(tx, c.challenger_id, gameId, c.stake, { source: 'CHALLENGE', status: 'MATCHED', category: 'FOOTBALL' });
+    // The challenger locked in when they sent it (lock-in screen, fee
+    // disclosed); the acceptor locks in now -> LOCKED straight away.
+    const { match, game } = await createMatchTx(tx, c.challenger_id, gameId, c.stake, { source: 'CHALLENGE', status: 'MATCHED', category: 'FOOTBALL', kickoffAt: fixture.kickoff_at, lockIn: true });
     await lockStake(tx, userId, match, game.name);
     await tx.q('INSERT INTO match_players (match_id, user_id, slot, stake) VALUES (?, ?, 2, ?)', [match.id, userId, c.stake]);
-    await tx.q('UPDATE matches SET matched_at = NOW() WHERE id = ?', [match.id]);
     await tx.q(`UPDATE challenges SET status = 'ACCEPTED', responded_at = NOW(), match_id = ? WHERE id = ?`, [match.id, c.id]);
     await tx.q(
       `INSERT INTO football_challenges (match_id, fixture_id, challenge_type_id, creator_pick, opponent_pick, cutoff_at) VALUES (?, ?, ?, ?, ?, ?)`,
@@ -401,9 +417,11 @@ export async function acceptFootballChallenge(userId, id, { pick: opponentPick }
     await recordAudit(tx, {
       actorType: 'PLAYER', actorUserId: userId, action: 'CHALLENGE_ACCEPTED', entityType: 'CHALLENGE', entityId: c.id,
       challengeId: c.id, matchId: match.id, previousState: 'PENDING', newState: 'ACCEPTED',
-      metadata: { fixtureId: c.fixture_id, opponentPick, creatorPick: c.creator_pick },
+      metadata: { fixtureId: c.fixture_id, opponentPick, creatorPick: c.creator_pick, lockedIn: true },
     });
-    await notify(tx, c.challenger_id, { type: 'CHALLENGE_ACCEPTED', title: 'Challenge accepted', message: `${me.username} accepted your football challenge. Your match is ready.`, link: `/match/${match.code}` });
+    // "Accept & Lock In" — the accepting player is locked in now.
+    await recordLockIn(tx, match.id, userId);
+    await notify(tx, c.challenger_id, { type: 'CHALLENGE_ACCEPTED', title: 'Challenge accepted — locked in', message: `${me.username} accepted your football challenge. You're both locked in.`, link: `/match/${match.code}` });
     for (const uid of [c.challenger_id, userId]) tx.afterCommit(() => emitToUser(uid, 'challenge:update', { id: c.id }));
     return match.id;
   });

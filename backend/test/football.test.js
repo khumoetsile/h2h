@@ -101,7 +101,7 @@ describe('football: direct challenge -> settlement (WIN)', () => {
 
     const accept = await api().post(`/api/challenges/${create.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     assert.equal(accept.status, 200, JSON.stringify(accept.body));
-    assert.equal(accept.body.match.status, 'MATCHED');
+    assert.equal(accept.body.match.status, 'READY');
     assert.equal(accept.body.match.category, 'FOOTBALL');
     assert.equal(accept.body.match.football.creatorPick, 'HOME');
     assert.equal(accept.body.match.football.opponentPick, 'AWAY');

@@ -27,7 +27,9 @@ router.get('/fixtures', validate(fixturesQuery, 'query'), ah(async (req, res) =>
 }));
 
 router.get('/fixtures/:id', ah(async (req, res) => {
-  res.json({ fixture: await svc.getFixtureDetail(Number(req.params.id) || 0) });
+  const id = Number(req.params.id) || 0;
+  const [fixture, openChallenges] = await Promise.all([svc.getFixtureDetail(id), svc.listOpenChallenges(req.user.id, { fixtureId: id })]);
+  res.json({ fixture, openChallenges, serverNow: new Date() });
 }));
 
 // Matchmaking: find (or wait for) an opponent who picks the other side of the same question.
@@ -38,7 +40,7 @@ router.post('/find', requirePlayer, validate(footballFindSchema), ah(async (req,
 
 // Publicly discoverable 1v1s waiting for a second player (created via /find when no instant match existed).
 router.get('/open-challenges', requirePlayer, ah(async (req, res) => {
-  res.json({ challenges: await svc.listOpenChallenges(req.user.id) });
+  res.json({ challenges: await svc.listOpenChallenges(req.user.id), serverNow: new Date() });
 }));
 
 // Join one specific open challenge directly — race-safe: only one caller can ever win this.

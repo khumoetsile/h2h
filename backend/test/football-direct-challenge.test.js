@@ -98,7 +98,7 @@ describe('direct football challenge: opponent pick', () => {
 
     const res = await api().post(`/api/challenges/${challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     assert.equal(res.status, 200, JSON.stringify(res.body));
-    assert.equal(res.body.match.status, 'MATCHED');
+    assert.equal(res.body.match.status, 'READY', 'challenger locked in when sending, acceptor via Accept & Lock In -> LOCKED');
     assert.equal(res.body.match.football.creatorPick, 'HOME');
     assert.equal(res.body.match.football.opponentPick, 'AWAY', 'the opponent pick must be exactly what B submitted, not a derived value');
     assert.equal((await wallet(A.token)).locked, 20);

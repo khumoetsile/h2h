@@ -3,9 +3,9 @@ import { Server } from 'socket.io';
 import { config } from './config.js';
 import { createApp } from './app.js';
 import { pool } from './db.js';
-import { setIo } from './realtime.js';
+import { isUserOnline, setIo } from './realtime.js';
 import { authenticateToken } from './middleware/auth.js';
-import { sweepMatches } from './services/matchService.js';
+import { compensateDowntime, heartbeat, markPresence, sweepMatches } from './services/matchService.js';
 import { expireChallenges } from './services/challengeService.js';
 import { startFootballSync } from './football/footballSyncService.js';
 
@@ -26,8 +26,17 @@ export function createServer() {
     }
   });
   io.on('connection', (socket) => {
-    socket.join(`user:${socket.data.userId}`);
+    const userId = socket.data.userId;
+    socket.join(`user:${userId}`);
     if (socket.data.role === 'ADMIN') socket.join('admins');
+    // Presence drives the reconnection window (see src/timers.js): a player
+    // whose LAST connection drops while they owe an action gets a bounded
+    // grace period; connecting again closes it.
+    markPresence(userId, true).catch((err) => console.error('presence (online) failed', err));
+    socket.on('disconnect', () => {
+      if (isUserOnline(userId)) return; // another tab/device is still connected
+      markPresence(userId, false).catch((err) => console.error('presence (offline) failed', err));
+    });
   });
   setIo(io);
   return { app, server, io };
@@ -35,12 +44,21 @@ export function createServer() {
 
 export function startSweeper() {
   let running = false;
+  let booted = false;
   const tick = async () => {
     if (running) return;
     running = true;
     try {
+      if (!booted) {
+        // Anything that was running while this server was down gets the
+        // outage added back before it can be judged as timed out.
+        const extended = await compensateDowntime({ thresholdMs: Math.max(30000, config.sweeperIntervalSeconds * 3000) });
+        if (extended) console.log(`  Server was down ~${extended}s — extended running challenge timers by that amount.`);
+        booted = true;
+      }
       await expireChallenges();
       await sweepMatches();
+      await heartbeat();
     } catch (err) {
       console.error('Sweeper error', err);
     } finally {

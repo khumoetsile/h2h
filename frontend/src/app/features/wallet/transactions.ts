@@ -50,7 +50,7 @@ import { TxTable, TX_LABEL } from './tx-table';
 })
 export class TransactionsPage implements OnInit {
   private api = inject(Api);
-  protected types: TxType[] = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT'];
+  protected types: TxType[] = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT', 'ABANDONMENT_FEE'];
   protected type = signal<TxType | null>(null);
   protected data = signal<Paged<Transaction> | null>(null);
   protected error = signal('');
