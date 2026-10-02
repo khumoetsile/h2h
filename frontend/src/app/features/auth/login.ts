@@ -1,4 +1,4 @@
-import { Component, inject, isDevMode, signal } from '@angular/core';
+import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -10,6 +10,8 @@ import { AuthService } from '../../core/auth.service';
 import { apiError } from '../../core/api-error';
 import { BRAND } from '../../core/brand';
 import { DemoBadge } from '../../shared/ui';
+
+const DEMO_PLAYER_PASSWORD = 'Player123!';
 
 @Component({
   selector: 'app-login',
@@ -49,7 +51,7 @@ import { DemoBadge } from '../../shared/ui';
           </mat-form-field>
           <mat-form-field>
             <mat-label>Password</mat-label>
-            <input matInput [type]="showPw() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
+            <input matInput #pwInput [type]="showPw() ? 'text' : 'password'" formControlName="password" autocomplete="current-password" />
             <button type="button" matSuffix class="btn btn-ghost btn-sm" (click)="showPw.set(!showPw())" [attr.aria-label]="showPw() ? 'Hide password' : 'Show password'">
               <mat-icon>{{ showPw() ? 'visibility_off' : 'visibility' }}</mat-icon>
             </button>
@@ -64,14 +66,12 @@ import { DemoBadge } from '../../shared/ui';
         </form>
         <p class="foot">New here? <a class="link" routerLink="/register">Create an account</a></p>
 
-        @if (dev) {
-          <div class="dev-creds">
-            <div class="row-between"><strong>Development logins</strong><app-demo-badge label="Demo data" /></div>
-            <div class="row-between"><span>Player</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('player@example.com', 'Player123!')"><code>player&#64;example.com</code></button></div>
-            <div class="row-between"><span>Opponent</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('kabelo@example.com', 'Player123!')"><code>kabelo&#64;example.com</code></button></div>
-            <div class="row-between"><span>Admin</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('admin@example.com', 'Admin123!')"><code>admin&#64;example.com</code></button></div>
-          </div>
-        }
+        <div class="dev-creds">
+          <div class="row-between"><strong>Demo accounts</strong><app-demo-badge label="Demo data" /></div>
+          <div class="row-between"><span>Player</span><button class="btn btn-ghost btn-sm" type="button" [disabled]="loading()" (click)="quickLogin('player@example.com')"><code>player&#64;example.com</code></button></div>
+          <div class="row-between"><span>Opponent</span><button class="btn btn-ghost btn-sm" type="button" [disabled]="loading()" (click)="quickLogin('kabelo@example.com')"><code>kabelo&#64;example.com</code></button></div>
+          <div class="row-between"><span>Admin</span><button class="btn btn-ghost btn-sm" type="button" (click)="pickAdmin(pwInput)"><code>admin&#64;example.com</code></button></div>
+        </div>
       </div>
     </section>
   `,
@@ -82,8 +82,6 @@ export class LoginPage {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   protected brand = BRAND;
-  /** Seeded demo logins are only offered in local development builds. */
-  protected dev = isDevMode();
 
   protected form = this.fb.nonNullable.group({
     identifier: ['', Validators.required],
@@ -99,8 +97,16 @@ export class LoginPage {
     ] || '',
   );
 
-  fill(identifier: string, password: string) {
-    this.form.patchValue({ identifier, password });
+  /** One-click sign-in for the shared demo players (their password is public by design). */
+  quickLogin(identifier: string) {
+    this.form.patchValue({ identifier, password: DEMO_PLAYER_PASSWORD });
+    return this.submit();
+  }
+
+  /** The admin password is never in the client: fill the email and let the person type it. */
+  pickAdmin(pw: HTMLInputElement) {
+    this.form.patchValue({ identifier: 'admin@example.com', password: '' });
+    pw.focus();
   }
 
   async submit() {
