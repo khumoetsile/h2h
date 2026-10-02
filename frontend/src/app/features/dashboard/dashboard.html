@@ -2,29 +2,11 @@
   @if (error() && !data()) {
     <app-load-error [message]="error()" (retry)="load()" />
   } @else {
-    <section class="top fade-in">
-      <div class="greet">
-        <p class="hello">{{ greeting() }}</p>
-        <h1>{{ auth.user()?.firstName }}</h1>
-      </div>
-      <a class="balance" routerLink="/wallet">
-        <span class="bal-label">Balance</span>
-        @if (data(); as d) {
-          <span class="bal-amount money">{{ d.wallet.available | money }}</span>
-        } @else {
-          <span class="skeleton" style="height:34px;width:110px;display:inline-block"></span>
-        }
-        <span class="bal-link">Add money</span>
-      </a>
-    </section>
-
-    <app-save-account class="block" />
-    <app-get-app variant="card" class="block" />
+    <p class="hi fade-in">Hi, <strong>{{ auth.user()?.username }}</strong></p>
 
     <!-- Anything mid-game takes priority over browsing. -->
     @if (data()?.activeMatches?.length) {
-      <section class="block">
-        <h2 class="h-title">Your match</h2>
+      <section class="block" style="margin-top:0;margin-bottom:16px">
         <div class="stack">
           @for (m of data()!.activeMatches.slice(0, 2); track m.id) {
             <a class="card card-interactive active-match" [routerLink]="matchLink(m)">
@@ -40,10 +22,10 @@
       </section>
     }
 
-    <!-- Pending challenges needing a response. -->
+    <!-- Challenges that need an answer. -->
     @if (incomingChallenges().length > 0) {
-      <section class="block">
-        <h2 class="h-title">Challenges waiting for you</h2>
+      <section class="block" style="margin-top:0;margin-bottom:16px">
+        <h2 class="h-title" style="margin-bottom:10px">Challenges waiting for you</h2>
         <div class="stack">
           @for (c of incomingChallenges().slice(0, 3); track c.id) {
             <div class="card challenge-card">
@@ -62,103 +44,93 @@
       </section>
     }
 
-    <!-- Football: real fixtures, right here, no extra tap. -->
-    <section class="block">
-      <div class="section-title">
-        <div>
-          <h2 class="h-title">Football</h2>
-          <p class="muted small">Pick a match, pick a side, and play another person.</p>
-        </div>
-        <a routerLink="/football">All fixtures</a>
-      </div>
-      @if (openCount() > 0) {
-        <a class="waiting-note" routerLink="/football">
-          <span class="live-dot"></span>
-          {{ openCount() }} {{ openCount() === 1 ? 'player is' : 'players are' }} waiting for an opponent. Join one
-        </a>
-      }
-      <div class="card card-flush">
-        @if (fixturesError()) {
-          <app-load-error message="We couldn't load the fixtures." (retry)="load()" />
-        } @else if (!fixtures()) {
-          <div class="skeleton" style="height:240px"></div>
-        } @else if (upcoming().length === 0) {
-          <app-empty icon="sports_soccer" title="No fixtures right now" text="New matches show up here as soon as they're scheduled.">
-            <a class="btn btn-sm" routerLink="/football">Open football</a>
-          </app-empty>
-        } @else {
-          <div class="list">
-            @for (f of upcoming(); track f.id) {
-              <a class="list-item fixture" [routerLink]="['/football', f.id]">
-                <div class="fx-when" [class.live]="f.status === 'LIVE'">
-                  @if (f.status === 'LIVE') {
-                    <span class="live-dot"></span> Live
-                    @if (f.minute) { <span class="fx-min">{{ f.minute }}'</span> }
-                  } @else {
-                    {{ kickoff(f) }}
-                  }
-                </div>
-                <div class="grow">
-                  <div class="fx-teams">
-                    {{ f.homeTeam.name }} <span class="vs">vs</span> {{ f.awayTeam.name }}
-                    @if (f.status === 'LIVE' && f.homeScore !== null) { <span class="fx-score">{{ f.homeScore }}-{{ f.awayScore }}</span> }
-                  </div>
-                  <div class="muted small">{{ f.competition.name }}</div>
-                </div>
-                <div class="fx-end">
-                  @if (f.openChallenges > 0) {
-                    <span class="chip chip-accent">{{ f.openChallenges }} waiting</span>
-                  } @else {
-                    <span class="fx-go">Challenge</span>
-                  }
-                </div>
-              </a>
-            }
+    <div class="layout">
+      <!-- The one thing to do: play. -->
+      <section class="card hero fade-in">
+        <app-pitch-art class="hero-art" />
+        <div class="hero-body">
+          <div class="hero-title">
+            <h1>Penalty Shootout</h1>
           </div>
-          @if (anySimulated()) { <p class="muted small sim-note">These are simulated demo fixtures. No live football data is connected.</p> }
-        }
-      </div>
-    </section>
+          <p class="hero-note">
+            @if ((main()?.waiting ?? 0) > 0) {
+              <span class="live-dot"></span>{{ main()!.waiting }} {{ main()!.waiting === 1 ? 'player is' : 'players are' }} playing now
+            } @else {
+              Take turns shooting and saving. About two minutes.
+            }
+          </p>
+          <button class="btn btn-primary btn-play btn-block" [disabled]="!!heroBusy()" (click)="playNow()">
+            @if (heroBusy() === 'play') { <mat-spinner diameter="24" /> } @else { Play now }
+          </button>
+          <button class="btn btn-block" [disabled]="!!heroBusy()" (click)="inviteFriend()">
+            @if (heroBusy() === 'invite') { <mat-spinner diameter="20" /> } @else { <mat-icon>share</mat-icon> Challenge a friend }
+          </button>
+          @if (heroError()) { <p class="form-error err">{{ heroError() }}</p> }
+        </div>
+      </section>
 
-    <!-- Skill games. -->
-    <section class="block">
-      <div class="section-title">
-        <h2 class="h-title">Skill games</h2>
-        <div class="title-actions">
-          <a routerLink="/challenges/new">Challenge a friend</a>
-          <a routerLink="/games">See all</a>
+      <!-- Football: real fixtures, right here, no extra tap. -->
+      <section class="block">
+        <div class="section-title">
+          <div>
+            <h2 class="h-title">Football</h2>
+            <p class="muted small">Pick a match, pick a side, and play another person.</p>
+          </div>
+          <a routerLink="/football">All fixtures</a>
         </div>
-      </div>
-      @if (!data()) {
-        <div class="games-row">
-          @for (i of [1,2,3]; track i) { <div class="card game-mini"><div class="skeleton" style="height:44px;width:44px"></div><div class="skeleton" style="height:14px;width:70%;margin-top:14px"></div></div> }
-        </div>
-      } @else {
-        <div class="games-row">
-          @for (g of data()!.games.slice(0, 4); track g.id) {
-            <a class="card game-mini card-interactive" [routerLink]="['/games', g.slug]">
-              <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="44" />
-              <h3>{{ g.name }}</h3>
-              <p class="muted small">{{ g.tagline }}</p>
-            </a>
+        <div class="card card-flush">
+          @if (fixturesError()) {
+            <app-load-error message="We couldn't load the fixtures." (retry)="load()" />
+          } @else if (!fixtures()) {
+            <div class="skeleton" style="height:200px"></div>
+          } @else if (upcoming().length === 0) {
+            <app-empty icon="sports_soccer" title="No fixtures right now" text="New matches show up here as soon as they're scheduled.">
+              <a class="btn btn-sm" routerLink="/football">Open football</a>
+            </app-empty>
+          } @else {
+            <div class="list">
+              @for (f of upcoming().slice(0, 3); track f.id) {
+                <a class="list-item fixture" [routerLink]="['/football', f.id]">
+                  <div class="fx-when" [class.live]="f.status === 'LIVE'">
+                    @if (f.status === 'LIVE') {
+                      <span class="live-dot"></span> Live
+                      @if (f.minute) { <span class="fx-min">{{ f.minute }}'</span> }
+                    } @else {
+                      {{ kickoff(f) }}
+                    }
+                  </div>
+                  <div class="grow">
+                    <div class="fx-teams">
+                      {{ f.homeTeam.name }} <span class="vs">vs</span> {{ f.awayTeam.name }}
+                      @if (f.status === 'LIVE' && f.homeScore !== null) { <span class="fx-score">{{ f.homeScore }}-{{ f.awayScore }}</span> }
+                    </div>
+                    <div class="muted small">{{ f.competition.name }}</div>
+                  </div>
+                  <div class="fx-end">
+                    @if (f.openChallenges > 0) {
+                      <span class="chip chip-accent">{{ f.openChallenges }} waiting</span>
+                    } @else {
+                      <span class="fx-go">Challenge</span>
+                    }
+                  </div>
+                </a>
+              }
+            </div>
+            @if (anySimulated()) { <p class="muted small sim-note">These are simulated demo fixtures. No live football data is connected.</p> }
           }
         </div>
-      }
-    </section>
+      </section>
+    </div>
 
-    <!-- Recent activity. -->
-    <section class="block">
-      <div class="section-title"><h2 class="h-title">Recent activity</h2><a routerLink="/matches">See all</a></div>
-      <div class="card card-flush">
-        @if (!data()) {
-          <div class="skeleton" style="height:180px"></div>
-        } @else if (data()!.recentMatches.length === 0) {
-          <app-empty icon="sports_esports" title="No games played yet" text="Play your first match to see your activity here.">
-            <a class="btn btn-sm btn-primary" routerLink="/games">Play a game</a>
-          </app-empty>
-        } @else {
+    <app-save-account class="block" style="display:block" />
+
+    <!-- Recent results, only once there are some. -->
+    @if (data()?.recentMatches?.length) {
+      <section class="block">
+        <div class="section-title"><h2 class="h-title">Recent results</h2><a routerLink="/matches">See all</a></div>
+        <div class="card card-flush">
           <div class="list">
-            @for (m of data()!.recentMatches.slice(0, 4); track m.id) {
+            @for (m of data()!.recentMatches.slice(0, 3); track m.id) {
               <a class="list-item" [routerLink]="['/matches', m.code]">
                 <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="36" />
                 <div class="grow">
@@ -173,8 +145,10 @@
               </a>
             }
           </div>
-        }
-      </div>
-    </section>
+        </div>
+      </section>
+    }
+
+    <app-get-app variant="card" class="block" style="display:block" />
   }
 </div>

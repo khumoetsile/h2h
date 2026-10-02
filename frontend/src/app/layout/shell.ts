@@ -17,15 +17,15 @@ interface NavItem { label: string; icon: string; link: string; exact?: boolean; 
 // Simple destinations — a player never needs to know these map to
 // "matchmaking", "wallet ledger" or any other technical concept underneath.
 const PLAYER_NAV: NavItem[] = [
-  { label: 'Home', icon: 'home', link: '/dashboard' },
-  { label: 'Play', icon: 'sports_esports', link: '/games' },
+  { label: 'Play', icon: 'sports_esports', link: '/dashboard' },
   { label: 'Football', icon: 'sports_soccer', link: '/football' },
+  { label: 'Matches', icon: 'history', link: '/matches' },
   { label: 'Challenges', icon: 'swords', link: '/challenges' },
   { label: 'Rankings', icon: 'leaderboard', link: '/leaderboard' },
-  { label: 'Profile', icon: 'person', link: '/profile' },
+  { label: 'Me', icon: 'person', link: '/profile' },
 ];
-// Football is the headline PvP mode, so it gets its own tab; Rankings stays in the desktop nav and the account menu.
-const PLAYER_BOTTOM = ['/dashboard', '/games', '/football', '/challenges', '/profile'];
+// Four tabs on a phone, always with a word under the icon. Challenges and Rankings live in the desktop nav and the account menu.
+const PLAYER_BOTTOM = ['/dashboard', '/football', '/matches', '/profile'];
 
 const ADMIN_NAV: NavItem[] = [
   { label: 'Overview', icon: 'monitoring', link: '/admin', exact: true },

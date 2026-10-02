@@ -20,12 +20,26 @@ export class QuickPlay {
   async playNow(slug = MAIN_GAME) {
     if (!this.auth.isLoggedIn()) await this.auth.guest();
     const { game } = await this.api.get<{ game: Game }>(`/games/${slug}`);
+    const stake = this.pickStake(game);
+    const r = await this.api.post<{ match: MatchView }>('/matches/find', { gameId: game.id, stake: stake.stake });
+    await this.router.navigate(['/match', r.match.code]);
+  }
+
+  /** Open a match just for a friend and go to the screen with the share buttons. */
+  async inviteFriend(slug = MAIN_GAME) {
+    if (!this.auth.isLoggedIn()) await this.auth.guest();
+    const { game } = await this.api.get<{ game: Game }>(`/games/${slug}`);
+    const stake = this.pickStake(game);
+    const r = await this.api.post<{ match: MatchView }>('/matches', { gameId: game.id, stake: stake.stake });
+    await this.router.navigate(['/match', r.match.code]);
+  }
+
+  private pickStake(game: Game) {
     const stakes = game.stakes ?? [];
     const balance = this.auth.wallet()?.available ?? 0;
     const stake = stakes.find((s) => s.stake === DEFAULT_STAKE && s.stake <= balance) ?? stakes.find((s) => s.stake <= balance) ?? stakes[0];
     if (!stake) throw new Error('This game is not available right now.');
-    const r = await this.api.post<{ match: MatchView }>('/matches/find', { gameId: game.id, stake: stake.stake });
-    await this.router.navigate(['/match', r.match.code]);
+    return stake;
   }
 
   /** A friend's invite link: same idea, but the match already exists. */

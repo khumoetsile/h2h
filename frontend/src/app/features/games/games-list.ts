@@ -3,6 +3,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../core/api.service';
+import { isLiveGame } from '../../core/featured';
 import { Game } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { MoneyPipe } from '../../shared/pipes';
@@ -95,7 +96,7 @@ export class GamesPage implements OnInit {
   async load() {
     this.error.set('');
     try {
-      this.games.set((await this.api.get<{ games: Game[] }>('/games')).games);
+      this.games.set((await this.api.get<{ games: Game[] }>('/games')).games.filter((g) => isLiveGame(g.slug)));
     } catch {
       this.error.set("We couldn't load the games list. Please try again.");
     }

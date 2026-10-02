@@ -8,7 +8,11 @@ import { AuthService } from '../../core/auth.service';
 import { Challenge, FootballFixture, Game, MatchSummary, UserStats, Wallet } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
+import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { apiError } from '../../core/api-error';
+import { MAIN_GAME, QuickPlay } from '../../core/quick-play';
 import { GetApp } from '../../shared/get-app';
+import { PitchArt } from '../../shared/pitch-art';
 import { SaveAccount } from '../../shared/save-account';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
 import { Avatar, EmptyState, GameIcon, LoadError, OutcomeChip } from '../../shared/ui';
@@ -30,7 +34,7 @@ interface Dashboard {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, MatIconModule, GetApp, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, GetApp, PitchArt, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
@@ -42,7 +46,12 @@ export class DashboardPage implements OnInit {
   protected router = inject(Router);
   private destroyRef = inject(DestroyRef);
 
+  private quick = inject(QuickPlay);
+
   protected data = signal<Dashboard | null>(null);
+  protected main = computed(() => this.data()?.games.find((g) => g.slug === MAIN_GAME) ?? null);
+  protected heroBusy = signal<'play' | 'invite' | null>(null);
+  protected heroError = signal('');
   protected error = signal('');
   protected busy = signal<number | null>(null);
   /** Players currently waiting for a football opponent. */
@@ -84,6 +93,18 @@ export class DashboardPage implements OnInit {
     } catch (err) {
       if (!silent || !this.data()) this.error.set("We couldn't load your home screen. Please try again.");
       void err;
+    }
+  }
+
+  protected async playNow() { await this.hero('play', () => this.quick.playNow()); }
+  protected async inviteFriend() { await this.hero('invite', () => this.quick.inviteFriend()); }
+
+  private async hero(kind: 'play' | 'invite', run: () => Promise<void>) {
+    this.heroBusy.set(kind);
+    this.heroError.set('');
+    try { await run(); } catch (err) {
+      this.heroError.set(apiError(err).message);
+      this.heroBusy.set(null);
     }
   }
 
