@@ -90,4 +90,4 @@ export async function start() {
 }
 
 const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
-if (isMain) await start();
+if (isMain) start();
