@@ -4,23 +4,7 @@
   } @else {
     <p class="hi fade-in">Hi, <strong>{{ auth.user()?.username }}</strong></p>
 
-    <!-- Anything mid-game takes priority over browsing. -->
-    @if (data()?.activeMatches?.length) {
-      <section class="block" style="margin-top:0;margin-bottom:16px">
-        <div class="stack">
-          @for (m of data()!.activeMatches.slice(0, 2); track m.id) {
-            <a class="card card-interactive active-match" [routerLink]="matchLink(m)">
-              <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="44" />
-              <div class="grow">
-                <div class="am-title">{{ m.football ? m.football.homeTeam + ' vs ' + m.football.awayTeam : m.game.name }}</div>
-                <div class="muted small">{{ m.opponent ? 'vs ' + m.opponent.username : 'Waiting for an opponent' }}</div>
-              </div>
-              <span class="btn btn-primary btn-sm">Continue</span>
-            </a>
-          }
-        </div>
-      </section>
-    }
+    <!-- A match in progress is shown by the bar at the top of every screen, so it is not repeated here. -->
 
     <!-- Challenges that need an answer. -->
     @if (incomingChallenges().length > 0) {
