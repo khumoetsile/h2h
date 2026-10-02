@@ -1,6 +1,7 @@
 import { Component, DestroyRef, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { MatIconModule } from '@angular/material/icon';
+import { Countdown } from '../shared/countdown';
 import { Api } from '../core/api.service';
 import { apiError } from '../core/api-error';
 import { RealtimeService } from '../core/realtime.service';
@@ -30,7 +31,7 @@ const POLL_MS = 2500;
  */
 @Component({
   selector: 'app-live-shootout',
-  imports: [MatIconModule, ShootoutScene],
+  imports: [MatIconModule, ShootoutScene, Countdown],
   template: `
     @if (showHelp()) {
       <section class="help">
@@ -64,13 +65,14 @@ const POLL_MS = 2500;
         <p class="status" aria-live="polite">
           {{ status() }}
           @if (st.suddenDeath && !st.done) { <span class="tag">Sudden death</span> }
-          @if (secondsLeft() !== null) { <span class="clock">{{ secondsLeft() }}s</span> }
+          @if (secondsLeft() !== null) { <span class="clock" [class.hurry]="secondsLeft()! <= 3">{{ secondsLeft() }}s</span> }
+          @if (st.phase === 'LOBBY' && st.lobbyDeadline) { <span class="clock"><app-countdown [deadline]="st.lobbyDeadline" [icon]="false" /></span> }
         </p>
 
         <div class="stage">
           <app-shootout-scene #scene
             [mode]="revealed() ? null : role()" [interactive]="canAct()" [aimZone]="aimZone()" [diveCol]="diveCol()"
-            [youKick]="youKick()" [countdown]="countdownNum()" [audio]="audio"
+            [youKick]="youKick()" [countdown]="countdownNum()" [caption]="caption()" [audio]="audio"
             (pickZone)="pickZone($event)" (pickCol)="pickCol($event)" (contact)="onContact()" />
           @if (st.done && !revealed()) {
             <div class="end" [attr.data-w]="st.winnerId === st.viewerId ? 'win' : st.winnerId === null ? 'draw' : 'loss'">
@@ -116,9 +118,14 @@ const POLL_MS = 2500;
     .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .pips { display: flex; gap: 6px; flex-wrap: wrap; }
     .pip { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--border-strong); box-sizing: border-box; transition: background .2s, border-color .2s; }
+    .pip { position: relative; }
     .pip[data-s='goal'] { background: var(--win); border-color: var(--win); }
+    .pip[data-s='goal']::after { content: ''; position: absolute; left: 3px; top: 1px; width: 4px; height: 7px; border: solid #0e1a12; border-width: 0 2px 2px 0; transform: rotate(40deg); }
     .pip[data-s='saved'] { background: var(--loss); border-color: var(--loss); }
+    .pip[data-s='saved']::before, .pip[data-s='saved']::after { content: ''; position: absolute; left: 50%; top: 50%; width: 8px; height: 2px; margin: -1px 0 0 -4px; background: #1c0f0d; transform: rotate(45deg); }
+    .pip[data-s='saved']::after { transform: rotate(-45deg); }
     .pip[data-s='miss'] { background: var(--muted); border-color: var(--muted); }
+    .pip[data-s='miss']::after { content: ''; position: absolute; left: 50%; top: 50%; width: 7px; height: 2px; margin: -1px 0 0 -3.5px; background: #1a1d1b; }
     .pip[data-s='now'] { border-color: var(--text); animation: blink 1s ease-in-out infinite; }
     @keyframes blink { 50% { opacity: .35; } }
     .goals { font-family: var(--font-display); font-size: 30px; line-height: 1; min-width: 1ch; text-align: right; }
@@ -128,6 +135,7 @@ const POLL_MS = 2500;
     .status { min-height: 24px; text-align: center; color: var(--text-2); font-size: 17px; }
     .tag { margin-left: 8px; background: var(--demo-soft); color: var(--demo); border-radius: 3px; padding: 1px 7px; font-size: 14px; font-weight: 600; }
     .clock { margin-left: 8px; color: var(--muted); font-variant-numeric: tabular-nums; }
+    .clock.hurry { color: var(--loss); font-weight: 700; }
 
     .stage { position: relative; }
     .end { position: absolute; inset: 0; border-radius: var(--radius); background: rgba(16, 19, 17, .9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 16px; animation: fade .35s ease both; }
@@ -139,10 +147,10 @@ const POLL_MS = 2500;
     .gauge.dim { opacity: .55; }
     .track { position: relative; height: 44px; background: #2a302b; border-radius: 4px; overflow: hidden; }
     .track i { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); }
-    /* Band widths are twice the server's half-widths: low 0.34, high 0.20, perfect 0.07. */
-    .b-low { width: 68%; background: #34403a; }
-    .b-high { width: 40%; background: #3c6b4a; }
-    .b-perfect { width: 14%; background: var(--win); transition: filter .1s; }
+    /* Band widths are twice the server's half-widths: low 0.40, high 0.25, perfect 0.09. */
+    .b-low { width: 80%; background: #34403a; }
+    .b-high { width: 50%; background: #3c6b4a; }
+    .b-perfect { width: 18%; background: var(--win); transition: filter .1s; }
     .track.perfect .b-perfect { filter: brightness(1.35); }
     .marker { left: 0 !important; width: 6px; margin-left: -3px; background: #fff; border-radius: 2px; will-change: transform; }
     .legend { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 5px; color: var(--muted); font-size: 13px; text-align: center; }
@@ -151,6 +159,14 @@ const POLL_MS = 2500;
     .act { min-height: 68px; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-size: 30px; font-weight: 700; cursor: pointer; text-align: center; transition: transform .08s; }
     .act:active:not(:disabled) { transform: scale(.985); }
     .act:disabled { opacity: .35; cursor: default; }
+    @media (orientation: landscape) and (max-height: 540px) {
+      /* Sideways phone: the pitch is sized by the height we have, controls sit beside it. */
+      .so { max-width: none; display: grid; grid-template-columns: auto minmax(220px, 1fr); gap: 6px 16px; align-items: start; justify-content: center; }
+      .stage { grid-column: 1; grid-row: 1 / span 6; height: calc(100vh - 92px); aspect-ratio: 360 / 400; }
+      .so > :not(.stage) { grid-column: 2; }
+      .side { grid-template-columns: 12px minmax(0, 5em) 1fr auto; }
+      .hint { font-size: 14px; }
+    }
     .hint { text-align: center; color: var(--muted); font-size: 15px; min-height: 20px; }
     .hint.big { color: var(--text); font-size: 19px; font-weight: 600; padding: 6px 0 14px; }
     .help { display: flex; flex-direction: column; gap: 12px; max-width: 520px; margin: 0 auto; padding: 8px 0 24px; }
@@ -258,7 +274,15 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     const toStart = Math.ceil((Date.parse(c.startsAt) - this.nowMs()) / 1000);
     if (toStart > 0) return `Kick ${c.no}: ${c.role === 'KICKER' ? 'you shoot' : 'you keep goal'}`;
     if (this.locked()) return c.opponentLocked ? 'Both locked in' : `Locked in. Waiting for ${this.opp()?.username ?? 'your opponent'}`;
+    if (c.opponentLocked) return `${this.opp()?.username ?? 'Your opponent'} has chosen. Your turn`;
     return c.role === 'KEEPER' ? 'Your dive' : 'Your shot';
+  });
+
+  /** Over the pitch while the next kick counts down. */
+  protected caption = computed(() => {
+    const c = this.cur();
+    if (!c || this.revealed() || this.state()?.done || this.countdownNum() === null) return null;
+    return c.role === 'KICKER' ? 'You shoot' : 'You keep goal';
   });
 
   protected hint = computed(() => {
@@ -308,6 +332,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
         const kick = st.history[n - 1];
         this.revealed.set(kick);
         this.pending.set(kick);
+        this.warnIfDecidedForMe(kick, st);
         this.revealedAt = Date.now();
         void this.replay(kick, st);
       }
@@ -345,6 +370,42 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   }
 
   protected onContact() { this.pending.set(null); }
+
+  /** Time ran out on one of my decisions: tell me plainly, and that two in a row forfeits. */
+  private warnIfDecidedForMe(kick: ShootoutKick, st: ShootoutState) {
+    const mine = (kick.kickerId === st.viewerId && kick.kickerAuto) || (kick.keeperId === st.viewerId && kick.keeperAuto);
+    if (!mine || st.done) return;
+    this.toast.info(kick.kickerId === st.viewerId
+      ? 'You ran out of time, so that kick was missed. Miss one more in a row and you forfeit.'
+      : 'You ran out of time, so your dive was picked for you. Miss one more in a row and you forfeit.');
+  }
+
+  /** Desktop: arrow keys move your aim (or dive), Space or Enter shoots. */
+  @HostListener('window:keydown', ['$event'])
+  protected onKey(ev: KeyboardEvent) {
+    if (!this.canAct() || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    const role = this.role();
+    const key = ev.key;
+    if (role === 'KEEPER') {
+      const col = key === 'ArrowLeft' ? 0 : key === 'ArrowRight' ? 2 : key === 'ArrowDown' || key === 'ArrowUp' ? 1 : null;
+      if (col === null) return;
+      ev.preventDefault();
+      this.diveCol.set(col);
+      void this.act(null);
+      return;
+    }
+    if (role !== 'KICKER') return;
+    const z = this.aimZone() ?? DEFAULT_AIM;
+    let next = z;
+    if (key === 'ArrowLeft') next = z - (z % 3 === 0 ? 0 : 1);
+    else if (key === 'ArrowRight') next = z + (z % 3 === 2 ? 0 : 1);
+    else if (key === 'ArrowUp') next = z % 3;
+    else if (key === 'ArrowDown') next = 3 + (z % 3);
+    else if (key === ' ' || key === 'Enter') { ev.preventDefault(); void this.act(ev); return; }
+    else return;
+    ev.preventDefault();
+    this.aimZone.set(next);
+  }
 
   /** Browsers only allow sound after a tap. Any press on this screen unlocks it. */
   @HostListener('pointerdown') unlockAudio() { this.audio.unlock(); }
@@ -435,7 +496,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     void this.act(null);
   }
 
-  protected async act(ev: PointerEvent | null) {
+  protected async act(ev: PointerEvent | KeyboardEvent | null) {
     const c = this.cur();
     if (!c || !this.canAct()) return;
     this.audio.unlock();

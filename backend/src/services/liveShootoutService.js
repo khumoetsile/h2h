@@ -72,6 +72,8 @@ function buildView(m, players, rounds, viewerId) {
     code: m.code,
     matchStatus: m.status,
     phase: finished ? 'FINISHED' : !allStarted ? 'LOBBY' : 'ROUND',
+    // While waiting for the other player to take the pitch: when they run out of time.
+    lobbyDeadline: !finished && !allStarted ? iso(m.player_action_deadline) : null,
     serverNow: new Date().toISOString(),
     viewerId,
     firstKickerId: first.user_id,

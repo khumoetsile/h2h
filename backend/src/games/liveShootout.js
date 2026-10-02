@@ -20,17 +20,17 @@ import { createRng, gauss } from './rng.js';
 
 export const KICKS_PER_SIDE = 5;
 /** Safety cap so a perfectly level shootout can't run forever (then it is a draw and stakes are refunded). */
-export const MAX_KICKS_EACH = 10;
+export const MAX_KICKS_EACH = 15;
 /** How long each player has to decide a kick once its window opens. */
-export const DECISION_MS = 12000;
+export const DECISION_MS = 14000;
 /** Pause before the first kick, and between kicks (lets the previous result play out). */
 export const FIRST_KICK_DELAY_MS = 3000;
 export const NEXT_KICK_DELAY_MS = 4800;
 
 // Timing bar: distance of the stop position from the centre (0..0.5 of the track).
-export const PERFECT_BAND = 0.07;
-export const HIGH_BAND = 0.2;
-export const LOW_BAND = 0.34;
+export const PERFECT_BAND = 0.09;
+export const HIGH_BAND = 0.25;
+export const LOW_BAND = 0.4;
 
 export const ZONES = 6;
 export const COLS = 3;
@@ -116,7 +116,8 @@ export function botKick(seed, roundNo, params) {
   const rng = createRng(((Number(seed) >>> 0) ^ Math.imul(roundNo, 69069) ^ 0xb5297a4d) >>> 0);
   const zone = rng.bool(0.4) ? rng.int(0, 2) : rng.int(3, 5);
   const high = isHigh(zone);
-  const target = 0.5 + (rng.bool() ? 1 : -1) * Math.abs(gauss(rng, 0, high ? 0.09 : 0.13));
+  // Human-like slips: a bot occasionally mistimes it, so it is beatable and not a machine.
+  const target = 0.5 + (rng.bool() ? 1 : -1) * Math.abs(gauss(rng, 0, high ? 0.14 : 0.2));
   let best = 600; let bestErr = Infinity;
   for (let t = 600; t < 4000; t += 10) {
     const err = Math.abs(markerAt(params.periodMs, params.phase, t) - target);

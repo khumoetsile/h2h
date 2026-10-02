@@ -369,7 +369,10 @@ describe('live shootout: timeouts and forfeits', () => {
 
   test('if the opponent never takes the pitch they forfeit', async () => {
     const M = await lockedMatch(20);
-    assert.equal((await api().post(`/api/matches/${M.code}/live/join`).set(auth(M.A.token))).status, 200);
+    const joined = await api().post(`/api/matches/${M.code}/live/join`).set(auth(M.A.token));
+    assert.equal(joined.status, 200);
+    assert.equal(joined.body.state.phase, 'LOBBY');
+    assert.ok(joined.body.state.lobbyDeadline, 'the waiting player sees when the other runs out of time');
     const m0 = await queryOne('SELECT status, player_action_deadline FROM matches WHERE id = ?', [M.id]);
     assert.equal(m0.status, 'IN_PROGRESS');
     assert.ok(m0.player_action_deadline, 'the other player is on a clock');

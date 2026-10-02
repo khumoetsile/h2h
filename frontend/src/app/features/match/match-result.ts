@@ -164,6 +164,12 @@ export class MatchResultPage implements OnInit {
     const opp = this.opponent()?.username ?? 'your opponent';
     if (!m) return '';
     const stake = formatMoney(m.stake);
+    // A finished shootout carries its own scoreline ("Won the shootout 3-2 in sudden death").
+    const shootout = /^Won the shootout (.+)$/.exec(m.resultReason ?? '')?.[1];
+    if (shootout && !m.endReason) {
+      if (this.ds() === 'WON') return `You beat ${opp}, ${shootout}.`;
+      if (this.ds() === 'LOST') return `${opp} won ${shootout}.`;
+    }
     switch (this.ds()) {
       case 'WON': return m.endReason === 'ACTION_TIMEOUT' ? `You beat ${opp}. They didn't finish before the timer ran out.` : `You beat ${opp}.`;
       case 'LOST': return m.endReason === 'ACTION_TIMEOUT' ? `You didn't finish before the timer ran out, so ${opp} won.` : `${opp} won this one.`;

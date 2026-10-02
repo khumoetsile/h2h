@@ -41,6 +41,8 @@ export interface ShootoutState {
   goals: Record<number, number>;
   kicksTaken: Record<number, number>;
   suddenDeath: boolean;
+  /** While waiting for the other player to take the pitch: when they run out of time. */
+  lobbyDeadline: string | null;
   kicksPerSide: number;
   decisionMs: number;
   done: boolean;
@@ -51,9 +53,9 @@ export interface ShootoutState {
 }
 
 // Timing bar bands: distance of the stop from the centre, as a fraction of the track (matches the server).
-export const PERFECT_BAND = 0.07;
-export const HIGH_BAND = 0.2;
-export const LOW_BAND = 0.34;
+export const PERFECT_BAND = 0.09;
+export const HIGH_BAND = 0.25;
+export const LOW_BAND = 0.4;
 
 /** Marker position 0..1 (triangle wave) at time t. Same function the server uses. */
 export function markerAt(periodMs: number, phase: number, t: number) {

@@ -125,6 +125,7 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
           </g>
         </g>
 
+        <path #trail d="M180 276L180 276" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-opacity=".75" opacity="0"/>
         <!-- ball on the spot -->
         <ellipse #shadow cx="180" cy="288" rx="9" ry="3" fill="#000" fill-opacity=".28"/>
         <g #ball class="ball">
@@ -158,11 +159,13 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
       </div>
     </div>
 
+    @if (caption(); as c) { <div class="role-cap">{{ c }}</div> }
     @if (countdown() !== null) { <div class="count" aria-hidden="true">{{ countdown() }}</div> }
     @if (banner(); as b) { <div class="banner" [attr.data-k]="b.kind" [attr.data-t]="b.tone"><strong>{{ b.title }}</strong><span>{{ b.sub }}</span></div> }
   `,
   styles: [`
     :host { position: relative; display: block; width: 100%; aspect-ratio: 360 / 400; max-height: 50vh; overflow: hidden; border-radius: var(--radius); background: #0c110e; contain: layout paint; }
+    @media (orientation: landscape) and (max-height: 540px) { :host { max-height: none; height: 100%; aspect-ratio: auto; } }
     .cam { position: absolute; inset: 0; transform-origin: 50% 38%; will-change: transform; }
     svg { display: block; width: 100%; height: 100%; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
     .k-body, .kk-run, .kick-leg, .arm, .ball { transform-box: fill-box; will-change: transform; }
@@ -192,6 +195,7 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
     .col .chev { fill: none; stroke: #fff; stroke-opacity: .55; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
     .col.sel .chev { stroke: #f5701f; stroke-opacity: 1; }
 
+    .role-cap { position: absolute; left: 0; right: 0; top: 10px; text-align: center; font-family: var(--font-display); font-size: 30px; font-weight: 700; color: #fff; text-shadow: 0 2px 0 rgba(0,0,0,.45); pointer-events: none; animation: banner .35s cubic-bezier(.2, 1.3, .4, 1) both; }
     .count { position: absolute; left: 0; right: 0; top: 38%; text-align: center; font-family: var(--font-display); font-weight: 700; font-size: 96px; line-height: 1; color: #fff; text-shadow: 0 3px 0 rgba(0,0,0,.35); animation: pop .9s ease-out both; pointer-events: none; }
     @keyframes pop { 0% { transform: scale(.5); opacity: 0; } 25% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); opacity: .9; } }
     .banner { position: absolute; left: 0; right: 0; top: 33%; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; pointer-events: none; animation: banner .45s cubic-bezier(.2, 1.3, .4, 1) both; }
@@ -216,6 +220,8 @@ export class ShootoutScene implements OnDestroy {
   /** Who is kicking right now, for the kit colours (you are always orange). */
   readonly youKick = input(true);
   readonly countdown = input<number | null>(null);
+  /** A short line over the pitch before a kick: "You shoot" / "You keep goal". */
+  readonly caption = input<string | null>(null);
   readonly audio = input<ShootoutAudio | null>(null);
   readonly pickZone = output<number>();
   readonly pickCol = output<number>();
@@ -241,6 +247,7 @@ export class ShootoutScene implements OnDestroy {
   private kickLeg = viewChild.required<ElementRef<SVGGElement>>('kickLeg');
   private netBack = viewChild.required<ElementRef<SVGGElement>>('netBack');
   private ripple = viewChild.required<ElementRef<SVGCircleElement>>('ripple');
+  private trail = viewChild.required<ElementRef<SVGPathElement>>('trail');
   private cam = viewChild.required<ElementRef<HTMLElement>>('cam');
 
   private anims: Animation[] = [];
@@ -355,6 +362,14 @@ export class ShootoutScene implements OnDestroy {
     ], { duration: (hitAt + 520) * 1, easing: 'ease-out' });
 
     this.fx(this.shadow().nativeElement, [{ opacity: 1 }, { opacity: 0 }], { duration: 80 * s, delay: strikeAt });
+    if (perfect && k.outcome !== 'MISSED') {
+      // A perfect strike leaves a streak across the pitch.
+      const tr = this.trail().nativeElement;
+      tr.setAttribute('d', `M${SPOT.x} ${SPOT.y} Q${(SPOT.x + tx) / 2} ${(SPOT.y + ty) / 2 - arc * 1.4} ${tx} ${ty}`);
+      const len = tr.getTotalLength();
+      tr.style.strokeDasharray = String(len);
+      this.fx(tr, [{ strokeDashoffset: len, opacity: 0.8 }, { strokeDashoffset: 0, opacity: 0.8, offset: 0.55 }, { strokeDashoffset: 0, opacity: 0 }], { duration: flight + 450 * s, delay: strikeAt, easing: 'ease-out' });
+    }
     this.at(strikeAt, () => { if (run === this.run) { a?.kick(); a?.buzz(14); } });
     // Ball flight.
     const keyframes: Keyframe[] = [

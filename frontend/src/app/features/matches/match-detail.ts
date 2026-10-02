@@ -78,8 +78,15 @@ export class MatchDetailPage implements OnInit {
     if (slug === 'reaction-rush' || slug === 'aim-challenge') main = ok ? `${r['reactionMs']} ms` : main;
     if (slug === 'word-battle') main = ok ? String(r['answer']) : `${r['guess'] || '-'}`;
     if (slug === 'memory-battle') main = ok ? `${r['length']} tiles` : `${r['correctPrefix']}/${r['length']}`;
+    if (slug === 'penalty-shootout' && r['zone'] != null) {
+      // A live shootout kick: where it was aimed and how well it was struck.
+      const zone = ['top left', 'top centre', 'top right', 'bottom left', 'bottom centre', 'bottom right'][Number(r['zone'])] ?? '';
+      const quality = String(r['quality'] ?? '').toLowerCase();
+      main = status === 'GOAL' ? 'Goal' : status === 'SAVED' ? 'Saved' : 'Missed';
+      return { main, sub: [zone, quality && quality !== 'none' ? quality : ''].filter(Boolean).join(', '), ok };
+    }
     if (slug === 'penalty-shootout') main = status === 'GOAL' ? 'Goal' : status === 'SAVED' ? `Saved (${String(r['keeperDive']).toLowerCase()})` : 'Wide';
-    return { main, sub: `${r['points']} pts`, ok };
+    return { main, sub: r['points'] != null ? `${r['points']} pts` : '', ok };
   }
 
   playAgain() {
