@@ -26,7 +26,7 @@ import { RealtimeService } from '../core/realtime.service';
     @if (rt.connectionState() === 'lost') {
       <div class="conn-banner lost" role="status" aria-live="assertive">
         <span class="spin"></span>
-        <span><strong>CONNECTION LOST</strong>: we're trying to reconnect you.</span>
+        <span><strong>Connection lost</strong>: we're trying to reconnect you.</span>
         @if (windowLeft() > 0) { <span class="clock">{{ clock() }}</span> }
         @else { <span>Still trying… your challenge timers keep running on the server.</span> }
       </div>

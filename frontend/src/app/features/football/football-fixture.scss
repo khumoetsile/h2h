@@ -19,7 +19,7 @@
 }
 
 .how { margin-top: 16px; padding: 18px; }
-.how h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; mat-icon { color: var(--muted); } }
+.how h3 { margin-bottom: 10px; }
 .type-list { display: flex; flex-direction: column; gap: 8px; }
 .type-row {
   display: flex; align-items: center; gap: 8px; text-align: left; padding: 14px; border-radius: var(--radius-sm);
@@ -29,13 +29,13 @@
 }
 
 .entry { padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-.entry h2 { font-size: 17px; margin-bottom: 10px; }
+.entry h2 { font-size: 22px; margin-bottom: 10px; }
 .stake-h { margin-top: 18px; }
 .center-note { text-align: center; padding: 20px 0; }
 .pick-tiles, .stake-tiles { grid-template-columns: repeat(2, 1fr); }
 .prize-box { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; display: flex; flex-direction: column; gap: 8px; margin-top: 12px; }
 .pb-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--text-2); }
-.win-row { border-top: 1px dashed var(--border-strong); padding-top: 8px; strong { font-size: 20px; font-family: var(--font-display); } }
+.win-row { border-top: 1px solid var(--border); padding-top: 8px; strong { font-size: 20px; font-family: var(--font-display); } }
 
 // .btn (global) sets white-space: nowrap, which — combined with flex:1 — refused to
 // shrink "Challenge someone" below its full-text width and pushed the whole page
@@ -65,23 +65,19 @@
 
 .kickoff-row { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; padding-top: 10px; border-top: 1px solid var(--border);
   div { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .right { align-items: flex-end; } strong { font-size: 15px; } }
-.step { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%;
-  background: var(--surface-3); color: var(--text); font-size: 12px; font-weight: 700; margin-right: 6px; flex-shrink: 0; }
-.how h3 .step { margin-right: 0; }
 .q { margin: -4px 0 10px; }
 .rule { margin-top: 8px; }
-.waiting-card { margin-top: 16px; padding: 18px; h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; mat-icon { color: var(--demo); } } }
+.waiting-card { margin-top: 16px; padding: 18px; h3 { margin-bottom: 12px; } }
 .waiting-list { display: flex; flex-direction: column; gap: 10px; }
 
 // The two ways to play must be unmistakably different choices.
 .mode-cards { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .mode-card {
-  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 14px 12px; min-height: 120px;
-  border-radius: var(--radius); border: 2px solid var(--border-strong); background: var(--surface-2); color: var(--text); cursor: pointer; min-width: 0;
-  mat-icon { font-size: 28px; width: 28px; height: 28px; color: var(--muted); }
-  strong { font-family: var(--font-display); font-size: 15px; }
-  span { font-size: 13px; color: var(--text-2); line-height: 1.35; }
-  &.selected { border-color: var(--accent); background: var(--accent-soft); mat-icon, strong { color: var(--accent); } }
+  display: flex; flex-direction: column; align-items: flex-start; gap: 6px; text-align: left; padding: 14px 12px; min-height: 96px;
+  border-radius: var(--radius); border: 1px solid var(--border-strong); background: var(--surface-2); color: var(--text); cursor: pointer; min-width: 0;
+  strong { font-family: var(--font-display); font-size: 20px; }
+  span { font-size: 14px; color: var(--text-2); line-height: 1.35; }
+  &.selected { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
   &:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 @media (max-width: 340px) { .mode-cards { grid-template-columns: minmax(0, 1fr); } .mode-card { min-height: 0; } }

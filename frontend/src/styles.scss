@@ -156,6 +156,10 @@ p { margin: 0; }
 @media (min-width: 900px) {
   .screen-actions { position: static; margin: 24px 0 0; padding: 0; background: none; flex-direction: row; justify-content: flex-end; }
 }
+// Entry cards (game + fixture pages) keep their buttons stacked and full width inside the card.
+@media (min-width: 900px) {
+  .entry .screen-actions { flex-direction: column; align-items: stretch; justify-content: flex-start; margin: 20px 0 0; }
+}
 .stack { display: flex; flex-direction: column; gap: 16px; }
 .row { display: flex; align-items: center; gap: 12px; }
 .row-between { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -285,7 +289,7 @@ p { margin: 0; }
   transition: all .12s ease;
   small { font-family: var(--font); font-size: 13px; color: var(--muted); font-weight: 600; }
   &:hover:not(:disabled) { border-color: var(--text-2); }
-  &.selected { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); small { color: var(--accent); opacity: .85; } }
+  &.selected { border-color: var(--accent); background: var(--accent); color: var(--accent-ink); small { color: var(--accent-ink); opacity: .8; } }
   &:disabled { opacity: .4; cursor: not-allowed; }
   &:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 }

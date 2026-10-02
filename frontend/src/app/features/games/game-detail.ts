@@ -41,12 +41,12 @@ import { GameIcon, LoadError, Spinner } from '../../shared/ui';
               </div>
             </div>
             <div class="meta">
-              <span class="chip"><mat-icon inline>schedule</mat-icon>{{ duration(g.estimatedDurationSeconds) }}</span>
+              <span class="chip">{{ duration(g.estimatedDurationSeconds) }}</span>
               @if ((g.waiting ?? 0) > 0) { <span class="chip chip-win"><span class="live-dot"></span>{{ g.waiting }} playing now</span> }
               @if (!g.isEnabled) { <span class="chip chip-loss">Unavailable right now</span> }
             </div>
             <div class="card how">
-              <h3><mat-icon>menu_book</mat-icon> How to play</h3>
+              <h3>How to play</h3>
               <p class="text-2">{{ g.howToPlay }}</p>
               <ul class="rules muted small">
                 <li>Both players get exactly the same challenge, so it's fair for everyone.</li>
@@ -115,15 +115,15 @@ import { GameIcon, LoadError, Spinner } from '../../shared/ui';
     .head { display: flex; gap: 16px; align-items: center; h1 { font-size: 28px; } }
     @media (min-width: 640px) { .head h1 { font-size: 32px; } }
     .meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 14px 0; }
-    .how h3 { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; mat-icon { color: var(--muted); } }
+    .how h3 { margin-bottom: 8px; }
     .how .text-2 { max-width: 56ch; }
     .rules { margin: 12px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; line-height: 1.4; max-width: 56ch; }
     .entry { padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-    .entry h2 { font-size: 18px; margin-bottom: 4px; }
+    .entry h2 { font-size: 22px; margin-bottom: 4px; }
     .stake-tiles { margin-top: 10px; }
     .prize-box { background: var(--bg-elev); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 14px; display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
     .pb-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--text-2); }
-    .win-row { border-top: 1px dashed var(--border-strong); padding-top: 8px; strong { font-size: 22px; font-family: var(--font-display); } }
+    .win-row { border-top: 1px solid var(--border); padding-top: 8px; strong { font-size: 22px; font-family: var(--font-display); } }
     .instant { display: flex; align-items: center; gap: 4px; }
     .how-link { align-self: flex-start; margin-top: 2px; }
     .breakdown-note { line-height: 1.5; }

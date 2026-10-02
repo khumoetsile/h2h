@@ -6,13 +6,14 @@ import { clamp, createRng, gauss, isNum } from './rng.js';
 // server from the reported stop time, so a client can't just claim "goal".
 const SHOTS = 5;
 const MAX_SHOT_MS = 6000;
+// A full left-right-left sweep takes 1.7 to 2.7 s, slow enough to aim on a phone.
 
 function fullSpec(seed) {
   const rng = createRng(seed);
   return Array.from({ length: SHOTS }, () => {
     const lean = rng.pick(['LEFT', 'CENTER', 'RIGHT']);
     const dive = rng.bool(0.55) ? lean : rng.pick(['LEFT', 'CENTER', 'RIGHT'].filter((z) => z !== lean));
-    return { periodMs: rng.int(1100, 1700), phase: Math.round(rng.float(0, 1) * 1000) / 1000, lean, dive };
+    return { periodMs: rng.int(1700, 2700), phase: Math.round(rng.float(0, 1) * 1000) / 1000, lean, dive };
   });
 }
 

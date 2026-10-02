@@ -43,10 +43,10 @@
       }
 
       <div class="money-row">
-        <div><span class="muted tiny">STAKE</span><strong class="money">{{ m.stake | money }}</strong></div>
+        <div><span class="muted tiny">Stake</span><strong class="money">{{ m.stake | money }}</strong></div>
         <div><span class="muted tiny">POOL</span><strong class="money">{{ m.pool | money }}</strong></div>
         <div><span class="muted tiny">FEE ({{ m.feePercent }}%)</span><strong class="money">{{ (m.status === 'COMPLETED' && !m.isDraw ? m.fee : 0) | money }}</strong></div>
-        <div><span class="muted tiny">PRIZE</span><strong class="money accent">{{ m.prize | money }}</strong></div>
+        <div><span class="muted tiny">Prize</span><strong class="money accent">{{ m.prize | money }}</strong></div>
         <app-demo-badge label="Demo funds" />
       </div>
     </section>
@@ -69,7 +69,7 @@
             </div>
             @if (p.result; as r) {
               <div class="score">
-                <span class="muted tiny">SCORE</span>
+                <span class="muted tiny">Score</span>
                 <strong class="num">{{ r.score.toLocaleString() }}</strong>
                 @if (!r.valid) { <span class="chip chip-loss">Invalid: {{ r.invalidReason }}</span> }
               </div>

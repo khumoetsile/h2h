@@ -21,8 +21,8 @@
     </div>
 
     <div class="stake-bar card">
-      <div><span class="muted tiny">STAKE</span><strong class="money">{{ m.stake | money }}</strong></div>
-      <div><span class="muted tiny">WINNER RECEIVES</span><strong class="money accent">{{ m.prize | money }}</strong></div>
+      <div><span class="muted tiny">Stake</span><strong class="money">{{ m.stake | money }}</strong></div>
+      <div><span class="muted tiny">Winner receives</span><strong class="money accent">{{ m.prize | money }}</strong></div>
     </div>
 
     <!-- Opponent's connection dropped while they owe an action -->
@@ -177,8 +177,8 @@
                   <span class="team">{{ f.awayTeam }}</span>
                 </div>
                 <div class="picks-row">
-                  <div><span class="muted tiny">YOUR PICK</span><strong class="accent">{{ picks().mine }}</strong></div>
-                  <div><span class="muted tiny">OPPONENT</span><strong>{{ picks().theirs }}</strong></div>
+                  <div><span class="muted tiny">Your pick</span><strong class="accent">{{ picks().mine }}</strong></div>
+                  <div><span class="muted tiny">Opponent</span><strong>{{ picks().theirs }}</strong></div>
                 </div>
                 @if (stat(); as s) {
                   <div class="stat-block">

@@ -97,7 +97,7 @@
         <div class="card review-card">
           <div class="rv-row">
             <app-avatar [name]="opponent()?.username ?? ''" [color]="opponent()?.avatarColor ?? '#3B82F6'" [size]="40" />
-            <div class="grow"><span class="muted tiny">OPPONENT</span><div class="r-name">{{ opponent()?.username }}</div></div>
+            <div class="grow"><span class="muted tiny">Opponent</span><div class="r-name">{{ opponent()?.username }}</div></div>
             <button type="button" class="link small" (click)="goTo('player')">Change</button>
           </div>
           <div class="rv-row">
@@ -106,7 +106,7 @@
             <button type="button" class="link small" (click)="goTo('game')">Change</button>
           </div>
           <div class="rv-row">
-            <div class="grow"><span class="muted tiny">ENTRY</span><div class="r-name money">{{ stake() | money }}</div></div>
+            <div class="grow"><span class="muted tiny">Entry</span><div class="r-name money">{{ stake() | money }}</div></div>
             <button type="button" class="link small" (click)="goTo('stake')">Change</button>
           </div>
           <div class="prize-line">

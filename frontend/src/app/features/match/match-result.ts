@@ -59,7 +59,7 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
               <div class="pvp-recap">
                 <div class="pvp-side"><span class="muted tiny">YOU</span><strong>{{ picks().mine }}</strong></div>
                 <div class="pvp-vs">vs</div>
-                <div class="pvp-side"><span class="muted tiny">{{ opponent()?.username ?? 'OPPONENT' }}</span><strong>{{ picks().theirs || '-' }}</strong></div>
+                <div class="pvp-side"><span class="muted tiny">{{ opponent()?.username ?? 'Opponent' }}</span><strong>{{ picks().theirs || '-' }}</strong></div>
               </div>
             </div>
           } @else if (m.status === 'COMPLETED') {

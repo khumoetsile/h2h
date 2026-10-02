@@ -68,11 +68,12 @@ const MAX_AUTO_RETRIES = 3;
           </div>
         } @else {
           @switch (start()!.game) {
-            @case ('reaction-rush') { <app-reaction-rush [spec]="start()!.spec" (finished)="submit($event)" /> }
-            @case ('aim-challenge') { <app-aim-challenge [spec]="start()!.spec" (finished)="submit($event)" /> }
-            @case ('memory-battle') { <app-memory-battle [spec]="start()!.spec" (finished)="submit($event)" /> }
-            @case ('word-battle') { <app-word-battle [spec]="start()!.spec" (finished)="submit($event)" /> }
-            @case ('penalty-shootout') { <app-penalty-shootout [spec]="start()!.spec" (finished)="submit($event)" /> }
+            <!-- Each game is its own lazy chunk, so a phone only downloads the one being played. -->
+            @case ('reaction-rush') { @defer (on immediate) { <app-reaction-rush [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
+            @case ('aim-challenge') { @defer (on immediate) { <app-aim-challenge [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
+            @case ('memory-battle') { @defer (on immediate) { <app-memory-battle [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
+            @case ('word-battle') { @defer (on immediate) { <app-word-battle [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
+            @case ('penalty-shootout') { @defer (on immediate) { <app-penalty-shootout [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
           }
         }
       }

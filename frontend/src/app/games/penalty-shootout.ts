@@ -1,4 +1,4 @@
-import { Component, computed, input, OnDestroy, OnInit, output, signal } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, computed, input, output, signal, viewChild } from '@angular/core';
 import { GameFinish, sleep } from './game-types';
 
 interface Shot { periodMs: number; phase: number; lean: 'LEFT' | 'CENTER' | 'RIGHT'; }
@@ -10,119 +10,187 @@ export function markerAt(periodMs: number, phase: number, t: number) {
   return p < 0.5 ? p * 2 : 2 - p * 2;
 }
 
+/** A tap this soon after the marker appears is almost certainly left over from the previous shot. */
+const MIN_SHOT_MS = 120;
+const KEEPER_LEFT = { LEFT: 22, CENTER: 50, RIGHT: 78 } as const;
+
+/**
+ * Penalty shootout. Built to stay light on a phone: plain DOM and CSS (no
+ * images, canvas or per-frame Angular updates). The marker moves by writing a
+ * transform straight to the element once per animation frame, and the ball's
+ * flight is a single CSS transition. Timing uses the tap event's own
+ * timestamp, so a slow frame can't change where the shot lands.
+ */
 @Component({
   selector: 'app-penalty-shootout',
-  styleUrl: './game-hud.scss',
   template: `
-    <div class="hud">
-      <div class="hud-item"><span>Shot</span><strong>{{ Math.min(index() + 1, total()) }}/{{ total() }}</strong></div>
-      <div class="hud-item"><span>Keeper leans</span><strong>{{ phase() === 'aim' ? leanLabel() : '-' }}</strong></div>
-      <div class="hud-item"><span>Shot clock</span><strong>{{ clock() }}s</strong></div>
-    </div>
-    <div class="pitch" (pointerdown)="shoot()">
-      <div class="goal">
-        <div class="net"></div>
-        <div class="zone-lines"><i></i><i></i></div>
-        <div class="keeper" [class.lean-left]="current().lean === 'LEFT'" [class.lean-right]="current().lean === 'RIGHT'">
-          <span class="head"></span><span class="body"></span>
+    <div class="ps">
+      <div class="ps-head">
+        <div class="pips" aria-hidden="true">
+          @for (taken of pips(); track $index) { <span class="pip" [class.taken]="taken"></span> }
         </div>
-        @if (phase() === 'aim') { <div class="marker" [style.left.%]="marker() * 100"></div> }
-        @if (phase() === 'shot') { <div class="ball-in" [style.left.%]="lastX() * 100" [class.wide]="lastWide()"></div> }
+        <p class="ps-shot">Shot {{ shotNo() }} of {{ total() }}</p>
+        <p class="ps-lean" [class.off]="phase() !== 'aim'">Keeper leans <strong>{{ leanLabel() }}</strong></p>
       </div>
-      <div class="spot"></div>
-      <div class="overlay">
-        @switch (phase()) {
-          @case ('countdown') { <div class="count">{{ count() }}</div><div class="sub">Tap to shoot when the marker is where you want the ball</div> }
-          @case ('aim') { <div class="hint">Tap anywhere to shoot</div> }
-          @case ('shot') { <div class="msg" [class.loss]="lastWide()">{{ lastWide() ? 'Wide!' : 'Shot taken!' }}</div><div class="sub">{{ lastWide() ? 'Off target' : 'Result revealed at full time' }}</div> }
-          @case ('done') { <div class="msg">Full time!</div><div class="sub">Checking your shots…</div> }
-        }
+
+      <div class="pitch" (pointerdown)="onTap($event)">
+        <div class="goal" #goal>
+          <i class="zone z1"></i><i class="zone z2"></i>
+          <div class="keeper" [style.left.%]="keeperLeft()"><span class="k-head"></span><span class="k-body"></span></div>
+          <div class="aim" #aim></div>
+        </div>
+        <div class="ball" #ball></div>
+        <div class="overlay" aria-live="polite">
+          @switch (phase()) {
+            @case ('countdown') { <div class="count">{{ count() }}</div><div class="sub">Tap Shoot when the marker is where you want the ball.</div> }
+            @case ('shot') { <div class="msg" [class.loss]="lastWide()">{{ lastWide() ? 'Wide' : 'Shot taken' }}</div> }
+            @case ('done') { <div class="msg">Full time</div><div class="sub">Checking your shots</div> }
+          }
+        </div>
       </div>
-    </div>
-    <div class="progress">
-      @for (s of shots(); track $index) { <i class="cur"></i> }
-      @for (i of remaining(); track $index) { <i></i> }
+
+      <button class="shoot" type="button" [disabled]="phase() !== 'aim'" (pointerdown)="onTap($event)">Shoot</button>
+      <p class="clock">{{ phase() === 'aim' ? clock() + 's left on this shot' : '' }}</p>
     </div>
   `,
   styles: [`
-    .pitch { position: relative; height: min(62vh, 520px); min-height: 340px; border-radius: var(--radius-lg); overflow: hidden; cursor: pointer; user-select: none; touch-action: manipulation;
-      border: 1px solid var(--border-strong);
-      background: repeating-linear-gradient(180deg, #0f2a1d 0 48px, #0d2419 48px 96px); }
-    .goal { position: absolute; left: 8%; right: 8%; top: 12%; height: 40%; border: 6px solid #e8ecf3; border-bottom: 0; border-radius: 4px 4px 0 0; }
-    .net { position: absolute; inset: 0; background:
-      linear-gradient(rgba(255,255,255,.12) 1px, transparent 1px) 0 0 / 16px 16px,
-      linear-gradient(90deg, rgba(255,255,255,.12) 1px, transparent 1px) 0 0 / 16px 16px; }
-    .zone-lines { position: absolute; inset: 0; display: flex; justify-content: space-evenly; pointer-events: none;
-      i { width: 1px; border-left: 1px dashed rgba(255,255,255,.18); } }
-    .keeper { position: absolute; bottom: 0; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: transform .2s;
-      .head { width: 22px; height: 22px; border-radius: 50%; background: #fbbf24; }
-      .body { width: 60px; height: 70px; border-radius: 14px 14px 4px 4px; background: #f97316; margin-top: 2px; } }
-    .keeper.lean-left { transform: translateX(-70%) rotate(-12deg); }
-    .keeper.lean-right { transform: translateX(-30%) rotate(12deg); }
-    .marker { position: absolute; top: -18px; bottom: -6px; width: 4px; margin-left: -2px; background: var(--accent); box-shadow: 0 0 14px var(--accent); border-radius: 2px; }
-    .ball-in { position: absolute; top: 40%; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px #111 inset; animation: kick .35s ease-out both; }
-    .ball-in.wide { top: -20%; }
-    @keyframes kick { from { transform: translateY(260px) scale(1.6); } to { transform: none; } }
-    .spot { position: absolute; left: 50%; bottom: 14%; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px #111 inset; }
-    .hint { position: absolute; bottom: 24px; color: var(--text-2); font-weight: 600; font-size: 13px; }
+    :host { display: block; }
+    .ps { display: flex; flex-direction: column; gap: 12px; user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+    .ps-head { display: grid; grid-template-columns: auto 1fr auto; align-items: center; gap: 14px; }
+    .pips { display: flex; gap: 5px; }
+    .pip { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--border-strong); }
+    .pip.taken { background: var(--text); border-color: var(--text); }
+    .ps-shot { font-family: var(--font-display); font-size: 22px; font-weight: 600; }
+    .ps-lean { color: var(--text-2); font-size: 15px; text-align: right; }
+    .ps-lean strong { color: var(--text); }
+    .ps-lean.off { visibility: hidden; }
+
+    .pitch { position: relative; height: min(52vh, 420px); min-height: 300px; background: #1b2e22; border-radius: var(--radius); overflow: hidden; contain: layout paint; cursor: pointer; }
+    .goal { position: absolute; left: 8%; right: 8%; top: 10%; height: 42%; border: 5px solid #eceae3; border-bottom: 0; }
+    .zone { position: absolute; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, .16); }
+    .z1 { left: 33.33%; } .z2 { left: 66.66%; }
+    .keeper { position: absolute; bottom: 0; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; transition: left .25s ease-out; }
+    .k-head { width: 20px; height: 20px; border-radius: 50%; background: #d9b44a; }
+    .k-body { width: 54px; height: 62px; margin-top: 2px; border-radius: 12px 12px 3px 3px; background: #cfd3c8; }
+    .aim { position: absolute; top: -14px; bottom: 0; left: 0; width: 4px; margin-left: -2px; background: var(--accent); will-change: transform; visibility: hidden; }
+    .aim.on { visibility: visible; }
+    .ball { position: absolute; left: 50%; bottom: 9%; width: 24px; height: 24px; margin-left: -12px; border-radius: 50%; background: #fff; border: 3px solid #14100c; will-change: transform; }
+    .ball.fly { transition: transform .28s ease-out; }
+
+    .overlay { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 4px; padding: 0 16px 22%; text-align: center; pointer-events: none; }
+    .count { font-family: var(--font-display); font-size: 88px; font-weight: 700; line-height: 1; color: var(--accent); }
+    .msg { font-family: var(--font-display); font-size: 30px; font-weight: 700; }
+    .sub { color: var(--text-2); font-size: 16px; }
+
+    .shoot { min-height: 68px; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-size: 28px; font-weight: 700; cursor: pointer; text-align: center; }
+    .shoot:disabled { opacity: .35; cursor: default; }
+    .clock { min-height: 22px; text-align: center; color: var(--muted); font-size: 15px; font-variant-numeric: tabular-nums; }
+    @media (prefers-reduced-motion: reduce) { .keeper, .ball.fly { transition-duration: .001ms; } }
   `],
 })
 export class PenaltyShootoutGame implements OnInit, OnDestroy {
   readonly spec = input.required<Spec>();
   readonly finished = output<GameFinish>();
-  protected Math = Math;
+
+  private goalEl = viewChild.required<ElementRef<HTMLElement>>('goal');
+  private aimEl = viewChild.required<ElementRef<HTMLElement>>('aim');
+  private ballEl = viewChild.required<ElementRef<HTMLElement>>('ball');
+
   protected phase = signal<'countdown' | 'aim' | 'shot' | 'done'>('countdown');
   protected count = signal(3);
   protected index = signal(0);
-  protected shots = signal<{ stopMs: number }[]>([]);
-  protected t = signal(0);
-  protected lastX = signal(0.5);
+  protected taken = signal<{ stopMs: number }[]>([]);
+  protected clock = signal(0);
+  protected lastWide = signal(false);
+
   protected total = computed(() => this.spec().shots.length);
-  protected current = computed(() => this.spec().shots[Math.min(this.index(), this.total() - 1)]);
-  protected remaining = computed(() => Array.from({ length: this.total() - this.shots().length }));
-  protected marker = computed(() => markerAt(this.current().periodMs, this.current().phase, this.t()));
-  protected clock = computed(() => Math.max(0, Math.ceil((this.spec().maxShotMs - this.t()) / 1000)));
-  protected leanLabel = computed(() => ({ LEFT: 'Left', CENTER: 'Centre', RIGHT: 'Right' })[this.current().lean]);
-  protected lastWide = computed(() => this.lastX() < 0.05 || this.lastX() > 0.95);
+  protected shotNo = computed(() => Math.min(this.index() + 1, this.total()));
+  protected pips = computed(() => Array.from({ length: this.total() }, (_, i) => i < this.taken().length));
+  private current = computed(() => this.spec().shots[Math.min(this.index(), this.total() - 1)]);
+  protected leanLabel = computed(() => ({ LEFT: 'left', CENTER: 'centre', RIGHT: 'right' })[this.current().lean]);
+  protected keeperLeft = computed(() => KEEPER_LEFT[this.current().lean]);
+
   private shotStart = 0;
+  private goalW = 0;
   private raf = 0;
-  private resolve: ((stopMs: number) => void) | null = null;
+  private stopShot: ((stopMs: number) => void) | null = null;
   private destroyed = false;
 
-  ngOnInit() { this.run(); }
+  ngOnInit() { void this.run(); }
   ngOnDestroy() { this.destroyed = true; cancelAnimationFrame(this.raf); }
 
   private async run() {
-    const start = performance.now();
     const spec = this.spec();
+    const start = performance.now();
     for (let c = Math.round(spec.countdownMs / 1000); c > 0; c--) { this.count.set(c); await sleep(1000); if (this.destroyed) return; }
     for (let i = 0; i < spec.shots.length; i++) {
-      this.index.set(i);
-      this.phase.set('aim');
-      this.shotStart = performance.now();
-      const stopMs = await new Promise<number>((resolve) => {
-        this.resolve = (ms) => { this.resolve = null; cancelAnimationFrame(this.raf); resolve(ms); };
-        const loop = () => {
-          const t = performance.now() - this.shotStart;
-          if (t >= spec.maxShotMs) { this.t.set(spec.maxShotMs); this.resolve?.(spec.maxShotMs); return; }
-          this.t.set(t);
-          this.raf = requestAnimationFrame(loop);
-        };
-        loop();
-      });
+      const stopMs = await this.playShot(i);
       if (this.destroyed) return;
-      const s = spec.shots[i];
-      this.lastX.set(markerAt(s.periodMs, s.phase, stopMs));
-      this.shots.update((l) => [...l, { stopMs }]);
-      this.phase.set('shot');
-      await sleep(1100);
+      this.taken.update((l) => [...l, { stopMs }]);
+      await this.kick(spec.shots[i], stopMs);
+      if (this.destroyed) return;
     }
     this.phase.set('done');
-    this.finished.emit({ actions: { shots: this.shots() }, clientElapsedMs: Math.round(performance.now() - start) });
+    this.finished.emit({ actions: { shots: this.taken() }, clientElapsedMs: Math.round(performance.now() - start) });
   }
 
-  protected shoot() {
-    if (this.phase() !== 'aim' || !this.resolve) return;
-    this.resolve(Math.round(performance.now() - this.shotStart));
+  /** Sweep the marker until the player shoots (or the shot clock runs out). Resolves with the stop time in ms. */
+  private playShot(i: number) {
+    const spec = this.spec();
+    const shot = spec.shots[i];
+    this.index.set(i);
+    this.resetBall();
+    this.goalW = this.goalEl().nativeElement.clientWidth;
+    this.clock.set(Math.ceil(spec.maxShotMs / 1000));
+    this.phase.set('aim');
+    const aim = this.aimEl().nativeElement;
+    aim.classList.add('on');
+    let lastSec = this.clock();
+    return new Promise<number>((resolve) => {
+      this.stopShot = (ms) => { this.stopShot = null; cancelAnimationFrame(this.raf); aim.classList.remove('on'); resolve(ms); };
+      const loop = (ts: number) => {
+        if (!this.shotStart) this.shotStart = ts;
+        const t = ts - this.shotStart;
+        if (t >= spec.maxShotMs) { this.stopShot?.(spec.maxShotMs); return; }
+        aim.style.transform = `translate3d(${markerAt(shot.periodMs, shot.phase, t) * this.goalW}px,0,0)`;
+        const left = Math.ceil((spec.maxShotMs - t) / 1000);
+        if (left !== lastSec) { lastSec = left; this.clock.set(left); }
+        this.raf = requestAnimationFrame(loop);
+      };
+      this.shotStart = 0;
+      this.raf = requestAnimationFrame(loop);
+    });
+  }
+
+  /** Fly the ball to where the marker was, then pause briefly before the next shot. */
+  private async kick(shot: Shot, stopMs: number) {
+    const x = markerAt(shot.periodMs, shot.phase, stopMs);
+    const wide = x < 0.05 || x > 0.95;
+    this.lastWide.set(wide);
+    this.phase.set('shot');
+    const pitch = this.ballEl().nativeElement.parentElement as HTMLElement;
+    const dx = (x - 0.5) * this.goalW;
+    const dy = -pitch.clientHeight * (wide ? 0.8 : 0.52);
+    const ball = this.ballEl().nativeElement;
+    ball.classList.add('fly');
+    ball.style.transform = `translate3d(${dx}px,${dy}px,0) scale(.72)`;
+    await sleep(700);
+  }
+
+  private resetBall() {
+    const ball = this.ballEl().nativeElement;
+    ball.classList.remove('fly');
+    ball.style.transform = 'translate3d(0,0,0)';
+    this.aimEl().nativeElement.style.transform = 'translate3d(0,0,0)';
+  }
+
+  protected onTap(e: PointerEvent) {
+    if (this.phase() !== 'aim' || !this.stopShot || !this.shotStart) return;
+    // event.timeStamp shares performance.now()'s clock in current browsers; fall back if it is epoch-based.
+    const at = e.timeStamp > 1e11 ? performance.now() : e.timeStamp;
+    const stopMs = Math.round(at - this.shotStart);
+    if (stopMs < MIN_SHOT_MS) return;
+    e.preventDefault();
+    this.stopShot(Math.min(stopMs, this.spec().maxShotMs));
   }
 }

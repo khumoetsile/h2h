@@ -28,8 +28,8 @@
           </div>
           @if (f.status === 'SCHEDULED' && !closed()) {
             <div class="kickoff-row">
-              <div><span class="muted tiny">KICKOFF</span><strong>{{ f.kickoffAt | date: 'EEE d MMM, HH:mm' }}</strong></div>
-              <div class="right"><span class="muted tiny">STARTS IN</span><app-countdown [deadline]="f.kickoffAt" [urgentUnder]="600" (expired)="load()" /></div>
+              <div><span class="muted small">Kickoff</span><strong>{{ f.kickoffAt | date: 'EEE d MMM, HH:mm' }}</strong></div>
+              <div class="right"><span class="muted small">Starts in</span><app-countdown [deadline]="f.kickoffAt" [urgentUnder]="600" (expired)="load()" /></div>
             </div>
             <p class="muted tiny">Challenges on this match close at kickoff. The challenge becomes active when the match begins.</p>
           }
@@ -54,7 +54,7 @@
         } @else {
           @if (visibleOpen().length) {
             <div class="card waiting-card">
-              <h3><mat-icon>person_search</mat-icon> Players waiting on this match</h3>
+              <h3>Players waiting on this match</h3>
               <div class="waiting-list">
                 @for (c of visibleOpen(); track c.matchId) {
                   <app-open-challenge-card [challenge]="c" (join)="joinTarget.set($event)" />
@@ -64,7 +64,7 @@
           }
 
           <div class="card how">
-            <h3><span class="step">1</span> Choose a question</h3>
+            <h3>Choose a question</h3>
             <div class="type-list">
               @for (t of f.challengeTypes ?? []; track t.id) {
                 <button class="type-row" [class.selected]="type()?.id === t.id" (click)="chooseType(t)">
@@ -87,7 +87,7 @@
             @let t = type()!;
             <div class="screen-body">
               <div>
-                <h2><span class="step">2</span> Your pick</h2>
+                <h2>Your pick</h2>
                 <p class="muted small q">{{ t.question }}</p>
                 <div class="tiles pick-tiles">
                   @if (t.pickType === 'TEAM') {
@@ -103,7 +103,7 @@
 
               @if (pick()) {
                 <div>
-                  <h2><span class="step">3</span> Stake</h2>
+                  <h2>Stake</h2>
                   <div class="tiles stake-tiles">
                     @for (s of f.stakes ?? []; track s) {
                       <button class="tile" [class.selected]="stake() === s" [disabled]="s > available()" (click)="stake.set(s)">{{ s | money }}</button>
@@ -121,16 +121,14 @@
 
               @if (pick() && stake()) {
                 <div>
-                  <h2><span class="step">4</span> Who do you want to play?</h2>
+                  <h2>Who do you want to play?</h2>
                   <div class="mode-cards" role="radiogroup" aria-label="How to find your opponent">
                     <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'direct'" [class.selected]="mode() === 'direct'" (click)="chooseMode('direct')">
-                      <mat-icon>person_pin</mat-icon>
                       <strong>Challenge someone</strong>
                       <span>I already know who I want to play.</span>
                     </button>
                     <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'find'" [class.selected]="mode() === 'find'" (click)="chooseMode('find')">
-                      <mat-icon>travel_explore</mat-icon>
-                      <strong>Find opponent</strong>
+                      <strong>Find an opponent</strong>
                       <span>Make it public: any available player can join.</span>
                     </button>
                   </div>
@@ -187,7 +185,7 @@
   @let f = fixture()!;
   <div class="confirm-backdrop" (click)="closeReview()">
     <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="lock-title" (click)="$event.stopPropagation()">
-      <p class="muted tiny eyebrow">{{ mode() === 'direct' ? 'CHALLENGE SOMEONE' : 'FIND OPPONENT' }}</p>
+      <p class="muted small eyebrow">{{ mode() === 'direct' ? 'Challenge someone' : 'Find an opponent' }}</p>
       <h2 id="lock-title">You're locking in</h2>
       <div class="lock-teams"><span>{{ f.homeTeam.name }}</span><small>vs</small><span>{{ f.awayTeam.name }}</span></div>
       <div class="confirm-summary">
