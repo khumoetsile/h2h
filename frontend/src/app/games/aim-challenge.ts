@@ -35,7 +35,7 @@ const grade = (offset: number) => (offset < 0.18 ? { label: 'Bullseye', color: G
         </div>
       }
       @if (phase() === 'target') {
-        <button class="t" [style.left.%]="current().x" [style.top.%]="current().y" [style.width.px]="current().size + 12" [style.height.px]="current().size + 12"
+        <button class="t" [style.left]="edge(current().x, current().size + 12)" [style.top]="edge(current().y, current().size + 12)" [style.width.px]="current().size + 12" [style.height.px]="current().size + 12"
                 [style.animation-duration.ms]="spec().lifetimeMs" (pointerdown)="shoot($event)" aria-label="Target"></button>
       }
       @if (phase() === 'done') { <div class="gx-center"><div class="gx-label">Finished</div><div class="gx-hint">Checking your result…</div></div> }
@@ -104,9 +104,16 @@ export class AimChallengeGame implements OnInit, OnDestroy {
     this.finished.emit({ actions: { targets: this.shots() }, clientElapsedMs: Math.round(performance.now() - start) });
   }
 
+  /** Keeps a target fully inside the arena, whatever the screen size. */
+  protected edge(pct: number, size: number) {
+    const r = size / 2 + 6;
+    return `clamp(${r}px, ${pct}%, calc(100% - ${r}px))`;
+  }
+
   private pos(t: Target) {
     const box = this.arena().nativeElement.getBoundingClientRect();
-    return { x: (t.x / 100) * box.width, y: (t.y / 100) * box.height };
+    const r = (t.size + 12) / 2 + 6;
+    return { x: Math.min(box.width - r, Math.max(r, (t.x / 100) * box.width)), y: Math.min(box.height - r, Math.max(r, (t.y / 100) * box.height)) };
   }
 
   private onMiss(t: Target) {

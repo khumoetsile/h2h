@@ -42,7 +42,7 @@ const rank = (ms: number) => (ms < 230 ? { label: 'Lightning', cls: 'gx-good', q
           </div>
         }
         @case ('target') {
-          <button class="orb" [style.left.%]="current().x" [style.top.%]="current().y" [style.width.px]="current().size + 14" [style.height.px]="current().size + 14"
+          <button class="orb" [style.left]="edge(current().x, current().size + 14)" [style.top]="edge(current().y, current().size + 14)" [style.width.px]="current().size + 14" [style.height.px]="current().size + 14"
                   (pointerdown)="hit($event)" aria-label="Tap now"></button>
         }
         @case ('feedback') {
@@ -131,12 +131,19 @@ export class ReactionRushGame implements OnInit, OnDestroy {
     this.finished.emit({ actions: { rounds: this.results() }, clientElapsedMs: Math.round(performance.now() - this.startedAt) });
   }
 
+  /** Keeps the circle fully inside the arena, whatever the screen size. */
+  protected edge(pct: number, size: number) {
+    const r = size / 2 + 6;
+    return `clamp(${r}px, ${pct}%, calc(100% - ${r}px))`;
+  }
+
   private showFeedback(r: RoundResult) {
     const host = this.arena().nativeElement;
     const box = host.getBoundingClientRect();
     const round = this.current();
-    const x = (round.x / 100) * box.width;
-    const y = (round.y / 100) * box.height;
+    const rad = (round.size + 14) / 2 + 6;
+    const x = Math.min(box.width - rad, Math.max(rad, (round.x / 100) * box.width));
+    const y = Math.min(box.height - rad, Math.max(rad, (round.y / 100) * box.height));
     if (r.hit && r.reactionMs) {
       const pts = pointsFor(r.reactionMs);
       const k = rank(r.reactionMs);

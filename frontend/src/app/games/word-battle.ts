@@ -36,13 +36,13 @@ const PURPLE = '#a855f7';
           <div class="timebar" [class.low]="timeLeft() <= 5"><i [style.width.%]="pct()"></i></div>
           <div class="seconds" [class.low]="timeLeft() <= 5">{{ timeLeft() }}</div>
 
-          <div class="slots" #slotsEl>
+          <div class="slots" [style.--n]="current().length">
             @for (s of slots(); track $index) {
               <button class="slot" [class.filled]="s !== ''" [class.locked]="phase() !== 'input'" [disabled]="phase() !== 'input' || s === ''" (pointerdown)="removeAt($index)">{{ s }}</button>
             }
           </div>
 
-          <div class="pool">
+          <div class="pool" [style.--n]="current().length">
             @for (i of order(); track i) {
               <button class="lt" [class.used]="picked().includes(i)" [disabled]="phase() !== 'input' || picked().includes(i)" (pointerdown)="pick(i)">{{ letters()[i] }}</button>
             }
@@ -69,14 +69,14 @@ const PURPLE = '#a855f7';
     .timebar.low i { background: var(--loss); }
     .seconds { font-family: var(--font-display); font-size: 30px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--text-2); }
     .seconds.low { color: var(--loss); }
-    .slots { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; min-height: 58px; }
-    .slot { width: 46px; height: 56px; border-radius: 10px; border: 2px dashed var(--border-strong); background: transparent; color: var(--text);
+    .slots { display: flex; gap: 6px; justify-content: center; flex-wrap: nowrap; min-height: 58px; }
+    .slot { width: min(46px, calc((min(100vw - 64px, 420px) - (var(--n) - 1) * 6px) / var(--n))); height: 56px; border-radius: 10px; border: 2px dashed var(--border-strong); background: transparent; color: var(--text);
       font-family: var(--font-display); font-size: 30px; font-weight: 700; padding: 0; touch-action: manipulation; cursor: pointer; }
     .slot.filled { border-style: solid; border-color: #a855f7; background: rgba(168, 85, 247, .18); animation: put .14s ease-out; }
     .slot.locked { opacity: .8; }
     @keyframes put { from { transform: scale(.8); } to { transform: scale(1); } }
-    .pool { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; max-width: 420px; }
-    .lt { width: 52px; height: 60px; border-radius: 10px; border: 1px solid #7c3aed; background: linear-gradient(180deg, #8b5cf6, #6d28d9); color: #fff;
+    .pool { display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap; max-width: 420px; }
+    .lt { width: min(52px, calc((min(100vw - 64px, 420px) - (var(--n) - 1) * 8px) / var(--n))); height: 60px; border-radius: 10px; border: 1px solid #7c3aed; background: linear-gradient(180deg, #8b5cf6, #6d28d9); color: #fff;
       font-family: var(--font-display); font-size: 30px; font-weight: 700; padding: 0; cursor: pointer; touch-action: manipulation; box-shadow: 0 3px 0 #4c1d95; transition: transform .06s, opacity .15s; }
     .lt:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #4c1d95; }
     .lt.used { opacity: .18; box-shadow: none; }
