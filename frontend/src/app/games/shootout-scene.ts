@@ -363,13 +363,13 @@ export class ShootoutScene implements OnDestroy {
     const kscale = sideDive ? 1 : (kHigh ? 1.04 : 0.84);
     // A perfect top-corner strike is unsavable even when he guessed the spot: he gets there late and just short, hands grasping at air.
     const beaten = k.outcome === 'GOAL' && k.keeperZone === k.zone;
-    const reach = beaten ? 0.5 : 1;
+    const reach = beaten ? 0.28 : 1;
     this.fx(this.keeper().nativeElement, [
       { transform: 'translate(0px,0px) rotate(0deg) scale(1)' },
-      { transform: `translate(${dir * (COL_W * 0.92) * reach}px,${beaten ? kdy * 0.4 : kdy}px) rotate(${rot * (beaten ? 0.7 : 1)}deg) scale(${beaten ? 1 : kscale})` },
+      { transform: `translate(${dir * (COL_W * 0.92) * reach}px,${beaten ? kdy * 0.4 : kdy}px) rotate(${rot * (beaten ? 0.45 : 1)}deg) scale(${beaten ? 1 : kscale})` },
     ], { duration: (beaten ? 620 : 460) * s, delay: keeperDelay + (beaten ? 140 * s : 0), easing: 'cubic-bezier(.15,.75,.3,1)' });
-    this.fx(this.armL().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${kHigh ? 170 : sideDive ? 120 : 60}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
-    this.fx(this.armR().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${kHigh ? -170 : sideDive ? -120 : -60}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
+    this.fx(this.armL().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${beaten ? 105 : kHigh ? 170 : sideDive ? 120 : 60}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
+    this.fx(this.armR().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${beaten ? -105 : kHigh ? -170 : sideDive ? -120 : -60}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
 
     // Camera leans in on the strike.
     this.fx(this.cam().nativeElement, [
