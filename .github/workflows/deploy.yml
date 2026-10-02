@@ -55,9 +55,12 @@ jobs:
           ACTIVATE: ${{ vars.CPANEL_NODE_ACTIVATE }}
         run: |
           install -m 700 -d ~/.ssh
-          echo "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          printf '%s
+' "$SSH_KEY" | tr -d '' > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          # Fails fast if the key is malformed or protected by a passphrase (CI can't type one).
+          ssh-keygen -y -P "" -f ~/.ssh/id_deploy > /dev/null             || { echo "::error::CPANEL_SSH_KEY is unreadable: it must be a passphrase-less private key in OpenSSH/PEM format"; exit 1; }
           ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
-          SSH="ssh -i ~/.ssh/id_deploy -p $SSH_PORT"
+          SSH="ssh -i ~/.ssh/id_deploy -p $SSH_PORT -o IdentitiesOnly=yes -o BatchMode=yes"
           # node_modules is a cPanel-managed symlink; .env and logs live only on the server.
           rsync -az --delete -e "$SSH"             --exclude '.env' --exclude 'node_modules' --exclude 'tmp/'             --exclude '.htaccess' --exclude 'stderr.log'             bundle/ "$SSH_USER@$SSH_HOST:$APP_DIR/"
           $SSH "$SSH_USER@$SSH_HOST" "set -e; source $ACTIVATE; cd $APP_DIR; npm ci --omit=dev; mkdir -p tmp; touch tmp/restart.txt"
