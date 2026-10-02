@@ -38,6 +38,8 @@ export class GameAudio extends ShootoutAudio {
   }
   /** Tapping a tile or a key. */
   tap(i = 0) { this.blip(420 + (i % 7) * 70, 420 + (i % 7) * 70, 0.07, 'sine', 0.14); }
+  /** A musical note, for games where each tile has its own sound. */
+  note(freq: number, dur = 0.22) { this.blip(freq, freq, dur, 'triangle', 0.22); }
 }
 
 const reduced = () => typeof window !== 'undefined' && !!window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;

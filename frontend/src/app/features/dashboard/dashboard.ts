@@ -10,6 +10,7 @@ import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { apiError } from '../../core/api-error';
+import { isLiveGame } from '../../core/featured';
 import { MAIN_GAME, QuickPlay } from '../../core/quick-play';
 import { AdSlot } from '../../shared/ad-slot';
 import { GetApp } from '../../shared/get-app';
@@ -51,6 +52,8 @@ export class DashboardPage implements OnInit {
 
   protected data = signal<Dashboard | null>(null);
   protected main = computed(() => this.data()?.games.find((g) => g.slug === MAIN_GAME) ?? null);
+  protected others = computed(() => (this.data()?.games ?? []).filter((g) => g.slug !== MAIN_GAME && isLiveGame(g.slug)));
+  protected playingSlug = signal<string | null>(null);
   protected heroBusy = signal<'play' | 'invite' | null>(null);
   protected heroError = signal('');
   protected error = signal('');
@@ -98,6 +101,12 @@ export class DashboardPage implements OnInit {
   }
 
   protected async playNow() { await this.hero('play', () => this.quick.playNow()); }
+  /** One tap on a game card: straight into a match of that game. */
+  protected async playGame(slug: string) {
+    this.playingSlug.set(slug);
+    this.heroError.set('');
+    try { await this.quick.playNow(slug); } catch (err) { this.heroError.set(apiError(err).message); this.playingSlug.set(null); }
+  }
   protected async inviteFriend() { await this.hero('invite', () => this.quick.inviteFriend()); }
 
   private async hero(kind: 'play' | 'invite', run: () => Promise<void>) {
