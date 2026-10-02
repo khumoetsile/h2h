@@ -4,6 +4,7 @@ import { Subject } from 'rxjs';
 import { io, Socket } from 'socket.io-client';
 import { AuthService } from './auth.service';
 import { AppNotification, MatchView, Wallet } from './models';
+import type { ShootoutState } from '../games/shootout.model';
 import { Toast } from './toast.service';
 import { ConfigStore } from './config.store';
 
@@ -39,6 +40,8 @@ export class RealtimeService {
   private showRestored = signal(false);
 
   readonly match$ = new Subject<MatchView>();
+  /** Live penalty shootout: this player's view after every kick or choice. */
+  readonly shootout$ = new Subject<ShootoutState>();
   readonly notification$ = new Subject<AppNotification>();
   readonly challenge$ = new Subject<{ id: number }>();
   readonly queue$ = new Subject<Record<string, { total: number; byStake: Record<string, number> }>>();
@@ -114,6 +117,7 @@ export class RealtimeService {
       if (!onFocusedScreen && !(n.link && this.router.url.startsWith(n.link))) this.toast.info(`${n.title}: ${n.message}`);
     });
     s.on('match:update', (m: MatchView) => this.match$.next(m));
+    s.on('shootout:state', (st: ShootoutState) => this.shootout$.next(st));
     s.on('challenge:update', (c: { id: number }) => this.challenge$.next(c));
     s.on('queue:update', (q: Record<string, { total: number; byStake: Record<string, number> }>) => this.queue$.next(q));
     s.on('leaderboard:update', () => this.leaderboard$.next());

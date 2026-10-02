@@ -4,6 +4,11 @@ import { clamp, createRng, gauss, isNum } from './rng.js';
 // shoot. The keeper visibly leans one way; where they actually dive is decided
 // by the seed and kept on the server. The ball position is computed on the
 // server from the reported stop time, so a client can't just claim "goal".
+// The match service plays this game live (see liveShootout.js and
+// services/liveShootoutService.js). The functions below are the original
+// solo-submission engine, still used to build demo history in the seed data.
+export const live = true;
+
 const SHOTS = 5;
 const MAX_SHOT_MS = 6000;
 // A full left-right-left sweep takes 1.7 to 2.7 s, slow enough to aim on a phone.

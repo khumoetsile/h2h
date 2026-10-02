@@ -23,9 +23,9 @@ const GAMES = [
     how: 'Wait for the target to appear, then tap it as fast as you can. The quicker you react, the more points you score. Tap too early or miss and you score nothing for that round. After 10 rounds, whoever scored the most wins.',
   },
   {
-    slug: 'penalty-shootout', name: 'Penalty Shootout', tagline: 'Score more goals than your opponent.', accent: '#10B981', duration: 40,
-    description: 'Take 5 penalty shots. Time it right to beat the keeper and score more goals than your opponent.',
-    how: 'Watch the marker slide across the goal and tap to shoot. The keeper often dives the way they\'re leaning, so aim the other way. Score in the corners for extra points. After 5 shots each, most goals wins.',
+    slug: 'penalty-shootout', name: 'Penalty Shootout', tagline: 'Take turns shooting and keeping goal.', accent: '#10B981', duration: 120,
+    description: 'A live penalty shootout against another player. Five kicks each, one at a time. When you shoot, your opponent dives. When they shoot, you dive.',
+    how: 'Every kick, you both choose in secret. Shooting: pick a corner, then stop the timing bar in the green. High corners need a tight stop and low shots are more forgiving, and a perfect strike at a high corner cannot be saved. Keeping goal: pick the side you think they will shoot at. Five kicks each, then sudden death if it is level.',
   },
   {
     slug: 'word-battle', name: 'Word Battle', tagline: 'Think faster than your opponent.', accent: '#A855F7', duration: 90,

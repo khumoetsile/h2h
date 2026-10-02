@@ -24,7 +24,7 @@ import {
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js';
 import { matchCode, randomSeed } from '../utils/ids.js';
 import { computePrize, formatMoney, toCents } from '../utils/money.js';
-import { getEngine } from '../games/index.js';
+import { getEngine, liveSlugs } from '../games/index.js';
 import { createRng } from '../games/rng.js';
 import { getSettings } from './settingsService.js';
 import { notify } from './notificationService.js';
@@ -321,7 +321,7 @@ async function lockMatchForPlayer(tx, userId, matchIdOrCode) {
   return { m, players, me, opp: players.find((p) => p.user_id !== userId) || null };
 }
 
-function assertNotFinished(m) {
+export function assertNotFinished(m) {
   if (m.status === 'COMPLETED') throw conflict('MATCH_COMPLETED', 'This match is already completed.');
   if (m.status === 'CANCELLED') throw conflict('MATCH_CANCELLED', `This match was cancelled${m.cancel_reason ? `: ${m.cancel_reason}` : ''}.`);
   if (m.status === 'VOID') throw conflict('MATCH_VOID', `This challenge could not be fairly completed${m.cancel_reason ? `: ${m.cancel_reason}` : ''}. Your entry was refunded.`);
@@ -366,6 +366,7 @@ export async function startMatch(userId, matchIdOrCode) {
     const deadline = await myDeadline(tx, m, me);
     if (isPast(deadline)) throw conflict('MATCH_TIMED_OUT', 'Your time to play this match has run out.');
     const engine = getEngine(m.game_slug);
+    if (engine.live) throw conflict('LIVE_GAME', 'This game is played live. Open the match to join the shootout.');
     const startedAt = me.started_at || new Date();
     if (!me.started_at) {
       await tx.q('UPDATE match_players SET started_at = ? WHERE id = ?', [startedAt, me.id]);
@@ -420,6 +421,7 @@ export async function submitResult(userId, matchIdOrCode, body) {
     assertNotFinished(m);
     if (m.status !== 'IN_PROGRESS' || !me.started_at) throw conflict('MATCH_NOT_STARTED', 'You have not started this match yet.');
     if (me.submitted_at) throw conflict('ALREADY_SUBMITTED', 'Your result has already been recorded.');
+    if (getEngine(m.game_slug).live) throw conflict('LIVE_GAME', 'This game is played live; results are recorded as you play.');
     const serverElapsed = Math.max(0, Date.now() - new Date(me.started_at).getTime());
     // The deadline is the stored one — whatever the client's clock says or
     // claims about elapsed time is irrelevant here.
@@ -491,7 +493,7 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
     const rb = byUser[b.user_id];
     const cmp = (ra.score - rb.score) || (ra.tiebreak - rb.tiebreak);
     if (cmp > 0) winner = a; else if (cmp < 0) winner = b;
-    resultReason = winner ? (ra.score === rb.score ? 'Won on tiebreak' : 'Higher score') : 'Exact tie, stakes refunded';
+    resultReason = reason || (winner ? (ra.score === rb.score ? 'Won on tiebreak' : 'Higher score') : 'Exact tie, stakes refunded');
   }
   // Duplicate-settlement guard.
   const upd = await tx.q(
@@ -749,9 +751,9 @@ export async function sweepMatches(now = new Date()) {
 
   // 3. Skill-game completion timer and player-action timer.
   const games = await query(
-    `SELECT id FROM matches WHERE category = 'SKILL_GAME' AND status IN ('READY','IN_PROGRESS')
-       AND (completion_deadline <= ? OR player_action_deadline <= ?) LIMIT 200`,
-    [now, now],
+    `SELECT m.id FROM matches m JOIN games g ON g.id = m.game_id WHERE m.category = 'SKILL_GAME' AND m.status IN ('READY','IN_PROGRESS')
+       AND g.slug NOT IN (?) AND (m.completion_deadline <= ? OR m.player_action_deadline <= ?) LIMIT 200`,
+    [liveSlugs.length ? liveSlugs : [''], now, now],
   );
   for (const { id } of games) {
     await run(id, async (tx, m) => {
@@ -855,6 +857,7 @@ export async function compensateDowntime({ now = new Date(), thresholdMs = 30000
   await query(`UPDATE matches SET lock_in_deadline = lock_in_deadline + INTERVAL ? SECOND WHERE status = 'MATCHED' AND lock_in_deadline > ?`, [gap, since]);
   await query(`UPDATE matches SET player_action_deadline = player_action_deadline + INTERVAL ? SECOND WHERE status IN ('MATCHED','READY','IN_PROGRESS') AND player_action_deadline > ?`, [gap, since]);
   await query(`UPDATE matches SET completion_deadline = completion_deadline + INTERVAL ? SECOND WHERE category = 'SKILL_GAME' AND status IN ('READY','IN_PROGRESS') AND completion_deadline > ?`, [gap, since]);
+  await query(`UPDATE shootout_rounds SET starts_at = starts_at + INTERVAL ? SECOND, deadline = deadline + INTERVAL ? SECOND WHERE resolved_at IS NULL AND deadline > ?`, [gap, gap, since]);
   await query(`UPDATE match_players mp JOIN matches m ON m.id = mp.match_id SET mp.reconnect_deadline = mp.reconnect_deadline + INTERVAL ? SECOND
                WHERE m.status IN ('MATCHED','READY','IN_PROGRESS') AND mp.reconnect_deadline > ?`, [gap, since]);
   await query(`UPDATE challenges SET expires_at = expires_at + INTERVAL ? SECOND WHERE status = 'PENDING' AND expires_at > ?`, [gap, since]);

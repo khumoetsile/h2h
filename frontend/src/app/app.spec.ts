@@ -2,7 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
 import { App } from './app';
 import { formatMoney } from './core/format';
-import { markerAt } from './games/penalty-shootout';
+import { markerAt } from './games/shootout.model';
 
 describe('App', () => {
   it('creates the root component', async () => {

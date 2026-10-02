@@ -38,6 +38,14 @@ export class ServerClock {
     return this.anchorServerMs + (performance.now() - this.anchorPerf);
   }
 
+  /** Server time right now, to the millisecond (not just the once-a-second signal). For timing-sensitive play. */
+  precise() { return this.read(); }
+
+  /** Server time at a given performance.now()-style timestamp, e.g. an input event's timeStamp. */
+  preciseAt(perfTimestamp: number) {
+    return this.anchorServerMs + (perfTimestamp - this.anchorPerf);
+  }
+
   /** Estimate the offset from a round trip to /api/time (midpoint method). */
   async sync(force = false) {
     this.lastSync = performance.now();

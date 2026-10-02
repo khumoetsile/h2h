@@ -11,7 +11,7 @@ import { ReactionRushGame } from '../../games/reaction-rush';
 import { AimChallengeGame } from '../../games/aim-challenge';
 import { MemoryBattleGame } from '../../games/memory-battle';
 import { WordBattleGame } from '../../games/word-battle';
-import { PenaltyShootoutGame } from '../../games/penalty-shootout';
+import { LiveShootoutGame } from '../../games/live-shootout';
 import { GameIcon, Spinner } from '../../shared/ui';
 import { Countdown } from '../../shared/countdown';
 
@@ -29,7 +29,7 @@ const MAX_AUTO_RETRIES = 3;
 @Component({
   selector: 'app-match-play',
   imports: [MatIconModule, MatProgressSpinnerModule, GameIcon, Spinner, Countdown,
-    ReactionRushGame, AimChallengeGame, MemoryBattleGame, WordBattleGame, PenaltyShootoutGame],
+    ReactionRushGame, AimChallengeGame, MemoryBattleGame, WordBattleGame, LiveShootoutGame],
   template: `
     <div class="play-screen">
       @if (error()) {
@@ -48,7 +48,7 @@ const MAX_AUTO_RETRIES = 3;
             <strong>{{ match()?.game?.name }}</strong>
             <div class="muted tiny">vs {{ opponentName() }}</div>
           </div>
-          <app-countdown [deadline]="start()!.deadline" [urgentUnder]="60" [attr.title]="'Time left to finish'" />
+          @if (!isLive()) { <app-countdown [deadline]="start()!.deadline" [urgentUnder]="60" [attr.title]="'Time left to finish'" /> }
           <app-game-icon [slug]="start()!.game" [color]="match()?.game?.accentColor ?? '#22D3EE'" [size]="32" />
         </div>
 
@@ -73,7 +73,7 @@ const MAX_AUTO_RETRIES = 3;
             @case ('aim-challenge') { @defer (on immediate) { <app-aim-challenge [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
             @case ('memory-battle') { @defer (on immediate) { <app-memory-battle [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
             @case ('word-battle') { @defer (on immediate) { <app-word-battle [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
-            @case ('penalty-shootout') { @defer (on immediate) { <app-penalty-shootout [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
+            @case ('penalty-shootout') { @defer (on immediate) { <app-live-shootout [code]="code()" (finished)="goToResult()" /> } @placeholder { <app-spinner /> } }
           }
         }
       }
@@ -106,6 +106,9 @@ export class MatchPlayPage implements OnInit {
   protected retryAttempt = signal(0);
   private pending: GameFinish | null = null;
 
+  /** Live games (the penalty shootout) are played through the live endpoints, not start/submit. */
+  protected isLive = () => this.start()?.game === 'penalty-shootout';
+
   protected opponentName = () => this.match()?.players.find((p) => p.userId !== this.match()?.viewerId)?.username ?? '';
 
   async ngOnInit() {
@@ -113,12 +116,14 @@ export class MatchPlayPage implements OnInit {
     // when we land here — clear it so the game gets a completely clean start.
     this.toast.dismiss();
     try {
-      const [start, view] = await Promise.all([
-        this.api.post<StartResponse>(`/matches/${this.code()}/start`),
-        this.api.get<{ match: MatchView }>(`/matches/${this.code()}`),
-      ]);
+      const view = await this.api.get<{ match: MatchView }>(`/matches/${this.code()}`);
       this.match.set(view.match);
-      this.start.set(start);
+      if (view.match.game.slug === 'penalty-shootout') {
+        // Live game: nothing to start here; the shootout screen joins the pitch itself.
+        this.start.set({ matchId: view.match.id, code: view.match.code, game: 'penalty-shootout', spec: null, startedAt: '', deadline: '', resumed: false });
+      } else {
+        this.start.set(await this.api.post<StartResponse>(`/matches/${this.code()}/start`));
+      }
     } catch (err) {
       const e = apiError(err);
       if (e.code === 'ALREADY_SUBMITTED' || e.code === 'MATCH_COMPLETED') {
@@ -131,8 +136,13 @@ export class MatchPlayPage implements OnInit {
 
   exit() { this.router.navigate(['/match', this.code()], { replaceUrl: true }); }
 
+  goToResult() { this.router.navigate(['/match', this.code(), 'result'], { replaceUrl: true }); }
+
   confirmExit() {
-    if (confirm("Leave this game screen? The timer keeps running, and if you don't finish before it runs out, you forfeit.")) this.exit();
+    const msg = this.isLive()
+      ? "Leave the pitch? The shootout carries on without you: your kicks are decided for you, and you forfeit if you miss two in a row."
+      : "Leave this game screen? The timer keeps running, and if you don't finish before it runs out, you forfeit.";
+    if (confirm(msg)) this.exit();
   }
 
   async submit(result: GameFinish, isRetry = false) {

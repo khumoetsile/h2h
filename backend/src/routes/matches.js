@@ -3,8 +3,9 @@ import { z } from 'zod';
 import { ah } from '../utils/errors.js';
 import { validate } from '../middleware/validate.js';
 import { requirePlayer } from '../middleware/auth.js';
-import { createMatchSchema, resultSchema } from './schemas.js';
+import { createMatchSchema, diveSchema, kickSchema, resultSchema } from './schemas.js';
 import * as svc from '../services/matchService.js';
+import * as live from '../services/liveShootoutService.js';
 
 const router = Router();
 const view = (req, id) => svc.getMatchView(id, req.user.id);
@@ -57,6 +58,12 @@ router.post('/:id/result', validate(resultSchema), ah(async (req, res) => {
   const r = await svc.submitResult(req.user.id, req.params.id, req.body);
   res.json({ result: r, match: await view(req, r.matchId) });
 }));
+
+// Live games (penalty shootout): join the pitch, read the state, and send your choice for the open kick.
+router.get('/:id/live', ah(async (req, res) => res.json({ state: await live.getLiveState(req.user.id, req.params.id) })));
+router.post('/:id/live/join', requirePlayer, ah(async (req, res) => res.json({ state: await live.joinLive(req.user.id, req.params.id) })));
+router.post('/:id/live/kick', requirePlayer, validate(kickSchema), ah(async (req, res) => res.json({ state: await live.submitKick(req.user.id, req.params.id, req.body) })));
+router.post('/:id/live/dive', requirePlayer, validate(diveSchema), ah(async (req, res) => res.json({ state: await live.submitDive(req.user.id, req.params.id, req.body) })));
 
 router.post('/:id/cancel', ah(async (req, res) => {
   const id = await svc.cancelMatch(req.user.id, req.params.id);

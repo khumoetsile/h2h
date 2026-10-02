@@ -8,6 +8,7 @@ import { isUserOnline, setIo } from './realtime.js';
 import { authenticateToken } from './middleware/auth.js';
 import { compensateDowntime, heartbeat, markPresence, sweepMatches } from './services/matchService.js';
 import { expireChallenges } from './services/challengeService.js';
+import { sweepLiveShootouts } from './services/liveShootoutService.js';
 import { startFootballSync } from './football/footballSyncService.js';
 
 export function createServer() {
@@ -59,6 +60,7 @@ export function startSweeper() {
       }
       await expireChallenges();
       await sweepMatches();
+      await sweepLiveShootouts();
       await heartbeat();
     } catch (err) {
       console.error('Sweeper error', err);

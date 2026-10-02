@@ -13,6 +13,9 @@ export const engines = {
   'penalty-shootout': penaltyShootout,
 };
 
+/** Games played live (both players at once) rather than by submitting a score each. */
+export const liveSlugs = Object.keys(engines).filter((slug) => engines[slug].live);
+
 export function getEngine(slug) {
   const e = engines[slug];
   if (!e) throw new Error(`No engine for game ${slug}`);

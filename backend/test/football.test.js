@@ -242,7 +242,7 @@ describe('football: cancellation and void (no fee, full refund)', () => {
   test('fixture abandoned mid-match -> VOID, full refund, no fee', async () => {
     const A = await newPlayer('abnA');
     const B = await newPlayer('abnB');
-    const fixtureId = await makeFixture({ status: 'SCHEDULED', kickoffMs: 1000 });
+    const fixtureId = await makeFixture({ status: 'SCHEDULED', kickoffMs: 10000 });
     const created = await api().post('/api/football/challenges').set(auth(A.token)).send({ opponent: B.user.username, fixtureId, challengeTypeSlug: 'match_winner', pick: 'HOME', stake: 50 });
     const match = await api().post(`/api/challenges/${created.body.challenge.id}/accept`).set(auth(B.token)).send({ pick: 'AWAY' });
     await query(`UPDATE matches SET status = 'IN_PROGRESS', started_at = NOW() WHERE id = ?`, [match.body.match.id]);

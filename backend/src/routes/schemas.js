@@ -57,6 +57,15 @@ export const createMatchSchema = z.object({
   stake: money,
 });
 
+export const kickSchema = z.object({
+  zone: z.number().int().min(0).max(5),
+  stopMs: z.number().min(0).max(60000),
+});
+
+export const diveSchema = z.object({
+  col: z.number().int().min(0).max(2),
+});
+
 export const resultSchema = z.object({
   actions: z.record(z.string(), z.unknown()),
   clientElapsedMs: z.number().nonnegative().optional(),
