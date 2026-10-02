@@ -4,6 +4,7 @@
 // joinLockedMatch) — a football head-to-head is a normal Head2Head match
 // underneath, just one whose outcome the system decides from a football
 // fixture instead of gameplay input.
+import { config } from '../config.js';
 import { query, withTransaction } from '../db.js';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js';
 import { formatMoney, toCents } from '../utils/money.js';
@@ -68,6 +69,8 @@ const FIXTURE_SELECT = `
 
 export async function listFixtures({ competitionId, status } = {}) {
   const where = ['comp.is_enabled = 1'];
+  // Once a real data provider is connected, fixtures left over from the simulated one (seed data) must not be offered as real games.
+  if (config.football.provider !== 'mock') where.push('fx.is_simulated = 0');
   const params = [];
   if (competitionId) { where.push('fx.competition_id = ?'); params.push(competitionId); }
   if (status === 'live') where.push(`fx.status = 'LIVE'`);
