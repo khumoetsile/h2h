@@ -54,7 +54,7 @@ const ICONS: Record<string, string> = {
   styles: [`
     .ic { width: 36px; height: 36px; border-radius: 8px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; color: var(--text-2); flex-shrink: 0; }
     .grow { flex: 1; min-width: 0; } .t { font-weight: 600; }
-    .unread { background: rgba(200,255,61,.035); .ic { color: var(--accent); background: var(--accent-soft); } }
+    .unread { background: rgba(245,112,31,.05); .ic { color: var(--accent); background: var(--accent-soft); } }
     .list-item { align-items: flex-start; }
   `],
 })

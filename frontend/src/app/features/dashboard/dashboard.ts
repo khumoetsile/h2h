@@ -1,11 +1,11 @@
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { merge, interval } from 'rxjs';
 import { Api } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
-import { Challenge, Game, MatchSummary, UserStats, Wallet } from '../../core/models';
+import { Challenge, FootballFixture, Game, MatchSummary, UserStats, Wallet } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
@@ -22,10 +22,9 @@ interface Dashboard {
 }
 
 /**
- * Home screen. Deliberately shows only what an ordinary player needs right
- * now — balance, one big "Play now" action, anything waiting for a response,
- * and a taste of games/recent activity. Deep stats live on the Profile page,
- * not here — this screen is not a dashboard.
+ * Home screen. Shows what a player needs right now: anything mid-game or
+ * waiting for a response, the next football fixtures (the main way to play),
+ * a few skill games and recent results. Deep stats live on the Profile page.
  */
 @Component({
   selector: 'app-dashboard',
@@ -44,8 +43,20 @@ export class DashboardPage implements OnInit {
   protected data = signal<Dashboard | null>(null);
   protected error = signal('');
   protected busy = signal<number | null>(null);
-  /** Players currently waiting for a football opponent — shown on the Football card. */
+  /** Players currently waiting for a football opponent. */
   protected openCount = signal(0);
+  protected fixtures = signal<FootballFixture[] | null>(null);
+  protected fixturesError = signal(false);
+
+  /** Live matches first, then the soonest kickoffs that can still be challenged. */
+  protected upcoming = computed(() => {
+    const now = Date.now();
+    return (this.fixtures() ?? [])
+      .filter((f) => f.status === 'LIVE' || (f.status === 'SCHEDULED' && new Date(f.kickoffAt).getTime() > now))
+      .sort((a, b) => (a.status === 'LIVE' ? 0 : 1) - (b.status === 'LIVE' ? 0 : 1) || new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime())
+      .slice(0, 6);
+  });
+  protected anySimulated = computed(() => this.upcoming().some((f) => f.isSimulated));
 
   protected incomingChallenges() {
     return (this.data()?.activeChallenges ?? []).filter((c) => c.direction === 'INCOMING');
@@ -63,12 +74,26 @@ export class DashboardPage implements OnInit {
     try {
       const d = await this.api.get<Dashboard>('/dashboard');
       this.api.get<{ challenges: unknown[] }>('/football/open-challenges').then((r) => this.openCount.set(r.challenges.length)).catch(() => {});
+      this.api.get<{ fixtures: FootballFixture[] }>('/football/fixtures')
+        .then((r) => { this.fixtures.set(r.fixtures); this.fixturesError.set(false); })
+        .catch(() => { if (!this.fixtures()) this.fixturesError.set(true); });
       this.data.set(d);
       this.auth.wallet.set(d.wallet);
     } catch (err) {
       if (!silent || !this.data()) this.error.set("We couldn't load your home screen. Please try again.");
       void err;
     }
+  }
+
+  /** "Today 18:30", "Tomorrow 15:00" or "Sat 20:00", in the player's local time. */
+  kickoff(f: FootballFixture) {
+    const d = new Date(f.kickoffAt);
+    const time = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
+    const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+    const days = Math.floor((d.getTime() - startToday.getTime()) / 86400000);
+    if (days <= 0) return `Today ${time}`;
+    if (days === 1) return `Tomorrow ${time}`;
+    return `${d.toLocaleDateString([], { weekday: 'short' })} ${time}`;
   }
 
   greeting() {

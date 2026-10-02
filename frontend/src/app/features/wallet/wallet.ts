@@ -57,11 +57,11 @@ import { TxTable } from './tx-table';
     .balances { display: grid; gap: 16px; grid-template-columns: 1fr; }
     @media (min-width: 900px) { .balances { grid-template-columns: 1.4fr 1fr 1fr; } }
     .bal { display: flex; flex-direction: column; gap: 6px; }
-    .main { border-color: rgba(255,176,32,.28); background: linear-gradient(160deg, rgba(255,176,32,.06), transparent 55%), var(--surface); }
-    .lbl { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+    .main { border-color: rgba(217,180,74,.35); background: var(--surface); }
+    .lbl { color: var(--muted); font-size: 12px; font-weight: 600; }
     .amt { font-family: var(--font-display); font-size: 40px; font-weight: 700; }
     .amt.sm { font-size: 28px; }
-    .suffix { font-size: 13px; color: var(--demo); margin-left: 8px; letter-spacing: .08em; vertical-align: middle; }
+    .suffix { font-size: 13px; color: var(--demo); margin-left: 8px; vertical-align: middle; }
     .acts { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
   `],
 })

@@ -2,30 +2,23 @@
 @media (min-width: 960px) { :host { grid-template-columns: 1.05fr 1fr; } }
 .brand-side {
   display: none; position: relative; overflow: hidden; padding: 48px; border-right: 1px solid var(--border);
-  background:
-    radial-gradient(700px 400px at 10% 0%, rgba(200, 255, 61, .07), transparent 60%),
-    linear-gradient(180deg, var(--bg-elev), var(--bg));
+  background: var(--bg-elev);
   flex-direction: column; justify-content: space-between;
 }
 @media (min-width: 960px) { .brand-side { display: flex; } }
-.brand-side .logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 22px; }
-.brand-side h1 { font-size: 44px; line-height: 1.05; max-width: 480px; margin-top: 12px; }
-.brand-side .lead { color: var(--text-2); max-width: 440px; margin-top: 16px; font-size: 16px; }
-.flow { display: flex; flex-direction: column; gap: 14px; margin-top: 36px; max-width: 420px; }
-.flow-step { display: flex; gap: 14px; align-items: flex-start;
-  .n { width: 28px; height: 28px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border-strong); display: flex; align-items: center; justify-content: center; font-weight: 700; font-family: var(--font-display); font-size: 13px; flex-shrink: 0; }
-  strong { display: block; font-size: 14px; } span { color: var(--muted); font-size: 13px; }
-}
+.brand-side .logo { display: flex; align-items: center; gap: 10px; font-family: var(--font-display); font-weight: 700; font-size: 28px; }
+.brand-side h1 { font-size: 56px; line-height: 1; max-width: 480px; }
+.brand-side .lead { color: var(--text-2); max-width: 440px; margin-top: 16px; font-size: 18px; line-height: 1.45; }
 .form-side { display: flex; align-items: center; justify-content: center; padding: 32px 16px; }
 .form-card { width: 100%; max-width: 420px; }
-.form-card h2 { font-size: 26px; }
+.form-card h2 { font-size: 32px; }
 .form-card .sub { color: var(--muted); margin: 6px 0 22px; }
-.mobile-logo { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 700; font-size: 20px; margin-bottom: 28px; }
+.mobile-logo { display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 700; font-size: 26px; margin-bottom: 28px; }
 @media (min-width: 960px) { .mobile-logo { display: none; } }
 .remember { display: flex; align-items: center; justify-content: space-between; margin: 4px 0 18px; font-size: 14px; }
 .foot { margin-top: 20px; text-align: center; color: var(--muted); font-size: 14px; }
 .dev-creds {
-  margin-top: 24px; border: 1px dashed var(--border-strong); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; color: var(--text-2);
+  margin-top: 24px; border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; font-size: 14px; color: var(--text-2);
   .row-between { padding: 4px 0; }
   code { color: var(--text); font-size: 12px; }
 }

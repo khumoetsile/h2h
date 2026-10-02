@@ -147,10 +147,10 @@ export class MatchResultPage implements OnInit {
     const m = this.match();
     if (!m) return '';
     switch (this.ds()) {
-      case 'WON': return 'YOU WON 🏆';
-      case 'LOST': return m.endReason === 'ACTION_TIMEOUT' ? 'TIMED OUT' : 'YOU LOST';
-      case 'DRAW': return 'DRAW';
-      case 'VOID': return 'VOID';
+      case 'WON': return 'You won';
+      case 'LOST': return m.endReason === 'ACTION_TIMEOUT' ? 'Timed out' : 'You lost';
+      case 'DRAW': return 'Draw';
+      case 'VOID': return 'Void';
       case 'EXPIRED': return 'Challenge expired';
       case 'TIMED_OUT': return 'Timed out';
       case 'LEFT': return 'You left the challenge';

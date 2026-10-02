@@ -99,15 +99,15 @@ interface Stats {
     </div>
   `,
   styles: [`
-    .grp { margin: 20px 0 10px; font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: .08em; display: flex; align-items: center; gap: 8px; }
+    .grp { margin: 20px 0 10px; font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
     .grp:first-of-type { margin-top: 0; }
     .kpi .value { font-size: 24px; }
-    .fees { border-color: rgba(200,255,61,.25); }
+    .fees { border-color: rgba(245,112,31,.3); }
     .charts { display: grid; gap: 16px; grid-template-columns: 1fr; margin-top: 20px; }
     @media (min-width: 900px) { .charts { grid-template-columns: 1fr 1fr; } }
     .bars { display: flex; align-items: flex-end; gap: 2px; height: 140px; margin-top: 16px; border-bottom: 1px solid var(--border); }
     .bar-col { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: default; }
-    .bar-col:hover .bar { background: #d6ff6b; }
+    .bar-col:hover .bar { background: #ff8238; }
     .bar { width: 100%; min-height: 2px; background: var(--accent); border-radius: 4px 4px 0 0; transition: height .3s ease; }
     .axis { display: flex; justify-content: space-between; margin-top: 6px; }
     .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 8px; }

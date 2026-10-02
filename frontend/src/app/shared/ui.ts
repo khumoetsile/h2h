@@ -21,8 +21,8 @@ export class DemoBadge {
   selector: 'app-avatar',
   template: `<span class="av" [style.background]="color()" [style.width.px]="size()" [style.height.px]="size()" [style.font-size.px]="size() * 0.38">{{ text() }}</span>`,
   styles: [`
-    .av { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #0a0d13; font-weight: 700;
-      font-family: var(--font-display); flex-shrink: 0; letter-spacing: .02em; }
+    .av { display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; color: #14100c; font-weight: 700;
+      font-family: var(--font-display); flex-shrink: 0; }
   `],
 })
 export class Avatar {
@@ -162,8 +162,8 @@ export class OutcomeChip {
   imports: [MatIconModule],
   template: `<span class="gi" [style.--c]="color()" [style.width.px]="size()" [style.height.px]="size()"><mat-icon [style.font-size.px]="size() * 0.5" [style.width.px]="size() * 0.5" [style.height.px]="size() * 0.5">{{ icon() }}</mat-icon></span>`,
   styles: [`
-    .gi { display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; flex-shrink: 0;
-      background: color-mix(in srgb, var(--c) 14%, transparent); color: var(--c); border: 1px solid color-mix(in srgb, var(--c) 30%, transparent); }
+    .gi { display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; flex-shrink: 0;
+      background: var(--surface-3); color: var(--text-2); }
   `],
 })
 export class GameIcon {

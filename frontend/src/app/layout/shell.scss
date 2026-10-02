@@ -1,34 +1,34 @@
 :host { display: block; min-height: 100vh; }
 .topbar {
   position: sticky; top: 0; z-index: 50; height: var(--header-h);
-  background: rgba(10, 13, 19, 0.88); backdrop-filter: blur(10px);
+  background: var(--bg);
   border-bottom: 1px solid var(--border);
 }
 .topbar-inner { max-width: 1180px; margin: 0 auto; height: 100%; padding: 0 16px; display: flex; align-items: center; gap: 10px; }
 .logo {
-  display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 700; font-size: 20px; letter-spacing: -.02em;
+  display: flex; align-items: center; gap: 8px; font-family: var(--font-display); font-weight: 700; font-size: 26px;
   .admin-tag { margin-left: 4px; }
 }
 .desktop-nav {
   margin-left: 28px; gap: 4px; align-items: center;
   a {
-    color: var(--muted); font-weight: 600; font-size: 14px; padding: 8px 12px; border-radius: 6px; position: relative; transition: color .15s;
+    color: var(--muted); font-weight: 600; font-size: 16px; padding: 8px 12px; border-radius: 3px; position: relative; transition: color .15s;
     &:hover { color: var(--text); }
     &.active { color: var(--text);
-      &::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: -13px; height: 2px; background: var(--accent); border-radius: 2px; }
+      &::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: -13px; height: 3px; background: var(--accent); }
     }
   }
 }
 @media (min-width: 900px) { .desktop-nav.hide-mobile { display: flex !important; } }
 .wallet-chip {
-  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 6px; border-radius: 6px;
+  display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 12px 0 6px; border-radius: 4px;
   background: var(--surface); border: 1px solid var(--border); transition: border-color .15s;
   &:hover { border-color: var(--border-strong); }
-  .wc-label { background: var(--demo-soft); color: var(--demo); font-size: 10px; font-weight: 800; letter-spacing: .08em; padding: 3px 6px; border-radius: 4px; }
-  .wc-amount { font-weight: 700; font-size: 14px; }
+  .wc-label { background: var(--demo-soft); color: var(--demo); font-size: 11px; font-weight: 700; padding: 3px 6px; border-radius: 3px; }
+  .wc-amount { font-weight: 700; font-size: 16px; }
 }
 .icon-btn {
-  position: relative; width: 38px; height: 38px; border-radius: 8px; border: 0; background: transparent; color: var(--text-2); cursor: pointer;
+  position: relative; width: 38px; height: 38px; border-radius: 4px; border: 0; background: transparent; color: var(--text-2); cursor: pointer;
   display: inline-flex; align-items: center; justify-content: center;
   &:hover { background: var(--surface-2); color: var(--text); }
   .badge {
@@ -43,10 +43,10 @@
 .bottom-nav {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 50;
   height: calc(var(--bottom-nav-h) + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom);
-  display: flex; background: rgba(15, 19, 27, .96); backdrop-filter: blur(10px); border-top: 1px solid var(--border);
+  display: flex; background: var(--bg-elev); border-top: 1px solid var(--border);
   a {
     flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
-    color: var(--muted); font-size: 11px; font-weight: 600;
+    color: var(--muted); font-size: 12px; font-weight: 600;
     mat-icon { font-size: 22px; width: 22px; height: 22px; }
     &.active { color: var(--accent); mat-icon { font-variation-settings: 'FILL' 1; } }
   }
@@ -74,7 +74,7 @@
 .topbar-inner > .logo { flex-shrink: 1; min-width: 0; span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }
 @media (max-width: 430px) {
   .topbar-inner { gap: 6px; padding: 0 12px; }
-  .logo { font-size: 17px; gap: 6px; }
+  .logo { font-size: 22px; gap: 6px; }
   .wallet-chip { gap: 6px; padding: 0 8px 0 5px; .wc-amount { font-size: 13px; } }
   .icon-btn { width: 34px; }
 }

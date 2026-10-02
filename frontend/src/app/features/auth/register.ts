@@ -40,11 +40,10 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
         {{ brand.name }}
       </div>
       <div>
-        <app-demo-badge label="Demo mode · simulated funds" size="lg" />
-        <h1>Create your<br/>competitor profile.</h1>
-        <p class="lead">You'll start with {{ bonusLabel() }} in <strong>demo funds</strong> so you can try every part of the platform. No real money is ever involved.</p>
+        <h1>Make an account and start playing.</h1>
+        <p class="lead">You start with {{ bonusLabel() }} in <strong>demo funds</strong> so you can try everything. No real money is involved.</p>
       </div>
-      <p class="muted small">Five skill games · Real-time matchmaking · Direct challenges</p>
+      <span></span>
     </aside>
 
     <section class="form-side">

@@ -44,7 +44,7 @@ interface PublicUser { id: number; username: string; displayName: string; avatar
             <div><strong>{{ s.draws }}</strong><span class="muted tiny">Draws</span></div>
             <div><strong class="loss">{{ s.losses }}</strong><span class="muted tiny">Losses</span></div>
           </div>
-          @if (s.currentWinStreak > 1) { <p class="streak">🔥 {{ s.currentWinStreak }} win streak</p> }
+          @if (s.currentWinStreak > 1) { <p class="streak">{{ s.currentWinStreak }} wins in a row</p> }
         </section>
 
         @if (canChallenge()) {
@@ -57,7 +57,7 @@ interface PublicUser { id: number; username: string; displayName: string; avatar
         @if (rivalry(); as r) {
           @if (r.played > 0) {
             <section class="card rivalry" [class.hot]="r.isRivalry">
-              <span class="muted tiny eyebrow">{{ r.isRivalry ? '⚔️ RIVALRY' : 'HEAD TO HEAD' }}</span>
+              <span class="muted tiny eyebrow">{{ r.isRivalry ? 'Rivalry' : 'Head to head' }}</span>
               <h2>{{ me() }} vs {{ u.username }}</h2>
               <p class="muted small">{{ r.played }} challenge{{ r.played === 1 ? '' : 's' }}</p>
               <div class="rv-bar">
@@ -84,7 +84,7 @@ interface PublicUser { id: number; username: string; displayName: string; avatar
     .streak { font-weight: 700; color: var(--demo); }
     .cta { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .rivalry { padding: 18px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; text-align: center; align-items: stretch;
-      &.hot { border-color: var(--demo); } .eyebrow { letter-spacing: .12em; font-weight: 800; } h2 { overflow-wrap: anywhere; } }
+      &.hot { border-color: var(--demo); } .eyebrow { font-weight: 800; } h2 { overflow-wrap: anywhere; } }
     .rv-bar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 6px 0;
       div { display: flex; flex-direction: column; gap: 2px; min-width: 0; } strong { font-family: var(--font-display); font-size: 26px; }
       span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }

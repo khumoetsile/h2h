@@ -38,7 +38,7 @@ interface RoundInput { input: number[]; timeMs: number; }
     .board { display: grid; gap: 10px; width: min(100%, 420px); aspect-ratio: 1; }
     .cell { border-radius: 10px; border: 1px solid var(--border-strong); background: var(--surface-2); cursor: pointer; transition: background .08s, transform .08s; touch-action: manipulation; }
     .cell:disabled { cursor: default; }
-    .cell.lit { background: var(--accent); box-shadow: 0 0 24px rgba(200,255,61,.45); border-color: var(--accent); }
+    .cell.lit { background: var(--accent); box-shadow: 0 0 24px rgba(245,112,31,.45); border-color: var(--accent); }
     .cell.tap { background: #f97316; transform: scale(.96); }
   `],
 })

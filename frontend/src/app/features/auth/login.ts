@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, inject, isDevMode, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -22,16 +22,11 @@ import { DemoBadge } from '../../shared/ui';
         {{ brand.name }}
       </div>
       <div>
-        <app-demo-badge label="Demo mode · simulated funds" size="lg" />
-        <h1>Skill decides.<br/>Winner takes the pool.</h1>
-        <p class="lead">Go head-to-head in fast, fair 1v1 skill games. Both players face the exact same challenge, and we always decide the result fairly.</p>
-        <div class="flow">
-          <div class="flow-step"><div class="n">1</div><div><strong>Pick a game & stake</strong><span>Entries from P5 to P200 (demo funds).</span></div></div>
-          <div class="flow-step"><div class="n">2</div><div><strong>Get matched</strong><span>Instant matchmaking or challenge a rival directly.</span></div></div>
-          <div class="flow-step"><div class="n">3</div><div><strong>Win the pool</strong><span>Winner receives the pool minus a small platform fee.</span></div></div>
-        </div>
+        <h1>Play someone who's actually there.</h1>
+        <p class="lead">Quick skill games and football fixtures, one opponent at a time. You both put up the same stake, you both get the same game, and the winner takes the pool minus a small fee.</p>
+        <p class="lead">This is a demo. Every balance is simulated and no real money moves.</p>
       </div>
-      <p class="muted small">No real money is used anywhere on this prototype.</p>
+      <span></span>
     </aside>
 
     <section class="form-side">
@@ -69,12 +64,14 @@ import { DemoBadge } from '../../shared/ui';
         </form>
         <p class="foot">New here? <a class="link" routerLink="/register">Create an account</a></p>
 
-        <div class="dev-creds">
-          <div class="row-between"><strong>Development logins</strong><app-demo-badge label="Demo data" /></div>
-          <div class="row-between"><span>Player</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('player@example.com', 'Player123!')"><code>player&#64;example.com</code></button></div>
-          <div class="row-between"><span>Opponent</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('kabelo@example.com', 'Player123!')"><code>kabelo&#64;example.com</code></button></div>
-          <div class="row-between"><span>Admin</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('admin@example.com', 'Admin123!')"><code>admin&#64;example.com</code></button></div>
-        </div>
+        @if (dev) {
+          <div class="dev-creds">
+            <div class="row-between"><strong>Development logins</strong><app-demo-badge label="Demo data" /></div>
+            <div class="row-between"><span>Player</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('player@example.com', 'Player123!')"><code>player&#64;example.com</code></button></div>
+            <div class="row-between"><span>Opponent</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('kabelo@example.com', 'Player123!')"><code>kabelo&#64;example.com</code></button></div>
+            <div class="row-between"><span>Admin</span><button class="btn btn-ghost btn-sm" type="button" (click)="fill('admin@example.com', 'Admin123!')"><code>admin&#64;example.com</code></button></div>
+          </div>
+        }
       </div>
     </section>
   `,
@@ -85,6 +82,8 @@ export class LoginPage {
   private router = inject(Router);
   private route = inject(ActivatedRoute);
   protected brand = BRAND;
+  /** Seeded demo logins are only offered in local development builds. */
+  protected dev = isDevMode();
 
   protected form = this.fb.nonNullable.group({
     identifier: ['', Validators.required],

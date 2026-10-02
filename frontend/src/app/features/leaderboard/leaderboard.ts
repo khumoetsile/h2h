@@ -74,11 +74,11 @@ type Period = 'daily' | 'weekly' | 'all';
   styles: [`
     .controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 16px; }
     .game-select { height: 38px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px; padding: 0 10px; font: inherit; font-size: 13px; }
-    .me-card { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; border-color: rgba(200,255,61,.3); .grow { flex: 1; } }
+    .me-card { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; border-color: rgba(245,112,31,.35); .grow { flex: 1; } }
     .rank-num { font-family: var(--font-display); font-size: 22px; font-weight: 700; color: var(--accent); min-width: 44px; }
     .rank { display: inline-flex; width: 28px; height: 28px; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; font-family: var(--font-display); background: var(--surface-2); }
     .r1 { background: rgba(250, 204, 21, .18); color: #facc15; } .r2 { background: rgba(203, 213, 225, .14); color: #cbd5e1; } .r3 { background: rgba(217, 119, 6, .18); color: #f59e0b; }
-    tr.mine td { background: rgba(200,255,61,.05); }
+    tr.mine td { background: rgba(245,112,31,.06); }
     .uname { font-weight: 600; } a.row:hover .uname { text-decoration: underline; }
   `],
 })

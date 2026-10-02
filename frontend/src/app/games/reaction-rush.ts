@@ -47,8 +47,8 @@ const pointsFor = (rt: number) => Math.min(1000, Math.max(100, Math.round(1100 -
   styles: [`
     .target {
       position: absolute; transform: translate(-50%, -50%); border-radius: 50%; border: 0; padding: 0; cursor: pointer; z-index: 2;
-      background: radial-gradient(circle, #0a0d13 0 18%, var(--accent) 19% 38%, #0a0d13 39% 50%, var(--accent) 51% 100%);
-      box-shadow: 0 0 0 4px rgba(200,255,61,.18), 0 0 30px rgba(200,255,61,.35);
+      background: radial-gradient(circle, #14100c 0 18%, var(--accent) 19% 38%, #14100c 39% 50%, var(--accent) 51% 100%);
+      box-shadow: 0 0 0 4px rgba(245,112,31,.2), 0 0 30px rgba(245,112,31,.35);
       animation: appear .09s ease-out both; touch-action: manipulation;
     }
     @keyframes appear { from { transform: translate(-50%, -50%) scale(.6); } to { transform: translate(-50%, -50%) scale(1); } }

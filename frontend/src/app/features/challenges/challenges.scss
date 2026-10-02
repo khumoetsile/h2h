@@ -20,6 +20,6 @@
   &.selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 16%, var(--surface-2)); color: var(--accent); }
   &:disabled { opacity: .45; cursor: not-allowed; }
 }
-.taken { color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: .03em; }
+.taken { color: var(--muted); font-weight: 500; }
 .fee-disclosure { display: flex; align-items: center; gap: 4px; margin-top: 6px; }
 .accept-timer { display: flex; align-items: center; gap: 6px; }

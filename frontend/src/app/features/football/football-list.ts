@@ -51,10 +51,10 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         </div>
       }
 
-      <!-- 🔥 OPEN CHALLENGES -->
+      <!-- Open challenges -->
       <section>
         <div class="section-title">
-          <div><h2>🔥 Open challenges</h2><p class="sub">Players looking for an opponent</p></div>
+          <div><h2>Open challenges</h2><p class="sub">Players looking for an opponent</p></div>
           @if (visibleOpen().length > 3) {
             <button class="btn btn-ghost btn-sm" (click)="showAllOpen.set(!showAllOpen())">{{ showAllOpen() ? 'Show less' : 'Show all ' + visibleOpen().length }}</button>
           }
@@ -77,11 +77,11 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         }
       </section>
 
-      <!-- 👤 MY CHALLENGES (active) -->
+      <!-- My challenges (active) -->
       @if (active() && active()!.length) {
         <section>
           <div class="section-title">
-            <div><h2>👤 My challenges</h2><p class="sub">Your active challenges</p></div>
+            <div><h2>My challenges</h2><p class="sub">Your active challenges</p></div>
             <a class="btn btn-ghost btn-sm" routerLink="/matches">All</a>
           </div>
           <div class="list card card-flush">
@@ -108,10 +108,10 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         </section>
       }
 
-      <!-- ⚡ FIXTURES -->
+      <!-- Fixtures -->
       <section id="fixtures">
         <div class="section-title">
-          <div><h2>⚡ Starting soon</h2><p class="sub">Real fixtures, pick one to create a challenge</p></div>
+          <div><h2>Starting soon</h2><p class="sub">Real fixtures, pick one to create a challenge</p></div>
         </div>
         <div class="segmented tabs day-tabs">
           @for (t of dayTabs; track t.key) {
@@ -162,11 +162,11 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         @if (anySimulated()) { <p class="muted tiny sim-note">Simulated demo fixtures are shown because no live football data provider is configured.</p> }
       </section>
 
-      <!-- 🏆 RECENT RESULTS -->
+      <!-- Recent results -->
       @if (recent() && recent()!.length) {
         <section>
           <div class="section-title">
-            <div><h2>🏆 Recent results</h2><p class="sub">Your latest battles</p></div>
+            <div><h2>Recent results</h2><p class="sub">Your latest battles</p></div>
             <a class="btn btn-ghost btn-sm" routerLink="/matches">History</a>
           </div>
           <div class="list card card-flush">

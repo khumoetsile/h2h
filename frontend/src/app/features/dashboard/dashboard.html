@@ -2,46 +2,21 @@
   @if (error() && !data()) {
     <app-load-error [message]="error()" (retry)="load()" />
   } @else {
-    <!-- Greeting + balance: one clear number, not a finance dashboard. -->
     <section class="top fade-in">
       <div class="greet">
         <p class="hello">{{ greeting() }}</p>
         <h1>{{ auth.user()?.firstName }}</h1>
       </div>
-      <a class="balance-card" routerLink="/wallet">
-        <span class="bal-label">Your balance</span>
+      <a class="balance" routerLink="/wallet">
+        <span class="bal-label">Balance</span>
         @if (data(); as d) {
           <span class="bal-amount money">{{ d.wallet.available | money }}</span>
         } @else {
-          <span class="skeleton" style="height:30px;width:110px;display:inline-block;margin-top:4px"></span>
+          <span class="skeleton" style="height:34px;width:110px;display:inline-block"></span>
         }
-        <span class="bal-link">Add money <mat-icon>chevron_right</mat-icon></span>
+        <span class="bal-link">Add money</span>
       </a>
     </section>
-
-    <!-- One obvious primary action. -->
-    <section class="cta">
-      <a class="btn btn-primary btn-play btn-block" routerLink="/games">
-        <mat-icon>play_arrow</mat-icon> Play now
-      </a>
-      <a class="btn btn-block" routerLink="/challenges/new">
-        <mat-icon>swords</mat-icon> Challenge a friend
-      </a>
-    </section>
-
-    <!-- Football PvP: the headline mode, one tap away. -->
-    <a class="card football-hero card-interactive fade-in" routerLink="/football">
-      <div class="fh-icon"><mat-icon>sports_soccer</mat-icon></div>
-      <div class="grow">
-        <span class="fh-eyebrow">Football</span>
-        <h2>Challenge a player on real matches</h2>
-        <p class="muted small">Pick a fixture, pick a side, and play another person. Never the house.</p>
-        @if (openCount() > 0) {
-          <span class="fh-live"><span class="live-dot"></span> {{ openCount() }} player{{ openCount() === 1 ? '' : 's' }} looking for an opponent</span>
-        }
-      </div>
-      <span class="btn btn-primary fh-go">Play football <mat-icon>chevron_right</mat-icon></span>
-    </a>
 
     <!-- Anything mid-game takes priority over browsing. -->
     @if (data()?.activeMatches?.length) {
@@ -53,7 +28,7 @@
               <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="44" />
               <div class="grow">
                 <div class="am-title">{{ m.football ? m.football.homeTeam + ' vs ' + m.football.awayTeam : m.game.name }}</div>
-                <div class="muted small">{{ m.opponent ? 'vs ' + m.opponent.username : 'Waiting for an opponent…' }}</div>
+                <div class="muted small">{{ m.opponent ? 'vs ' + m.opponent.username : 'Waiting for an opponent' }}</div>
               </div>
               <span class="btn btn-primary btn-sm">Continue</span>
             </a>
@@ -65,14 +40,14 @@
     <!-- Pending challenges needing a response. -->
     @if (incomingChallenges().length > 0) {
       <section class="block">
-        <div class="section-title"><h2 class="h-title">Challenges waiting for you</h2></div>
+        <h2 class="h-title">Challenges waiting for you</h2>
         <div class="stack">
           @for (c of incomingChallenges().slice(0, 3); track c.id) {
             <div class="card challenge-card">
               <app-avatar [name]="c.challenger.username" [color]="c.challenger.avatarColor" [size]="40" />
               <div class="grow">
                 <div class="am-title">{{ c.challenger.username }} challenged you</div>
-                <div class="muted small">{{ c.football ? c.football.homeTeam + ' vs ' + c.football.awayTeam : c.game.name }} · {{ c.stake | money }} stake</div>
+                <div class="muted small">{{ c.football ? c.football.homeTeam + ' vs ' + c.football.awayTeam : c.game.name }}, {{ c.stake | money }} stake</div>
               </div>
               <div class="ch-actions">
                 <button class="btn btn-ghost btn-sm" [disabled]="busy() === c.id" (click)="respond(c, 'decline')">Decline</button>
@@ -84,18 +59,82 @@
       </section>
     }
 
-    <!-- Games: simple, visual, low information density. -->
+    <!-- Football: real fixtures, right here, no extra tap. -->
     <section class="block">
-      <div class="section-title"><h2 class="h-title">Choose a game</h2><a routerLink="/games">See all</a></div>
+      <div class="section-title">
+        <div>
+          <h2 class="h-title">Football</h2>
+          <p class="muted small">Pick a match, pick a side, and play another person.</p>
+        </div>
+        <a routerLink="/football">All fixtures</a>
+      </div>
+      @if (openCount() > 0) {
+        <a class="waiting-note" routerLink="/football">
+          <span class="live-dot"></span>
+          {{ openCount() }} {{ openCount() === 1 ? 'player is' : 'players are' }} waiting for an opponent. Join one
+        </a>
+      }
+      <div class="card card-flush">
+        @if (fixturesError()) {
+          <app-load-error message="We couldn't load the fixtures." (retry)="load()" />
+        } @else if (!fixtures()) {
+          <div class="skeleton" style="height:240px"></div>
+        } @else if (upcoming().length === 0) {
+          <app-empty icon="sports_soccer" title="No fixtures right now" text="New matches show up here as soon as they're scheduled.">
+            <a class="btn btn-sm" routerLink="/football">Open football</a>
+          </app-empty>
+        } @else {
+          <div class="list">
+            @for (f of upcoming(); track f.id) {
+              <a class="list-item fixture" [routerLink]="['/football', f.id]">
+                <div class="fx-when" [class.live]="f.status === 'LIVE'">
+                  @if (f.status === 'LIVE') {
+                    <span class="live-dot"></span> Live
+                    @if (f.minute) { <span class="fx-min">{{ f.minute }}'</span> }
+                  } @else {
+                    {{ kickoff(f) }}
+                  }
+                </div>
+                <div class="grow">
+                  <div class="fx-teams">
+                    {{ f.homeTeam.name }} <span class="vs">vs</span> {{ f.awayTeam.name }}
+                    @if (f.status === 'LIVE' && f.homeScore !== null) { <span class="fx-score">{{ f.homeScore }}-{{ f.awayScore }}</span> }
+                  </div>
+                  <div class="muted small">{{ f.competition.name }}</div>
+                </div>
+                <div class="fx-end">
+                  @if (f.openChallenges > 0) {
+                    <span class="chip chip-accent">{{ f.openChallenges }} waiting</span>
+                  } @else {
+                    <span class="fx-go">Challenge</span>
+                  }
+                </div>
+              </a>
+            }
+          </div>
+          @if (anySimulated()) { <p class="muted small sim-note">These are simulated demo fixtures. No live football data is connected.</p> }
+        }
+      </div>
+    </section>
+
+    <!-- Skill games. -->
+    <section class="block">
+      <div class="section-title">
+        <h2 class="h-title">Skill games</h2>
+        <div class="title-actions">
+          <a routerLink="/challenges/new">Challenge a friend</a>
+          <a routerLink="/games">See all</a>
+        </div>
+      </div>
       @if (!data()) {
         <div class="games-row">
-          @for (i of [1,2,3]; track i) { <div class="card game-mini"><div class="skeleton" style="height:44px;width:44px;border-radius:10px"></div><div class="skeleton" style="height:14px;width:70%;margin-top:14px"></div></div> }
+          @for (i of [1,2,3]; track i) { <div class="card game-mini"><div class="skeleton" style="height:44px;width:44px"></div><div class="skeleton" style="height:14px;width:70%;margin-top:14px"></div></div> }
         </div>
       } @else {
         <div class="games-row">
           @for (g of data()!.games.slice(0, 4); track g.id) {
             <a class="card game-mini card-interactive" [routerLink]="['/games', g.slug]">
-              <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="48" />
+              <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="44" />
               <h3>{{ g.name }}</h3>
               <p class="muted small">{{ g.tagline }}</p>
             </a>
@@ -104,7 +143,7 @@
       }
     </section>
 
-    <!-- Recent activity: plain W/L, no jargon. -->
+    <!-- Recent activity. -->
     <section class="block">
       <div class="section-title"><h2 class="h-title">Recent activity</h2><a routerLink="/matches">See all</a></div>
       <div class="card card-flush">
@@ -112,7 +151,7 @@
           <div class="skeleton" style="height:180px"></div>
         } @else if (data()!.recentMatches.length === 0) {
           <app-empty icon="sports_esports" title="No games played yet" text="Play your first match to see your activity here.">
-            <a class="btn btn-sm btn-primary" routerLink="/games">Play now</a>
+            <a class="btn btn-sm btn-primary" routerLink="/games">Play a game</a>
           </app-empty>
         } @else {
           <div class="list">

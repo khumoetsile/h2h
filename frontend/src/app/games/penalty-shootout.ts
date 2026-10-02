@@ -64,7 +64,7 @@ export function markerAt(periodMs: number, phase: number, t: number) {
     .ball-in.wide { top: -20%; }
     @keyframes kick { from { transform: translateY(260px) scale(1.6); } to { transform: none; } }
     .spot { position: absolute; left: 50%; bottom: 14%; width: 26px; height: 26px; margin-left: -13px; border-radius: 50%; background: #fff; box-shadow: 0 0 0 3px #111 inset; }
-    .hint { position: absolute; bottom: 24px; color: var(--text-2); font-weight: 600; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; }
+    .hint { position: absolute; bottom: 24px; color: var(--text-2); font-weight: 600; font-size: 13px; }
   `],
 })
 export class PenaltyShootoutGame implements OnInit, OnDestroy {
