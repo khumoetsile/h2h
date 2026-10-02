@@ -3,6 +3,7 @@ import { Server } from 'socket.io';
 import { config } from './config.js';
 import { createApp } from './app.js';
 import { pool } from './db.js';
+import { migrate } from '../scripts/migrate.js';
 import { isUserOnline, setIo } from './realtime.js';
 import { authenticateToken } from './middleware/auth.js';
 import { compensateDowntime, heartbeat, markPresence, sweepMatches } from './services/matchService.js';
@@ -70,10 +71,11 @@ export function startSweeper() {
   return handle;
 }
 
-const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
-if (isMain) {
+/** Boot the API: optional auto-migrate, DB check, background jobs, listen. */
+export async function start() {
   const { server } = createServer();
   try {
+    if (process.env.AUTO_MIGRATE === 'true') await migrate();
     await pool.query('SELECT 1');
   } catch (err) {
     console.error(`\n  Could not connect to MySQL at ${config.db.host}:${config.db.port}/${config.db.database}: ${err.message}\n  Check DB_* in backend/.env and run "npm run db:reset".\n`);
@@ -86,3 +88,6 @@ if (isMain) {
     console.log(`  Listening on http://localhost:${config.port}/api\n`);
   });
 }
+
+const isMain = process.argv[1] && import.meta.url === new URL(`file://${process.argv[1]}`).href;
+if (isMain) await start();

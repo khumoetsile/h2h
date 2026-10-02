@@ -1,3 +1,6 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
@@ -21,10 +24,20 @@ import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
 
+/** Built frontend, if present: WEB_ROOT, ./public (deployed) or ../frontend/dist/frontend/browser (local build). */
+function resolveWebRoot() {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [process.env.WEB_ROOT, path.join(here, '..', 'public'), path.join(here, '..', '..', 'frontend', 'dist', 'frontend', 'browser')];
+  return candidates.find((d) => d && fs.existsSync(path.join(d, 'index.html')));
+}
+
 export function createApp() {
   const app = express();
   app.set('trust proxy', 'loopback');
-  app.use(helmet());
+  // The Angular build ships inline bootstrap snippets, so the default CSP is
+  // only kept for the API-only setup.
+  const webRoot = config.isTest ? undefined : resolveWebRoot();
+  app.use(helmet(webRoot ? { contentSecurityPolicy: false } : undefined));
   app.use(cors({ origin: config.corsOrigins, credentials: false }));
   app.use(express.json({ limit: '100kb' }));
   if (!config.isTest) app.use(morgan('dev'));
@@ -69,6 +82,11 @@ export function createApp() {
   app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);
 
   app.use('/api', notFoundHandler);
+  // Single-origin hosting (cPanel): serve the built Angular app with SPA fallback.
+  if (webRoot) {
+    app.use(express.static(webRoot, { index: false, maxAge: '1h' }));
+    app.get(/^\/(?!api\/|socket\.io\/).*/, (_req, res) => res.sendFile(path.join(webRoot, 'index.html')));
+  }
   app.use(errorHandler);
   return app;
 }

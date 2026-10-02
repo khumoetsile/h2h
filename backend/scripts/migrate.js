@@ -9,10 +9,15 @@ import { config } from '../src/config.js';
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'migrations');
 
 export async function migrate({ fresh = false, log = console.log } = {}) {
-  // Create the database if it doesn't exist (requires CREATE privilege).
-  const bootstrap = await mysql.createConnection({ ...config.db, database: undefined });
-  await bootstrap.query(`CREATE DATABASE IF NOT EXISTS \`${config.db.database}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci`);
-  await bootstrap.end();
+  // Create the database if it doesn't exist. Shared hosts (cPanel) pre-create it
+  // and deny CREATE DATABASE, so a failure here is not fatal.
+  try {
+    const bootstrap = await mysql.createConnection({ ...config.db, database: undefined });
+    await bootstrap.query(`CREATE DATABASE IF NOT EXISTS \`${config.db.database}\` CHARACTER SET utf8mb4`);
+    await bootstrap.end();
+  } catch (err) {
+    log(`Skipping CREATE DATABASE (${err.code || err.message}); assuming it already exists.`);
+  }
 
   const conn = await mysql.createConnection({ ...config.db });
   try {

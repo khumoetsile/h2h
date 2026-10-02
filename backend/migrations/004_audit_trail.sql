@@ -33,7 +33,7 @@ CREATE TABLE audit_events (
   CONSTRAINT fk_audit_actor FOREIGN KEY (actor_user_id) REFERENCES users(id) ON DELETE SET NULL,
   CONSTRAINT fk_audit_match FOREIGN KEY (match_id) REFERENCES matches(id) ON DELETE SET NULL,
   CONSTRAINT fk_audit_challenge FOREIGN KEY (challenge_id) REFERENCES challenges(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 -- The loser's locked stake was previously released with no ledger row at all
 -- (see walletService.forfeitStake) — every wallet balance change must have a

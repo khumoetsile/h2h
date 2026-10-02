@@ -1,0 +1,87 @@
+name: Deploy to cPanel
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    env:
+      SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}   # selects SSH deploy; empty falls back to FTP
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Build frontend
+        run: |
+          npm ci
+          npm run build
+        working-directory: frontend
+
+      # Assemble exactly what the cPanel Node.js app needs: the API plus the
+      # built Angular app in ./public (served by Express, same origin).
+      # node_modules is NOT shipped; it is installed on the server.
+      - name: Assemble bundle
+        run: |
+          mkdir -p bundle/tmp
+          cp -r backend/src backend/migrations backend/scripts bundle/
+          cp backend/package.json backend/package-lock.json backend/passenger.js bundle/
+          cp -r frontend/dist/frontend/browser bundle/public
+          # Changing this file makes Passenger restart the app after upload.
+          date -u +%s > bundle/tmp/restart.txt
+
+      # --- Preferred: SSH. Sync, install deps, restart, verify. -------------
+      - name: Deploy via SSH
+        if: env.SSH_KEY != ''
+        env:
+          SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
+          SSH_USER: ${{ secrets.CPANEL_SSH_USER }}
+          SSH_PORT: ${{ secrets.CPANEL_SSH_PORT || '22' }}
+          APP_DIR: ${{ vars.CPANEL_APP_DIR }}
+          ACTIVATE: ${{ vars.CPANEL_NODE_ACTIVATE }}
+        run: |
+          install -m 700 -d ~/.ssh
+          echo "$SSH_KEY" > ~/.ssh/id_deploy && chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+          SSH="ssh -i ~/.ssh/id_deploy -p $SSH_PORT"
+          # node_modules is a cPanel-managed symlink; .env and logs live only on the server.
+          rsync -az --delete -e "$SSH"             --exclude '.env' --exclude 'node_modules' --exclude 'tmp/'             --exclude '.htaccess' --exclude 'stderr.log'             bundle/ "$SSH_USER@$SSH_HOST:$APP_DIR/"
+          $SSH "$SSH_USER@$SSH_HOST" "set -e; source $ACTIVATE; cd $APP_DIR; npm ci --omit=dev; mkdir -p tmp; touch tmp/restart.txt"
+
+      - name: Verify site is up
+        if: env.SSH_KEY != '' && vars.CPANEL_SITE_URL != ''
+        run: |
+          for i in $(seq 1 12); do
+            if curl -fsS "${{ vars.CPANEL_SITE_URL }}/api/health"; then exit 0; fi
+            sleep 10
+          done
+          echo "Site did not become healthy after deploy"; exit 1
+
+      # --- Fallback: FTP (no npm install; click "Run NPM Install" in cPanel). -
+      - name: Upload via FTP
+        if: env.SSH_KEY == ''
+        uses: SamKirkland/FTP-Deploy-Action@v4.3.5
+        with:
+          server: ${{ secrets.CPANEL_FTP_HOST }}
+          username: ${{ secrets.CPANEL_FTP_USER }}
+          password: ${{ secrets.CPANEL_FTP_PASSWORD }}
+          protocol: ${{ vars.CPANEL_FTP_PROTOCOL || 'ftps' }}
+          local-dir: bundle/
+          server-dir: ${{ vars.CPANEL_APP_DIR }}
+          exclude: |
+            **/.env
+            **/node_modules/**

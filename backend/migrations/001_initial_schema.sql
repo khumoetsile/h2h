@@ -21,7 +21,7 @@ CREATE TABLE users (
   UNIQUE KEY uq_users_username (username),
   UNIQUE KEY uq_users_email (email),
   KEY idx_users_role_status (role, status)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
 CREATE TABLE sessions (
   id CHAR(36) PRIMARY KEY,
