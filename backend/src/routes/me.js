@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { query, queryOne } from '../db.js';
 import { ah } from '../utils/errors.js';
 import { validate } from '../middleware/validate.js';
@@ -9,6 +10,7 @@ import { getUserStats, leaderboardPosition } from '../services/statsService.js';
 import { listMatchesForUser, queueCounts } from '../services/matchService.js';
 import { listChallenges } from '../services/challengeService.js';
 import { listGames } from '../services/gameService.js';
+import * as push from '../services/pushService.js';
 
 const router = Router();
 
@@ -28,6 +30,11 @@ router.patch('/me', validate(profileSchema), ah(async (req, res) => {
   if (sets.length) await query(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, [...params, req.user.id]);
   const user = await queryOne('SELECT * FROM users WHERE id = ?', [req.user.id]);
   res.json({ user: mapUser(user) });
+}));
+
+router.get('/me/notification-settings', ah(async (req, res) => res.json({ settings: await push.getPreferences(req.user.id) })));
+router.put('/me/notification-settings', validate(z.object({ challenges: z.boolean().optional(), waiting: z.boolean().optional() })), ah(async (req, res) => {
+  res.json({ settings: await push.setPreferences(req.user.id, req.body) });
 }));
 
 router.post('/me/password', validate(passwordChangeSchema), ah(async (req, res) => {

@@ -25,7 +25,7 @@ import { SkillRoom } from './skill-room';
  * what happened — it never decides an outcome itself.
  */
 /** How long to look for a real opponent before a practice match steps in. */
-const AUTO_PRACTICE_MS = 8000;
+const AUTO_PRACTICE_MS = 5 * 60 * 1000;
 
 @Component({
   selector: 'app-match-lobby',
@@ -99,7 +99,7 @@ export class MatchLobbyPage implements OnInit {
       const cur = this.match();
       if (cur && cur.status === 'WAITING' && !this.busy() && !this.autoPracticed) {
         this.autoPracticed = true;
-        this.toast.info('No one free right now, so you are playing a practice match.');
+        this.toast.info('Nobody joined in 5 minutes, so you are playing a practice match.');
         await this.practiceNow();
       }
     }, Math.max(0, AUTO_PRACTICE_MS - waited));

@@ -109,3 +109,80 @@ describe('web push', () => {
     } finally { push.setEnabledForTests(true); }
   });
 });
+
+describe('notifications stay welcome: preferences, quiet hours, gaps', () => {
+  const DAY = () => new Date('2026-03-10T10:00:00Z');   // 12:00 in Botswana
+  const NIGHT = () => new Date('2026-03-10T21:30:00Z'); // 23:30 in Botswana
+  const reset = () => { push.setClockForTests(DAY); push.resetRateLimitsForTests(); };
+  after(() => push.setClockForTests(null));
+
+  test('preferences default to challenges on and "someone is looking" off, and can be changed', async () => {
+    const p = await player();
+    const get = await api().get('/api/me/notification-settings').set(auth(p.token));
+    assert.deepEqual(get.body.settings, { challenges: true, waiting: false });
+    const put = await api().put('/api/me/notification-settings').set(auth(p.token)).send({ waiting: true });
+    assert.deepEqual(put.body.settings, { challenges: true, waiting: true });
+    assert.equal((await api().put('/api/me/notification-settings').set(auth(p.token)).send({ waiting: 'yes' })).status, 400);
+  });
+
+  test('turning challenges off silences those pings, and a repeat inside the gap is dropped', async () => {
+    reset();
+    const sent = [];
+    push.setSender(async (s, body) => { sent.push(JSON.parse(body)); });
+    const p = await player();
+    await api().post('/api/push/subscribe').set(auth(p.token)).send(sub('pref' + p.id));
+    const msg = { title: 'Challenge', body: 'x', url: '/challenges' };
+    assert.equal(await push.sendToUser(p.id, msg, 'CHALLENGE_RECEIVED'), 1);
+    assert.equal(await push.sendToUser(p.id, msg, 'CHALLENGE_RECEIVED'), 0, 'a second ping right away is dropped');
+    await api().put('/api/me/notification-settings').set(auth(p.token)).send({ challenges: false });
+    push.resetRateLimitsForTests();
+    assert.equal(await push.sendToUser(p.id, msg, 'CHALLENGE_ACCEPTED'), 0, 'switched off');
+    assert.equal(sent.length, 1);
+  });
+
+  test('no challenge pings at night, but a friend joining the invite you are waiting on still gets through', async () => {
+    reset();
+    push.setSender(async () => {});
+    const p = await player();
+    await api().post('/api/push/subscribe').set(auth(p.token)).send(sub('night' + p.id));
+    push.setClockForTests(NIGHT);
+    assert.equal(await push.sendToUser(p.id, { title: 't', body: 'b' }, 'CHALLENGE_RECEIVED'), 0);
+    assert.equal(await push.sendToUser(p.id, { title: 't', body: 'b' }, 'MATCH_FOUND'), 1);
+    push.setClockForTests(DAY);
+    assert.equal(await push.sendToUser(p.id, { title: 't', body: 'b' }, 'CHALLENGE_RECEIVED'), 1);
+  });
+
+  test('"someone is looking" goes only to opted-in players who have played the game, once per three hours, never at night', async () => {
+    reset();
+    const sent = [];
+    push.setSender(async (s, body) => { sent.push({ endpoint: s.endpoint, ...JSON.parse(body) }); });
+    const game = await queryOne("SELECT id FROM games WHERE slug = 'penalty-shootout'");
+
+    // W has played the game and asked to hear; N has played it but did not opt in; S opted in but never played it.
+    const W = await player(); const N = await player(); const S = await player();
+    for (const p of [W, N, S]) await api().post('/api/push/subscribe').set(auth(p.token)).send(sub('wait' + p.id));
+    for (const p of [W, N]) assert.equal((await api().post('/api/matches/practice').set(auth(p.token)).send({ gameId: game.id, stake: 10 })).status, 201);
+    for (const p of [W, S]) await api().put('/api/me/notification-settings').set(auth(p.token)).send({ waiting: true });
+
+    // Night: nothing goes out.
+    push.setClockForTests(NIGHT);
+    const looker = await player();
+    await api().post('/api/matches/find').set(auth(looker.token)).send({ gameId: game.id, stake: 10 });
+    await until(() => false, 300);
+    assert.equal(sent.length, 0);
+    await api().post(`/api/matches/${(await queryOne('SELECT code FROM matches WHERE created_by = ? ORDER BY id DESC LIMIT 1', [looker.id])).code}/cancel`).set(auth(looker.token));
+
+    // Daytime: only W hears about it.
+    push.setClockForTests(DAY);
+    const looker2 = await player();
+    const f = await api().post('/api/matches/find').set(auth(looker2.token)).send({ gameId: game.id, stake: 10 });
+    assert.equal(f.status, 201, JSON.stringify(f.body));
+    await until(() => sent.length >= 1);
+    assert.equal(sent.length, 1);
+    assert.equal(sent[0].endpoint, `https://push.example.test/send/wait${W.id}`);
+    assert.equal(sent[0].tag, 'WAITING_PLAYER');
+
+    // Again straight away: W was just told, so nobody is.
+    assert.equal(await push.announceWaiting({ gameId: game.id, gameName: 'Penalty Shootout', creatorId: looker2.id }), 0);
+  });
+});

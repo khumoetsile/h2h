@@ -11,6 +11,7 @@ import { Toast } from '../../core/toast.service';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { apiError } from '../../core/api-error';
 import { MAIN_GAME, QuickPlay } from '../../core/quick-play';
+import { AdSlot } from '../../shared/ad-slot';
 import { GetApp } from '../../shared/get-app';
 import { PitchArt } from '../../shared/pitch-art';
 import { SaveAccount } from '../../shared/save-account';
@@ -34,7 +35,7 @@ interface Dashboard {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, GetApp, PitchArt, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, AdSlot, GetApp, PitchArt, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })

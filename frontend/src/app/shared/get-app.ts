@@ -1,4 +1,5 @@
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
+import { Api } from '../core/api.service';
 import { MatIconModule } from '@angular/material/icon';
 import { PwaService } from '../core/pwa.service';
 import { Toast } from '../core/toast.service';
@@ -19,11 +20,23 @@ const DISMISS_DAYS = 7;
   template: `
     @if (variant() === 'settings') {
       @if (push() === 'on' || push() === 'off') {
+        <div class="settings">
         <div class="row">
           <mat-icon>{{ push() === 'on' ? 'notifications' : 'notifications_off' }}</mat-icon>
           <div class="grow"><strong>Notifications on this phone</strong>
             <p class="muted small">{{ push() === 'on' ? 'You will get a ping when an opponent joins or a match starts.' : 'Get a ping when an opponent joins or a match starts.' }}</p></div>
           <button class="btn btn-sm" [class.btn-primary]="push() === 'off'" [disabled]="busy()" (click)="toggle()">{{ push() === 'on' ? 'Turn off' : 'Turn on' }}</button>
+        </div>
+        @if (push() === 'on' && prefs(); as p) {
+          <label class="pref">
+            <input type="checkbox" [checked]="p.challenges" (change)="setPref('challenges', $any($event.target).checked)" />
+            <span><strong>Challenges and matches</strong><small class="muted">When someone challenges you, joins your invite or a match is about to start.</small></span>
+          </label>
+          <label class="pref">
+            <input type="checkbox" [checked]="p.waiting" (change)="setPref('waiting', $any($event.target).checked)" />
+            <span><strong>When someone is looking for a game</strong><small class="muted">At most once every 3 hours, and never at night.</small></span>
+          </label>
+        }
         </div>
       } @else if (push() === 'blocked') {
         <p class="muted small">Notifications are blocked for this site. Allow them in your browser's site settings to turn them on.</p>
@@ -63,6 +76,10 @@ const DISMISS_DAYS = 7;
   `,
   styles: [`
     :host { display: block; }
+    .settings { display: flex; flex-direction: column; gap: 8px; }
+    .pref { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); cursor: pointer; }
+    .pref input { width: 22px; height: 22px; margin-top: 2px; accent-color: var(--accent); flex-shrink: 0; }
+    .pref span { display: flex; flex-direction: column; gap: 2px; }
     .nudge, .row { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); text-align: left; }
     .nudge > mat-icon, .row > mat-icon { color: var(--accent); flex-shrink: 0; }
     .waiting { width: 100%; }
@@ -82,7 +99,9 @@ export class GetApp implements OnInit {
   /** The name to mention in the waiting-room line. */
   readonly who = input<string | null>(null);
 
+  private api = inject(Api);
   protected push = this.pwa.pushState;
+  protected prefs = signal<{ challenges: boolean; waiting: boolean } | null>(null);
   protected busy = signal(false);
   private dismissed = signal(this.wasDismissed());
 
@@ -94,7 +113,23 @@ export class GetApp implements OnInit {
     return this.variant() === 'card' && (this.pwa.canInstall() || this.pwa.needsIosSteps());
   });
 
-  ngOnInit() { void this.pwa.refreshPush(); }
+  ngOnInit() {
+    void this.pwa.refreshPush();
+    if (this.variant() === 'settings') {
+      this.api.get<{ settings: { challenges: boolean; waiting: boolean } }>('/me/notification-settings').then((r) => this.prefs.set(r.settings)).catch(() => undefined);
+    }
+  }
+
+  protected async setPref(key: 'challenges' | 'waiting', value: boolean) {
+    const before = this.prefs();
+    if (before) this.prefs.set({ ...before, [key]: value });
+    try {
+      this.prefs.set((await this.api.put<{ settings: { challenges: boolean; waiting: boolean } }>('/me/notification-settings', { [key]: value })).settings);
+    } catch (err) {
+      this.prefs.set(before);
+      this.toast.error(err);
+    }
+  }
 
   private wasDismissed() {
     try {

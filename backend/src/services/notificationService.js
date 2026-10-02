@@ -16,7 +16,7 @@ export async function notify(tx, userId, { type, title, message, link = null }) 
   const push = () => {
     emitToUser(userId, 'notification', payload);
     // The phone's own notification, for the moments a player is waiting on someone.
-    if (PUSH_TYPES.has(type)) void sendToUser(userId, { title, body: message, url: link || '/notifications', tag: type });
+    if (PUSH_TYPES.has(type)) void sendToUser(userId, { title, body: message, url: link || '/notifications', tag: type }, type);
   };
   if (tx) tx.afterCommit(push); else push();
   return payload;

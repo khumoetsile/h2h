@@ -47,6 +47,12 @@ export function createApp() {
   app.get('/api/health', (_req, res) => res.json({ ok: true, app: config.appName, demoMode: true, time: new Date().toISOString() }));
   // Server clock for countdown display. Clients estimate their offset from
   // this; they never use their own clock to decide whether time is up.
+  // Tells Google which sellers may sell this site's ads. Only exists once a publisher ID is configured.
+  app.get('/ads.txt', (_req, res) => {
+    const id = config.ads.client.replace(/^ca-/, '');
+    if (!id) return res.sendStatus(404);
+    res.type('text/plain').send(`google.com, ${id}, DIRECT, f08c47fec0942fa0\n`);
+  });
   app.get('/api/time', (_req, res) => res.json({ serverNow: new Date().toISOString() }));
 
   // Public runtime configuration (app name, demo flags, stakes, fee).
@@ -65,6 +71,7 @@ export function createApp() {
       maxDeposit: s.max_deposit,
       minWithdrawal: s.min_withdrawal,
       demoBotsEnabled: config.demoBotsEnabled,
+      ads: config.ads.client ? { client: config.ads.client, slots: { home: config.ads.slotHome, list: config.ads.slotList } } : null,
       abandonmentFee: config.abandonmentFee,
       timers: publicTimerConfig(),
       serverNow: new Date().toISOString(),

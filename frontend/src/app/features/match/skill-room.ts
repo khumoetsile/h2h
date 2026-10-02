@@ -11,7 +11,7 @@ import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, GameIcon } from '../../shared/ui';
 
 /** After this long without an opponent, "Practice" becomes the main button. */
-const OFFER_PRACTICE_AFTER_S = 8;
+const OFFER_PRACTICE_AFTER_S = 30;
 
 export type RoomPhase = 'searching' | 'found' | 'waiting-opponent' | 'starting' | 'playing' | 'waiting-finish';
 
@@ -55,7 +55,7 @@ export function roomPhase(m: MatchView): RoomPhase {
           } @else {
             <h2>Looking for an opponent</h2>
             <p class="elapsed" role="timer">{{ elapsedText() }}</p>
-            <p class="text-2">If nobody is free in a few seconds, you will play a practice match instead.</p>
+            <p class="text-2">We will keep looking for up to 5 minutes. If nobody joins, you will play a practice match.</p>
           }
           <app-get-app variant="waiting" [who]="m.source === 'DIRECT' ? 'your friend' : null" />
           @if (config.config()?.demoBotsEnabled) {

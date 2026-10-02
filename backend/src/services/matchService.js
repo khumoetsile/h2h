@@ -27,6 +27,7 @@ import { computePrize, formatMoney, toCents } from '../utils/money.js';
 import { getEngine, liveSlugs } from '../games/index.js';
 import { createRng } from '../games/rng.js';
 import { getSettings } from './settingsService.js';
+import { announceWaiting } from './pushService.js';
 import { notify } from './notificationService.js';
 import { chargeAbandonmentFee, forfeitStake, houseBotFloat, lockStake, payWinner, refundStake, ABANDONMENT_FEE_AMOUNT } from './walletService.js';
 import { recordAudit } from './auditService.js';
@@ -267,9 +268,11 @@ export async function findOpponent(userId, gameId, stake) {
       await joinLockedMatch(tx, candidate, userId);
       return { matchId: candidate.id, matched: true };
     }
-    const { match } = await createMatchTx(tx, userId, gameId, stake, { source: 'MATCHMAKING' });
+    const { match, game } = await createMatchTx(tx, userId, gameId, stake, { source: 'MATCHMAKING' });
     emitMatch(tx, match.id, [userId]);
     tx.afterCommit(() => broadcastQueueCounts());
+    // Nobody was waiting: tell the few players who asked to hear about it (rate-limited, never at night).
+    tx.afterCommit(() => { void announceWaiting({ gameId: game.id, gameName: game.name, creatorId: userId }); });
     return { matchId: match.id, matched: false };
   });
 }

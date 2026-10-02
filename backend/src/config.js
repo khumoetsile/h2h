@@ -42,7 +42,7 @@ export const config = {
   // those stored deadlines. See README "Timers".
   timers: {
     // Find Opponent (open) and direct challenges: time for someone to accept.
-    challengeAcceptanceSeconds: positive('CHALLENGE_ACCEPTANCE_TIMEOUT_SECONDS', 300),
+    challengeAcceptanceSeconds: positive('CHALLENGE_ACCEPTANCE_TIMEOUT_SECONDS', 900),
     // Once two players are matched: time for both to press Lock In.
     lockInSeconds: positive('LOCK_IN_TIMEOUT_SECONDS', 120),
     // Once both are locked in (skill games): time to complete the game.
@@ -61,6 +61,16 @@ export const config = {
     publicKey: process.env.VAPID_PUBLIC_KEY || '',
     privateKey: process.env.VAPID_PRIVATE_KEY || '',
     subject: process.env.VAPID_SUBJECT || 'mailto:admin@example.com',
+    // No challenge or "looking for a game" pings between these local hours (default: Botswana time, UTC+2).
+    quietStartHour: num('PUSH_QUIET_START_HOUR', 22),
+    quietEndHour: num('PUSH_QUIET_END_HOUR', 7),
+    utcOffsetHours: num('PUSH_UTC_OFFSET_HOURS', 2),
+  },
+  // Google AdSense. Leave the publisher ID empty and no ad code is ever loaded.
+  ads: {
+    client: process.env.ADSENSE_CLIENT || '', // e.g. ca-pub-1234567890123456
+    slotHome: process.env.ADSENSE_SLOT_HOME || '',
+    slotList: process.env.ADSENSE_SLOT_LIST || '',
   },
   // Flat fee for leaving a challenge after both players locked in. Server-side only.
   abandonmentFee: positive('ABANDONMENT_FEE', 0.5),

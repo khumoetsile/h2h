@@ -346,6 +346,8 @@ export interface PublicConfig {
   maxDeposit: number;
   minWithdrawal: number;
   demoBotsEnabled: boolean;
+  /** Present only when the server has a Google AdSense publisher ID. */
+  ads?: { client: string; slots: { home: string; list: string } } | null;
   abandonmentFee: number;
   timers: {
     challengeAcceptanceSeconds: number; lockInSeconds: number; lockedGameSeconds: number;

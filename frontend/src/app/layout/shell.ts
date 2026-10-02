@@ -10,6 +10,7 @@ import { AppNotification } from '../core/models';
 import { RealtimeService } from '../core/realtime.service';
 import { Avatar } from '../shared/ui';
 import { ActiveMatchBar } from './active-match-bar';
+import { AdsConsent } from './ads-consent';
 import { AgoPipe, MoneyPipe } from '../shared/pipes';
 
 interface NavItem { label: string; icon: string; link: string; exact?: boolean; }
@@ -41,7 +42,7 @@ const ADMIN_BOTTOM = ['/admin', '/admin/users', '/admin/matches', '/admin/transa
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, MatMenuModule, MatTooltipModule, Avatar, MoneyPipe, AgoPipe, ActiveMatchBar],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, MatMenuModule, MatTooltipModule, Avatar, MoneyPipe, AgoPipe, ActiveMatchBar, AdsConsent],
   templateUrl: './shell.html',
   styleUrl: './shell.scss',
 })
