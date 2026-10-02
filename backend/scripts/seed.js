@@ -101,7 +101,7 @@ export async function seed({ log = console.log } = {}) {
   await withTransaction(async (tx) => {
     // Settings
     for (const [k, v] of Object.entries(SETTING_DEFAULTS)) {
-      await tx.q('INSERT INTO admin_settings (setting_key, setting_value, description) VALUES (?, CAST(? AS JSON), ?)', [k, JSON.stringify(v), SETTING_DESCRIPTIONS[k]]);
+      await tx.q('INSERT INTO admin_settings (setting_key, setting_value, description) VALUES (?, ?, ?)', [k, JSON.stringify(v), SETTING_DESCRIPTIONS[k]]);
     }
     // Games
     const gameIds = {};
@@ -204,7 +204,7 @@ export async function seed({ log = console.log } = {}) {
       const scores = [a, b].map((p, i) => engine.score(spec, engine.botPlay(spec, createRng(seed + i * 7919 + p.id), seed), seed));
       for (const [i, p] of [a, b].entries()) {
         await tx.q(
-          `INSERT INTO game_results (match_id, user_id, score, tiebreak, is_valid, summary, rounds, server_elapsed_ms, created_at) VALUES (?, ?, ?, ?, 1, CAST(? AS JSON), CAST(? AS JSON), ?, ?)`,
+          `INSERT INTO game_results (match_id, user_id, score, tiebreak, is_valid, summary, rounds, server_elapsed_ms, created_at) VALUES (?, ?, ?, ?, 1, ?, ?, ?, ?)`,
           [matchId, p.id, scores[i].score, scores[i].tiebreak, JSON.stringify(scores[i].summary), JSON.stringify(scores[i].rounds), 60000 + rng.int(0, 20000), completed],
         );
       }

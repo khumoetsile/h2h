@@ -81,7 +81,7 @@ export async function updateSettings(patch, adminId) {
   for (const k of keys) clean[k] = validate(k, patch[k]);
   for (const [k, v] of Object.entries(clean)) {
     await query(
-      `INSERT INTO admin_settings (setting_key, setting_value, description, updated_by) VALUES (?, CAST(? AS JSON), ?, ?)
+      `INSERT INTO admin_settings (setting_key, setting_value, description, updated_by) VALUES (?, ?, ?, ?)
        ON DUPLICATE KEY UPDATE setting_value = VALUES(setting_value), updated_by = VALUES(updated_by)`,
       [k, JSON.stringify(v), SETTING_DESCRIPTIONS[k] || null, adminId],
     );

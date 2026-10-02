@@ -22,7 +22,7 @@ const router = Router();
 // alongside player/system events — an admin cannot silently modify or
 // bypass this: `audit()` is called from every mutating admin route below.
 async function legacyAudit(adminId, action, targetType, targetId, details) {
-  await query('INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, CAST(? AS JSON))', [
+  await query('INSERT INTO admin_audit_log (admin_id, action, target_type, target_id, details) VALUES (?, ?, ?, ?, ?)', [
     adminId, action, targetType, targetId != null ? String(targetId) : null, JSON.stringify(details ?? null),
   ]);
 }
@@ -369,7 +369,7 @@ router.get('/system-errors', ah(async (_req, res) => {
 // Legacy admin-only action log (kept for compatibility with existing callers).
 router.get('/audit', ah(async (_req, res) => {
   const rows = await query(`SELECT a.*, u.username FROM admin_audit_log a JOIN users u ON u.id = a.admin_id ORDER BY a.created_at DESC, a.id DESC LIMIT 100`);
-  res.json({ entries: rows.map((r) => ({ id: r.id, admin: r.username, action: r.action, targetType: r.target_type, targetId: r.target_id, details: r.details, createdAt: r.created_at })) });
+  res.json({ entries: rows.map((r) => ({ id: r.id, admin: r.username, action: r.action, targetType: r.target_type, targetId: r.target_id, details: typeof r.details === 'string' ? JSON.parse(r.details) : r.details, createdAt: r.created_at })) });
 }));
 
 // Unified, filterable audit trail across auth, match/challenge lifecycle,

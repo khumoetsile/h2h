@@ -32,7 +32,7 @@ import { query } from '../db.js';
 export async function recordAudit(tx, event) {
   const sql = `INSERT INTO audit_events
     (actor_type, actor_user_id, action, entity_type, entity_id, match_id, challenge_id, request_id, ip_address, user_agent, previous_state, new_state, reason, metadata)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CAST(? AS JSON))`;
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
   const params = [
     event.actorType,
     event.actorUserId ?? null,

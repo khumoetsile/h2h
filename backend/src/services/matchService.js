@@ -399,7 +399,7 @@ async function submitBotResult(tx, m, p) {
   const scored = engine.score(spec, actions, seed);
   await tx.q(
     `INSERT INTO game_results (match_id, user_id, score, tiebreak, is_valid, summary, rounds, client_elapsed_ms, server_elapsed_ms)
-     VALUES (?, ?, ?, ?, 1, CAST(? AS JSON), CAST(? AS JSON), NULL, NULL)`,
+     VALUES (?, ?, ?, ?, 1, ?, ?, NULL, NULL)`,
     [m.id, p.user_id, scored.score, scored.tiebreak, JSON.stringify(scored.summary), JSON.stringify(scored.rounds)],
   );
   await tx.q('UPDATE match_players SET started_at = NOW(), submitted_at = NOW() WHERE id = ?', [p.id]);
@@ -441,7 +441,7 @@ export async function submitResult(userId, matchIdOrCode, body) {
     const clientElapsed = Number.isFinite(Number(body?.clientElapsedMs)) ? Math.max(0, Math.round(Number(body.clientElapsedMs))) : null;
     await tx.q(
       `INSERT INTO game_results (match_id, user_id, score, tiebreak, is_valid, invalid_reason, summary, rounds, client_elapsed_ms, server_elapsed_ms)
-       VALUES (?, ?, ?, ?, ?, ?, CAST(? AS JSON), CAST(? AS JSON), ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [m.id, userId, valid ? scored.score : 0, valid ? scored.tiebreak : -2147483647, valid ? 1 : 0, invalidReason, JSON.stringify(scored.summary), JSON.stringify(scored.rounds), clientElapsed, serverElapsed],
     );
     await tx.q('UPDATE match_players SET submitted_at = NOW() WHERE id = ?', [me.id]);
