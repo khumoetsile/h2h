@@ -11,6 +11,7 @@ import { formatMoney } from '../../core/format';
 import { MatchView } from '../../core/models';
 import { RematchService } from '../../core/rematch.service';
 import { Toast } from '../../core/toast.service';
+import { SaveAccount } from '../../shared/save-account';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, LoadError, Spinner } from '../../shared/ui';
 
@@ -22,7 +23,7 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
  */
 @Component({
   selector: 'app-match-result',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner],
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, SaveAccount, MoneyPipe, Avatar, LoadError, Spinner],
   template: `
     <div class="result-screen">
       @if (error()) {
@@ -76,6 +77,7 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
             }
           </div>
 
+          <app-save-account class="save-slot" />
           <div class="actions">
             @if (canRematch()) {
               <button class="btn btn-primary btn-lg btn-block" [disabled]="rematching()" (click)="rematch()">
@@ -112,6 +114,7 @@ import { Avatar, LoadError, Spinner } from '../../shared/ui';
     .pvp-vs { color: var(--muted); font-size: 12px; font-weight: 700; }
     .money-lines { width: 100%; padding: 12px 16px; display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
     .ml { display: flex; justify-content: space-between; gap: 10px; font-size: 14px; }
+    .save-slot { width: 100%; margin-top: 12px; }
     .actions { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 12px; }
   `],
 })

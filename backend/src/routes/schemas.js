@@ -33,6 +33,11 @@ export const quickSignupSchema = z.object({
   password: z.string({ error: 'Password is required.' }).min(6, 'Password must be at least 6 characters.').max(72, 'Password must be at most 72 characters.'),
 });
 
+export const claimSchema = z.object({
+  password: z.string({ error: 'Password is required.' }).min(6, 'Password must be at least 6 characters.').max(72, 'Password must be at most 72 characters.'),
+  username: username.optional(),
+});
+
 export const loginSchema = z.object({
   identifier: z.string({ error: 'Email or username is required.' }).trim().min(1, 'Email or username is required.').max(190),
   password: z.string({ error: 'Password is required.' }).min(1, 'Password is required.').max(200),

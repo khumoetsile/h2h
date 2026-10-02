@@ -8,6 +8,12 @@ export const authGuard: CanActivateFn = (_route, state) => {
   return inject(Router).createUrlTree(['/login'], { queryParams: state.url && state.url !== '/' ? { next: state.url } : {} });
 };
 
+/** The front door: people who are already signed in go straight to their home page. */
+export const landingGuard: CanActivateFn = () => {
+  const auth = inject(AuthService);
+  return auth.isLoggedIn() ? inject(Router).parseUrl(auth.homeUrl()) : true;
+};
+
 export const guestGuard: CanActivateFn = () => {
   const auth = inject(AuthService);
   return auth.isLoggedIn() ? inject(Router).parseUrl(auth.homeUrl()) : true;

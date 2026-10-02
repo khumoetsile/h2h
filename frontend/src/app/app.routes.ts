@@ -1,9 +1,9 @@
 import { Routes } from '@angular/router';
-import { adminGuard, authGuard, guestGuard, playerGuard } from './core/guards';
+import { adminGuard, authGuard, guestGuard, landingGuard, playerGuard } from './core/guards';
 import { Shell } from './layout/shell';
 
 export const routes: Routes = [
-  { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+  { path: '', pathMatch: 'full', canActivate: [landingGuard], title: 'Play', loadComponent: () => import('./features/landing/landing').then((m) => m.LandingPage) },
   { path: 'login', canActivate: [guestGuard], title: 'Sign in', loadComponent: () => import('./features/auth/login').then((m) => m.LoginPage) },
   // Shared challenge link: open to everyone (new players sign up on the page itself).
   { path: 'join/:code', title: 'Challenge', loadComponent: () => import('./features/invite/invite').then((m) => m.InvitePage) },

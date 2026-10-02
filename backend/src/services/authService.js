@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import { config } from '../config.js';
 import { queryOne, query, withTransaction } from '../db.js';
 import { signToken } from '../middleware/auth.js';
-import { badRequest, conflict, forbidden, unauthorized } from '../utils/errors.js';
+import { badRequest, conflict, forbidden, notFound, unauthorized } from '../utils/errors.js';
 import { toCents, fromCents } from '../utils/money.js';
 import { txReference } from '../utils/ids.js';
 import { createWallet } from './walletService.js';
@@ -27,6 +27,7 @@ export function mapUser(u) {
     bio: u.bio,
     avatarColor: u.avatar_color,
     isBot: !!u.is_bot,
+    isGuest: !!u.is_guest,
     isDemoData: !!u.is_demo_data,
     createdAt: u.created_at,
     lastLoginAt: u.last_login_at,
@@ -53,6 +54,49 @@ export async function quickSignup({ username, password }, meta = {}) {
     email: `${username.toLowerCase()}@quick.invalid`, phone: '+26700000000',
     password, remember: true,
   }, meta);
+}
+
+const GUEST_ADJ = ['Swift', 'Bold', 'Lucky', 'Sharp', 'Cool', 'Fast', 'Brave', 'Clever', 'Mighty', 'Calm'];
+const GUEST_NOUN = ['Striker', 'Keeper', 'Winger', 'Falcon', 'Lion', 'Eagle', 'Hawk', 'Rhino', 'Cheetah', 'Zebra'];
+const pick = (list) => list[crypto.randomInt(list.length)];
+
+/**
+ * A player who just tapped Play: a friendly generated name and a random password nobody knows. They keep playing
+ * on this device and can claim the account (set a password and a name) whenever they like.
+ */
+export async function guestSignup(meta = {}) {
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const username = `${pick(GUEST_ADJ)}${pick(GUEST_NOUN)}${crypto.randomInt(10, 9999)}`;
+    try {
+      const out = await register({
+        firstName: 'Guest', lastName: 'Player', username,
+        email: `guest-${crypto.randomBytes(8).toString('hex')}@quick.invalid`, phone: '+26700000000',
+        // Letters, a digit and enough length to satisfy the same rules as everyone else.
+        password: `Gg1${crypto.randomBytes(18).toString('base64url')}`, remember: true,
+      }, meta);
+      await query('UPDATE users SET is_guest = 1 WHERE id = ?', [out.user.id]);
+      return { ...out, user: { ...out.user, isGuest: true } };
+    } catch (err) {
+      if (err?.code !== 'ALREADY_EXISTS') throw err;
+    }
+  }
+  throw conflict('ALREADY_EXISTS', 'Could not create a guest account. Please try again.');
+}
+
+/** Turn a guest into a normal account: choose a password (and optionally a name). Returns the refreshed user. */
+export async function claimAccount(userId, { password, username }) {
+  const user = await queryOne('SELECT * FROM users WHERE id = ?', [userId]);
+  if (!user) throw notFound('Account not found.');
+  if (!user.is_guest) throw conflict('NOT_A_GUEST', 'This account is already saved.');
+  const name = username && username !== user.username ? username : null;
+  if (name) {
+    const taken = await queryOne('SELECT id FROM users WHERE username = ? AND id <> ?', [name, userId]);
+    if (taken) throw conflict('ALREADY_EXISTS', 'That username is already taken.', { fields: { username: 'That username is already taken.' } });
+  }
+  const hash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  await query('UPDATE users SET password_hash = ?, is_guest = 0, username = COALESCE(?, username) WHERE id = ?', [hash, name, userId]);
+  await recordAudit(null, { actorType: 'PLAYER', actorUserId: userId, action: 'GUEST_ACCOUNT_SAVED', entityType: 'USER', entityId: userId, metadata: { renamed: !!name } });
+  return mapUser(await queryOne('SELECT * FROM users WHERE id = ?', [userId]));
 }
 
 export async function register(data, meta = {}) {

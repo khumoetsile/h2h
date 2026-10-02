@@ -12,6 +12,8 @@ export interface User {
   bio: string | null;
   avatarColor: string;
   isBot?: boolean;
+  /** Started playing with no sign-up; has not set a password yet. */
+  isGuest?: boolean;
   isDemoData?: boolean;
   createdAt: string;
   lastLoginAt?: string | null;

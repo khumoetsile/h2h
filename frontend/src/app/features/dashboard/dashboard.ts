@@ -9,6 +9,7 @@ import { Challenge, FootballFixture, Game, MatchSummary, UserStats, Wallet } fro
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { GetApp } from '../../shared/get-app';
+import { SaveAccount } from '../../shared/save-account';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
 import { Avatar, EmptyState, GameIcon, LoadError, OutcomeChip } from '../../shared/ui';
 
@@ -29,7 +30,7 @@ interface Dashboard {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, MatIconModule, GetApp, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
+  imports: [RouterLink, MatIconModule, GetApp, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })

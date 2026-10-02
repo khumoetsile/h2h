@@ -24,6 +24,9 @@ import { SkillRoom } from './skill-room';
  * the server stamped; when one reaches zero the page simply asks the server
  * what happened — it never decides an outcome itself.
  */
+/** How long to look for a real opponent before a practice match steps in. */
+const AUTO_PRACTICE_MS = 8000;
+
 @Component({
   selector: 'app-match-lobby',
   imports: [RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, Spinner, Countdown, SkillRoom],
@@ -62,6 +65,7 @@ export class MatchLobbyPage implements OnInit {
 
   ngOnInit() {
     this.load();
+    this.destroyRef.onDestroy(() => { if (this.autoPractice) clearTimeout(this.autoPractice); });
     this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((m) => {
       if (m.code === this.code()) this.apply(m);
     });
@@ -72,10 +76,37 @@ export class MatchLobbyPage implements OnInit {
 
   private autoReadied = false;
   private autoStarted = false;
+  private autoPractice: ReturnType<typeof setTimeout> | null = null;
+  private autoPracticed = false;
+
+  /**
+   * Nobody should sit on a spinner. If a matchmaking game finds no human within a few seconds, a practice
+   * opponent steps in (clearly labelled) and the match starts. Friend invites are exempt: they wait for the friend.
+   */
+  private scheduleAutoPractice(m: MatchView) {
+    const eligible = m.status === 'WAITING' && m.category !== 'FOOTBALL' && m.source !== 'DIRECT' && !!this.config.config()?.demoBotsEnabled;
+    if (!eligible) {
+      if (this.autoPractice) { clearTimeout(this.autoPractice); this.autoPractice = null; }
+      return;
+    }
+    if (this.autoPractice || this.autoPracticed) return;
+    const waited = Math.max(0, this.clock.now() - new Date(m.createdAt).getTime());
+    this.autoPractice = setTimeout(async () => {
+      this.autoPractice = null;
+      await this.load(true);
+      const cur = this.match();
+      if (cur && cur.status === 'WAITING' && !this.busy() && !this.autoPracticed) {
+        this.autoPracticed = true;
+        this.toast.info('No one free right now, so you are playing a practice match.');
+        await this.practiceNow();
+      }
+    }, Math.max(0, AUTO_PRACTICE_MS - waited));
+  }
 
   private apply(m: MatchView) {
     const prev = this.match();
     this.match.set(m);
+    this.scheduleAutoPractice(m);
     const skill = m.category !== 'FOOTBALL';
     const opp = m.players.find((p) => p.userId !== m.viewerId);
     const me = m.players.find((p) => p.userId === m.viewerId);

@@ -69,6 +69,21 @@ export class AuthService {
     return res.user;
   }
 
+  /** No form: a guest account with a generated name, so someone can play before deciding to sign up. */
+  async guest() {
+    const res = await this.api.post<AuthResponse>('/auth/guest', {});
+    this.storeToken(res.token, true);
+    await this.refreshMe();
+    return res.user;
+  }
+
+  /** A guest saves their account by choosing a password (and, if they like, a different name). */
+  async claim(password: string, username?: string) {
+    const res = await this.api.post<{ user: User }>('/auth/claim', username ? { password, username } : { password });
+    this.user.set(res.user);
+    return res.user;
+  }
+
   /** Account with just a name and password, for people arriving from an invite link. */
   async quickSignup(username: string, password: string) {
     const res = await this.api.post<AuthResponse>('/auth/quick', { username, password });

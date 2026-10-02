@@ -55,7 +55,7 @@ export function roomPhase(m: MatchView): RoomPhase {
           } @else {
             <h2>Looking for an opponent</h2>
             <p class="elapsed" role="timer">{{ elapsedText() }}</p>
-            <p class="text-2">You will be matched with the next player who picks this game and stake.</p>
+            <p class="text-2">If nobody is free in a few seconds, you will play a practice match instead.</p>
           }
           <app-get-app variant="waiting" [who]="m.source === 'DIRECT' ? 'your friend' : null" />
           @if (config.config()?.demoBotsEnabled) {
