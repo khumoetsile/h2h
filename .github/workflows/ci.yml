@@ -46,8 +46,7 @@ jobs:
         if: failure()
         working-directory: backend
         run: |
-          msg=$(grep -E "✖|failing tests|AssertionError|Error:|expected|actual|test/.*.test.js:[0-9]+" test-output.txt | head -60 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/
-/%0A/g')
+          msg=$(grep -E "✖|failing tests|AssertionError|Error:|expected|actual|test/.*.test.js:[0-9]+" test-output.txt | head -60 | sed 's/%/%25/g' | awk 'BEGIN{ORS="%0A"} {print}')
           echo "::error title=Backend test failures::$msg"
 
   frontend:
