@@ -361,10 +361,13 @@ export class ShootoutScene implements OnDestroy {
     const rot = sideDive ? dir * (kHigh ? 52 : 82) : 0;
     const kdy = kHigh ? (sideDive ? -14 : -16) : 6;
     const kscale = sideDive ? 1 : (kHigh ? 1.04 : 0.84);
+    // A perfect top-corner strike is unsavable even when he guessed the spot: he gets there late and just short, hands grasping at air.
+    const beaten = k.outcome === 'GOAL' && k.keeperZone === k.zone;
+    const reach = beaten ? 0.5 : 1;
     this.fx(this.keeper().nativeElement, [
       { transform: 'translate(0px,0px) rotate(0deg) scale(1)' },
-      { transform: `translate(${dir * (COL_W * 0.92)}px,${kdy}px) rotate(${rot}deg) scale(${kscale})` },
-    ], { duration: 460 * s, delay: keeperDelay, easing: 'cubic-bezier(.15,.75,.3,1)' });
+      { transform: `translate(${dir * (COL_W * 0.92) * reach}px,${beaten ? kdy * 0.4 : kdy}px) rotate(${rot * (beaten ? 0.7 : 1)}deg) scale(${beaten ? 1 : kscale})` },
+    ], { duration: (beaten ? 620 : 460) * s, delay: keeperDelay + (beaten ? 140 * s : 0), easing: 'cubic-bezier(.15,.75,.3,1)' });
     this.fx(this.armL().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${kHigh ? 170 : sideDive ? 120 : 60}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
     this.fx(this.armR().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${kHigh ? -170 : sideDive ? -120 : -60}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
 
@@ -404,7 +407,7 @@ export class ShootoutScene implements OnDestroy {
       if (run !== this.run) return;
       this.contact.emit();
       if (k.outcome === 'GOAL') {
-        this.banner.set({ kind: 'GOAL', title: 'Goal!', sub: perfect ? 'Perfect strike' : (kHigh !== high ? (high ? 'Keeper went low, shot went high' : 'Keeper went high, shot went low') : 'Keeper went the wrong way'), tone: good ? 'good' : 'bad' });
+        this.banner.set({ kind: 'GOAL', title: 'Goal!', sub: perfect ? (k.keeperZone === k.zone ? 'Perfect strike. Right spot, too quick' : 'Perfect strike') : (kHigh !== high ? (high ? 'Keeper went low, shot went high' : 'Keeper went high, shot went low') : 'Keeper went the wrong way'), tone: good ? 'good' : 'bad' });
         const ring = this.ripple().nativeElement;
         ring.setAttribute('cx', String(tx));
         ring.setAttribute('cy', String(ty));
