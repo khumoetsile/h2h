@@ -1,72 +1,68 @@
-import { Component, DestroyRef, ElementRef, OnDestroy, OnInit, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
+import { Component, DestroyRef, ElementRef, HostListener, OnDestroy, OnInit, computed, effect, inject, input, output, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../core/api.service';
 import { apiError } from '../core/api-error';
 import { RealtimeService } from '../core/realtime.service';
 import { ServerClock } from '../core/server-clock';
 import { Toast } from '../core/toast.service';
-import {
-  COL_NAMES, ShootoutKick, ShootoutState, ZONE_NAMES, markerAt, zoneCol, zoneIsHigh,
-} from './shootout.model';
+import { ShootoutAudio } from './shootout-audio';
+import { ShootoutScene } from './shootout-scene';
+import { PERFECT_BAND, ShootoutKick, ShootoutState, markerAt, zoneCol } from './shootout.model';
 
 type Pip = 'goal' | 'saved' | 'miss' | 'now' | 'todo';
 
-/** How long a result stays on screen before the next kick's countdown takes over. */
-const REVEAL_MAX_MS = 4500;
-/** After the last kick, how long before the end card appears / we move on. */
-const END_CARD_DELAY_MS = 3200;
+/** After the final kick has played, how long before the end card is allowed to cover the pitch. */
+const END_AUTO_MS = 9000;
 const POLL_MS = 2500;
 
 /**
  * Live penalty shootout screen. The server runs the rules and keeps every
  * choice sealed until both players are in; this screen sends your own choice
- * and draws what the server tells it.
+ * and shows what the server tells it, through the animated stage.
  *
- * Built to stay light on a phone: plain DOM and CSS, no images or canvas, no
- * per-frame Angular updates (the timing bar's marker is moved with a
- * transform from one animation-frame loop), and this component is its own
- * lazy chunk.
+ * Built to stay light on a phone: plain DOM/SVG and CSS, no images or canvas,
+ * no per-frame Angular updates (the timing gauge's marker is moved with a
+ * transform from a single animation-frame loop), and this component is its
+ * own lazy chunk.
  */
 @Component({
   selector: 'app-live-shootout',
+  imports: [MatIconModule, ShootoutScene],
   template: `
     @if (error()) {
       <div class="err"><p>{{ error() }}</p><button class="btn btn-primary" (click)="join()">Try again</button></div>
     } @else if (state(); as st) {
       <div class="so">
         <section class="board" aria-label="Score">
-          @for (s of sides(); track s.userId) {
-            <div class="side" [class.me]="s.me">
-              <span class="name">{{ s.me ? 'You' : s.username }}</span>
-              <span class="pips">@for (p of s.pips; track $index) { <i class="pip" [attr.data-s]="p"></i> }</span>
-              <strong class="goals">{{ s.goals }}</strong>
-            </div>
-          }
+          <div class="rows">
+            @for (s of sides(); track s.userId) {
+              <div class="side" [class.me]="s.me">
+                <i class="kit"></i>
+                <span class="name">{{ s.me ? 'You' : s.username }}</span>
+                <span class="pips">@for (p of s.pips; track $index) { <i class="pip" [attr.data-s]="p"></i> }</span>
+                <strong class="goals">{{ s.goals }}</strong>
+              </div>
+            }
+          </div>
+          <button class="snd" type="button" (pointerdown)="toggleSound($event)" [attr.aria-label]="muted() ? 'Turn sound on' : 'Turn sound off'">
+            <mat-icon>{{ muted() ? 'volume_off' : 'volume_up' }}</mat-icon>
+          </button>
         </section>
+
         <p class="status" aria-live="polite">
           {{ status() }}
           @if (st.suddenDeath && !st.done) { <span class="tag">Sudden death</span> }
           @if (secondsLeft() !== null) { <span class="clock">{{ secondsLeft() }}s</span> }
         </p>
 
-        <div class="pitch">
-          <div class="goal">
-            @for (z of zones; track z) {
-              <button type="button" class="cell"
-                [class.sel]="aimZone() === z"
-                [class.hot]="role() === 'KEEPER' && diveCol() === z % 3"
-                [class.win]="hit() === z && revealed()?.outcome === 'GOAL'"
-                [class.stop]="hit() === z && revealed()?.outcome === 'SAVED'"
-                [disabled]="!canAct()"
-                [attr.aria-label]="role() === 'KEEPER' ? 'Dive ' + colNames[z % 3] : 'Aim ' + zoneNames[z]"
-                (click)="pick(z)"></button>
-            }
-            <div class="keeper" [style.left.%]="keeperPos().left" [style.transform]="'translateX(-50%) rotate(' + keeperPos().rot + 'deg)'"><span class="k-head"></span><span class="k-body"></span></div>
-          </div>
-          <div class="ball" [style.left.%]="ballPos().left" [style.top.%]="ballPos().top"></div>
-          @if (banner(); as b) { <div class="banner" [attr.data-k]="b.kind"><strong>{{ b.title }}</strong><span>{{ b.sub }}</span></div> }
+        <div class="stage">
+          <app-shootout-scene #scene
+            [mode]="revealed() ? null : role()" [interactive]="canAct()" [aimZone]="aimZone()" [diveCol]="diveCol()"
+            [youKick]="youKick()" [countdown]="countdownNum()" [audio]="audio"
+            (pickZone)="pickZone($event)" (pickCol)="pickCol($event)" (contact)="onContact()" />
           @if (st.done && !revealed()) {
-            <div class="end">
+            <div class="end" [attr.data-w]="st.winnerId === st.viewerId ? 'win' : st.winnerId === null ? 'draw' : 'loss'">
               <h2>{{ endTitle() }}</h2>
               <p>{{ endSub() }}</p>
               <button class="btn btn-primary btn-lg" (click)="finished.emit()">See result</button>
@@ -75,12 +71,12 @@ const POLL_MS = 2500;
         </div>
 
         @if (role() === 'KICKER' && !st.done && !revealed()) {
-          <div class="bar" [class.off]="!canAct() && !frozen()">
+          <div class="gauge" [class.dim]="!canAct() && frozen() === null">
             <div class="track" #track>
               <i class="b-low"></i><i class="b-high"></i><i class="b-perfect"></i>
               <i class="marker" #marker></i>
             </div>
-            <p class="legend">Stop it in the green. High corners need a tight stop; low shots are more forgiving.</p>
+            <div class="legend"><span>Weak</span><span>Good</span><strong>Perfect</strong><span>Good</span><span>Weak</span></div>
           </div>
         }
 
@@ -88,6 +84,7 @@ const POLL_MS = 2500;
           <button class="act" type="button" [disabled]="!canAct() || (role() === 'KICKER' ? aimZone() === null : diveCol() === null)" (pointerdown)="act($event)">
             {{ role() === 'KEEPER' ? 'Dive' : 'Shoot' }}
           </button>
+          <p class="hint">{{ hint() }}</p>
         }
       </div>
     } @else {
@@ -100,54 +97,50 @@ const POLL_MS = 2500;
     .center { text-align: center; padding: 40px 0; }
     .err { text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; padding: 40px 0; }
 
-    .board { display: flex; flex-direction: column; gap: 6px; background: var(--surface); border-radius: var(--radius); padding: 10px 14px; }
-    .side { display: grid; grid-template-columns: minmax(0, 7.5em) 1fr auto; align-items: center; gap: 12px; }
+    .board { display: flex; align-items: stretch; gap: 8px; background: var(--surface); border-radius: var(--radius); padding: 8px 8px 8px 14px; }
+    .rows { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; justify-content: center; }
+    .side { display: grid; grid-template-columns: 12px minmax(0, 7em) 1fr auto; align-items: center; gap: 10px; }
+    .kit { width: 12px; height: 12px; border-radius: 3px; background: #6fa8dc; }
+    .side.me .kit { background: #f5701f; }
     .name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .side.me .name { color: var(--accent); }
     .pips { display: flex; gap: 6px; flex-wrap: wrap; }
-    .pip { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--border-strong); box-sizing: border-box; }
+    .pip { width: 15px; height: 15px; border-radius: 50%; border: 2px solid var(--border-strong); box-sizing: border-box; transition: background .2s, border-color .2s; }
     .pip[data-s='goal'] { background: var(--win); border-color: var(--win); }
     .pip[data-s='saved'] { background: var(--loss); border-color: var(--loss); }
     .pip[data-s='miss'] { background: var(--muted); border-color: var(--muted); }
-    .pip[data-s='now'] { border-color: var(--text); }
-    .goals { font-family: var(--font-display); font-size: 28px; line-height: 1; min-width: 1ch; text-align: right; }
+    .pip[data-s='now'] { border-color: var(--text); animation: blink 1s ease-in-out infinite; }
+    @keyframes blink { 50% { opacity: .35; } }
+    .goals { font-family: var(--font-display); font-size: 30px; line-height: 1; min-width: 1ch; text-align: right; }
+    .snd { align-self: flex-start; width: 36px; height: 36px; border-radius: 4px; color: var(--text-2); display: flex; align-items: center; justify-content: center; }
+    .snd:hover { background: var(--surface-2); color: var(--text); }
 
     .status { min-height: 24px; text-align: center; color: var(--text-2); font-size: 17px; }
     .tag { margin-left: 8px; background: var(--demo-soft); color: var(--demo); border-radius: 3px; padding: 1px 7px; font-size: 14px; font-weight: 600; }
     .clock { margin-left: 8px; color: var(--muted); font-variant-numeric: tabular-nums; }
 
-    .pitch { position: relative; width: 100%; aspect-ratio: 4 / 3; max-height: 46vh; min-height: 250px; background: #1b2e22; border-radius: var(--radius); overflow: hidden; contain: layout paint; }
-    .goal { position: absolute; left: 8%; right: 8%; top: 8%; height: 44%; border: 5px solid #eceae3; border-bottom: 0; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 1fr); }
-    .cell { border: 0; border-right: 1px solid rgba(255,255,255,.14); border-bottom: 1px solid rgba(255,255,255,.14); background: transparent; cursor: pointer; padding: 0; }
-    .cell:nth-child(3n) { border-right: 0; } .cell:nth-child(n+4) { border-bottom: 0; }
-    .cell:disabled { cursor: default; }
-    .cell.sel, .cell.hot { background: rgba(245, 112, 31, .28); box-shadow: inset 0 0 0 2px var(--accent); }
-    .cell.win { background: rgba(92, 203, 138, .35); box-shadow: inset 0 0 0 2px var(--win); }
-    .cell.stop { background: rgba(232, 98, 79, .35); box-shadow: inset 0 0 0 2px var(--loss); }
-    .keeper { position: absolute; top: 26%; width: 14%; max-width: 54px; display: flex; flex-direction: column; align-items: center; transition: left .3s ease-out, transform .3s ease-out; pointer-events: none; }
-    .k-head { width: 38%; aspect-ratio: 1; border-radius: 50%; background: #d9b44a; }
-    .k-body { width: 100%; height: 56px; margin-top: 2px; border-radius: 10px 10px 3px 3px; background: #cfd3c8; }
-    .ball { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #fff; border: 3px solid #14100c; box-sizing: border-box; transition: left .38s ease-out, top .38s ease-out; pointer-events: none; }
-    .banner { position: absolute; left: 0; right: 0; top: 56%; display: flex; flex-direction: column; align-items: center; gap: 2px; text-align: center; pointer-events: none; }
-    .banner strong { font-family: var(--font-display); font-size: 40px; line-height: 1; }
-    .banner span { color: var(--text-2); font-size: 16px; }
-    .banner[data-k='GOAL'] strong { color: var(--win); } .banner[data-k='SAVED'] strong { color: var(--loss); } .banner[data-k='MISSED'] strong { color: var(--muted); }
-    .end { position: absolute; inset: 0; background: rgba(16, 19, 17, .92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 16px; }
-    .end h2 { font-size: 42px; } .end p { color: var(--text-2); margin-bottom: 8px; }
+    .stage { position: relative; }
+    .end { position: absolute; inset: 0; border-radius: var(--radius); background: rgba(16, 19, 17, .9); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; text-align: center; padding: 16px; animation: fade .35s ease both; }
+    .end h2 { font-size: 54px; line-height: 1; }
+    .end[data-w='win'] h2 { color: var(--win); } .end[data-w='loss'] h2 { color: var(--loss); }
+    .end p { color: var(--text-2); font-size: 18px; margin-bottom: 8px; }
+    @keyframes fade { from { opacity: 0; } to { opacity: 1; } }
 
-    .bar.off { opacity: .55; }
-    .track { position: relative; height: 46px; background: #2a302b; border-radius: 4px; overflow: hidden; }
+    .gauge.dim { opacity: .55; }
+    .track { position: relative; height: 44px; background: #2a302b; border-radius: 4px; overflow: hidden; }
     .track i { position: absolute; top: 0; bottom: 0; left: 50%; transform: translateX(-50%); }
     /* Band widths are twice the server's half-widths: low 0.34, high 0.20, perfect 0.07. */
     .b-low { width: 68%; background: #34403a; }
     .b-high { width: 40%; background: #3c6b4a; }
-    .b-perfect { width: 14%; background: var(--win); }
-    .marker { left: 0 !important; width: 4px; margin-left: -2px; background: #fff; will-change: transform; }
-    .legend { margin-top: 6px; color: var(--muted); font-size: 14px; text-align: center; }
+    .b-perfect { width: 14%; background: var(--win); transition: filter .1s; }
+    .track.perfect .b-perfect { filter: brightness(1.35); }
+    .marker { left: 0 !important; width: 6px; margin-left: -3px; background: #fff; border-radius: 2px; will-change: transform; }
+    .legend { display: grid; grid-template-columns: repeat(5, 1fr); margin-top: 5px; color: var(--muted); font-size: 13px; text-align: center; }
+    .legend strong { color: var(--win); font-weight: 600; }
 
-    .act { min-height: 68px; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-size: 30px; font-weight: 700; cursor: pointer; text-align: center; }
+    .act { min-height: 68px; border-radius: var(--radius); background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-size: 30px; font-weight: 700; cursor: pointer; text-align: center; transition: transform .08s; }
+    .act:active:not(:disabled) { transform: scale(.985); }
     .act:disabled { opacity: .35; cursor: default; }
-    @media (prefers-reduced-motion: reduce) { .keeper, .ball { transition-duration: .001ms; } }
+    .hint { text-align: center; color: var(--muted); font-size: 15px; min-height: 20px; }
   `],
 })
 export class LiveShootoutGame implements OnInit, OnDestroy {
@@ -160,12 +153,11 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   private toast = inject(Toast);
   private destroyRef = inject(DestroyRef);
 
+  protected audio = new ShootoutAudio();
+  protected muted = signal(this.audio.muted);
+  private scene = viewChild(ShootoutScene);
   private trackEl = viewChild<ElementRef<HTMLElement>>('track');
   private markerEl = viewChild<ElementRef<HTMLElement>>('marker');
-
-  protected zones = [0, 1, 2, 3, 4, 5];
-  protected zoneNames = ZONE_NAMES;
-  protected colNames = COL_NAMES;
 
   protected state = signal<ShootoutState | null>(null);
   protected error = signal('');
@@ -173,6 +165,8 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   protected diveCol = signal<number | null>(null);
   protected frozen = signal<number | null>(null); // marker position kept after the kicker has shot
   protected revealed = signal<ShootoutKick | null>(null);
+  /** The kick being replayed: its result is held back from the scoreboard until the ball arrives. */
+  private pending = signal<ShootoutKick | null>(null);
   private revealedAt = 0;
   private localLocked = signal(false);
   private busy = signal(false);
@@ -181,11 +175,21 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   private roundNo = -1;
   private endTimer: ReturnType<typeof setTimeout> | null = null;
   private raf = 0;
+  private inPerfect = false;
+  private lastCount: number | null = null;
 
   private cur = computed(() => this.state()?.current ?? null);
   protected role = computed(() => this.cur()?.role ?? null);
   private nowMs = computed(() => { this.tick(); return this.clock.precise(); });
   private opp = computed(() => this.state()?.players.find((p) => p.userId !== this.state()!.viewerId) ?? null);
+
+  /** Kit colours follow whoever is shooting: the kick being replayed, else the one being taken. */
+  protected youKick = computed(() => {
+    const r = this.revealed();
+    const st = this.state();
+    if (r && st) return r.kickerId === st.viewerId;
+    return this.cur() ? this.cur()!.role === 'KICKER' : true;
+  });
 
   protected locked = computed(() => !!this.cur()?.myLocked || this.localLocked());
   protected canAct = computed(() => {
@@ -203,42 +207,27 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     return Math.max(0, Math.ceil((Date.parse(c.deadline) - now) / 1000));
   });
 
+  /** 3, 2, 1 shown on the pitch before a kick. */
+  protected countdownNum = computed(() => {
+    const c = this.cur(); const st = this.state();
+    if (!c || !st || st.done || this.revealed()) return null;
+    const n = Math.ceil((Date.parse(c.startsAt) - this.nowMs()) / 1000);
+    return n >= 1 && n <= 3 ? n : null;
+  });
+
   protected sides = computed(() => {
     const st = this.state();
     if (!st) return [];
+    const hold = this.pending();
+    const shown = hold ? st.history.filter((k) => k.no !== hold.no) : st.history;
+    const nowKicker = hold ? hold.kickerId : st.done ? null : st.current?.kickerId ?? null;
     return st.players.map((p) => {
-      const kicks = st.history.filter((k) => k.kickerId === p.userId);
+      const kicks = shown.filter((k) => k.kickerId === p.userId);
       const pips: Pip[] = kicks.map((k) => (k.outcome === 'GOAL' ? 'goal' : k.outcome === 'SAVED' ? 'saved' : 'miss'));
-      if (st.current?.kickerId === p.userId && !st.done) pips.push('now');
+      if (nowKicker === p.userId) pips.push('now');
       while (pips.length < st.kicksPerSide) pips.push('todo');
-      return { userId: p.userId, username: p.username, me: p.userId === st.viewerId, pips, goals: st.goals[p.userId] ?? 0 };
+      return { userId: p.userId, username: p.username, me: p.userId === st.viewerId, pips, goals: kicks.filter((k) => k.outcome === 'GOAL').length };
     });
-  });
-
-  /** The zone the last revealed kick was aimed at, while its result is on screen. */
-  protected hit = computed(() => this.revealed()?.zone ?? -1);
-
-  protected ballPos = computed(() => {
-    const k = this.revealed();
-    if (!k || k.zone == null) return { left: 50, top: 88 };
-    const col = zoneCol(k.zone);
-    const x = 8 + (84 * (col + 0.5)) / 3;
-    if (k.outcome === 'MISSED') return zoneIsHigh(k.zone) ? { left: x, top: -8 } : { left: col === 0 ? 3 : col === 2 ? 97 : 94, top: 40 };
-    return { left: x, top: zoneIsHigh(k.zone) ? 19 : 41 };
-  });
-
-  protected keeperPos = computed(() => {
-    const k = this.revealed();
-    const col = k ? k.keeperCol : 1;
-    return { left: 8 + (84 * (col + 0.5)) / 3, rot: (col - 1) * 18 };
-  });
-
-  protected banner = computed(() => {
-    const k = this.revealed();
-    if (!k) return null;
-    if (k.zone == null) return { kind: 'MISSED', title: 'No shot', sub: k.kickerId === this.state()?.viewerId ? 'You ran out of time' : 'They ran out of time' };
-    const quality = k.quality === 'PERFECT' ? 'Perfect strike' : k.quality === 'POOR' ? (zoneIsHigh(k.zone) ? 'Over the bar' : 'Wide of the post') : k.outcome === 'SAVED' ? 'Keeper guessed right' : 'Keeper went the wrong way';
-    return { kind: k.outcome, title: k.outcome === 'GOAL' ? 'Goal!' : k.outcome === 'SAVED' ? 'Saved!' : 'Missed!', sub: quality };
   });
 
   protected status = computed(() => {
@@ -248,12 +237,18 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     if (st.phase === 'LOBBY') return `Waiting for ${this.opp()?.username ?? 'your opponent'} to take the pitch`;
     const c = st.current;
     if (!c) return '';
-    if (this.revealed()) return 'Next kick coming up';
+    if (this.revealed()) return '';
     const toStart = Math.ceil((Date.parse(c.startsAt) - this.nowMs()) / 1000);
-    if (toStart > 0) return `Kick ${c.no}: ${c.role === 'KICKER' ? 'you shoot' : 'you keep goal'}. Starting in ${toStart}`;
+    if (toStart > 0) return `Kick ${c.no}: ${c.role === 'KICKER' ? 'you shoot' : 'you keep goal'}`;
     if (this.locked()) return c.opponentLocked ? 'Both locked in' : `Locked in. Waiting for ${this.opp()?.username ?? 'your opponent'}`;
-    if (c.role === 'KEEPER') return 'Pick a side to dive';
-    return this.aimZone() === null ? 'Pick where to aim, then stop the bar in the green' : 'Stop the bar in the green, then shoot';
+    return c.role === 'KEEPER' ? 'Your dive' : 'Your shot';
+  });
+
+  protected hint = computed(() => {
+    const c = this.cur();
+    if (!c || this.revealed() || this.state()?.done || this.locked()) return '';
+    if (c.role === 'KEEPER') return this.diveCol() === null ? 'Tap the side of the goal you think they will shoot at' : 'Now dive';
+    return this.aimZone() === null ? 'Tap where you want to aim, then stop the gauge in the green' : 'Stop the gauge in the green, then shoot';
   });
 
   protected endTitle = computed(() => {
@@ -279,11 +274,12 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
       this.roundNo = no;
       this.localLocked.set(false);
       this.frozen.set(null);
+      this.scene()?.reset();
       const mine = this.state()?.myChoice;
       this.aimZone.set(mine?.zone ?? null);
       this.diveCol.set(mine?.col ?? null);
     });
-    // A newly resolved kick: show its result.
+    // A newly resolved kick: play it out on the stage.
     effect(() => {
       const st = this.state();
       if (!st) return;
@@ -291,15 +287,22 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
       if (this.seenKicks === -1) { this.seenKicks = n; return; }
       if (n > this.seenKicks) {
         this.seenKicks = n;
-        this.revealed.set(st.history[n - 1]);
+        const kick = st.history[n - 1];
+        this.revealed.set(kick);
+        this.pending.set(kick);
         this.revealedAt = Date.now();
+        void this.replay(kick, st);
       }
     });
-    // When it's over, move on after the last result has been seen.
+    // Tick on the last second of the pre-kick countdown.
     effect(() => {
-      if (this.state()?.done && !this.endTimer) {
-        this.endTimer = setTimeout(() => this.finished.emit(), END_CARD_DELAY_MS + 4000);
-      }
+      const n = this.countdownNum();
+      if (n !== null && n !== this.lastCount) this.audio.tick();
+      this.lastCount = n;
+    });
+    // Whatever happens, move on from the end card after a while.
+    effect(() => {
+      if (this.state()?.done && !this.endTimer) this.endTimer = setTimeout(() => this.finished.emit(), END_AUTO_MS);
     });
   }
 
@@ -308,7 +311,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     this.realtime.shootout$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((s) => { if (s.code === this.code()) this.apply(s); });
     this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.refresh());
     const poll = setInterval(() => { if (!document.hidden && !this.state()?.done) void this.refresh(); }, POLL_MS);
-    const ticker = setInterval(() => this.onTick(), 200);
+    const ticker = setInterval(() => this.tick.set(Date.now()), 200);
     this.destroyRef.onDestroy(() => { clearInterval(poll); clearInterval(ticker); });
     const onVisible = () => { if (!document.hidden) { void this.refresh(); this.clock.sync(true); } };
     document.addEventListener('visibilitychange', onVisible);
@@ -321,23 +324,31 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     if (this.endTimer) clearTimeout(this.endTimer);
   }
 
-  private onTick() {
-    this.tick.set(Date.now());
-    const r = this.revealed();
-    const c = this.cur();
-    const st = this.state();
-    if (r) {
-      if (st?.done) {
-        // The final kick: let it play out, then the end card takes over.
-        if (Date.now() - this.revealedAt > END_CARD_DELAY_MS) this.revealed.set(null);
-      } else {
-        const nextStarted = c && this.clock.precise() >= Date.parse(c.startsAt) && c.no > r.no;
-        if (nextStarted || Date.now() - this.revealedAt > REVEAL_MAX_MS) this.revealed.set(null);
-      }
+  protected onContact() { this.pending.set(null); }
+
+  /** Browsers only allow sound after a tap. Any press on this screen unlocks it. */
+  @HostListener('pointerdown') unlockAudio() { this.audio.unlock(); }
+
+  protected toggleSound(ev: Event) {
+    ev.stopPropagation();
+    this.audio.unlock();
+    this.audio.setMuted(!this.audio.muted);
+    this.muted.set(this.audio.muted);
+  }
+
+  private async replay(kick: ShootoutKick, st: ShootoutState) {
+    const scene = this.scene();
+    if (!scene) { this.pending.set(null); this.revealed.set(null); return; }
+    await scene.play({ zone: kick.zone, keeperCol: kick.keeperCol, outcome: kick.outcome, quality: kick.quality, meKicker: kick.kickerId === st.viewerId });
+    if (this.pending() === kick) this.pending.set(null);
+    if (this.revealed() === kick) this.revealed.set(null);
+    const now = this.state();
+    if (now?.done && kick.no === now.history.length) {
+      if (now.winnerId === now.viewerId) { scene.celebrate(); this.audio.win(); }
     }
   }
 
-  /** One animation-frame loop moves the timing bar's marker. No Angular change detection per frame. */
+  /** One animation-frame loop moves the gauge's marker. No Angular change detection per frame. */
   private frame = (ts: number) => {
     const c = this.cur();
     const el = this.markerEl()?.nativeElement;
@@ -350,7 +361,11 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
         const t = Math.max(0, this.clock.preciseAt(ts) - Date.parse(c.startsAt));
         pos = markerAt(c.timing.periodMs, c.timing.phase, t);
       }
-      if (pos !== null) el.style.transform = `translate3d(${pos * track.clientWidth}px,0,0)`;
+      if (pos !== null) {
+        el.style.transform = `translate3d(${pos * track.clientWidth}px,0,0)`;
+        const perfect = Math.abs(pos - 0.5) <= PERFECT_BAND;
+        if (perfect !== this.inPerfect) { this.inPerfect = perfect; track.classList.toggle('perfect', perfect); }
+      }
     }
     this.raf = requestAnimationFrame(this.frame);
   };
@@ -366,7 +381,10 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     try {
       this.apply((await this.api.post<{ state: ShootoutState }>(`/matches/${this.code()}/live/join`)).state);
     } catch (err) {
-      this.error.set(apiError(err).message);
+      const e = apiError(err);
+      // Already over (e.g. you came back after a forfeit): nothing to join, go and see how it ended.
+      if (['MATCH_COMPLETED', 'MATCH_CANCELLED', 'MATCH_VOID'].includes(e.code)) { this.finished.emit(); return; }
+      this.error.set(e.message);
     }
   }
 
@@ -376,14 +394,22 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     } catch { /* the next poll or push will catch up */ }
   }
 
-  protected pick(z: number) {
-    if (!this.canAct()) return;
-    if (this.role() === 'KEEPER') this.diveCol.set(zoneCol(z)); else this.aimZone.set(z);
+  protected pickZone(z: number) {
+    if (!this.canAct() || this.role() !== 'KICKER') return;
+    this.aimZone.set(z);
+    this.audio.buzz(8);
+  }
+
+  protected pickCol(c: number) {
+    if (!this.canAct() || this.role() !== 'KEEPER') return;
+    this.diveCol.set(c);
+    this.audio.buzz(8);
   }
 
   protected async act(ev: PointerEvent) {
     const c = this.cur();
     if (!c || !this.canAct()) return;
+    this.audio.unlock();
     this.busy.set(true);
     try {
       if (c.role === 'KICKER') {
@@ -394,11 +420,13 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
         const stopMs = Math.max(0, Math.round(this.clock.preciseAt(at) - Date.parse(c.startsAt)));
         this.frozen.set(markerAt(c.timing.periodMs, c.timing.phase, stopMs));
         this.localLocked.set(true);
+        this.audio.buzz(20);
         this.apply((await this.api.post<{ state: ShootoutState }>(`/matches/${this.code()}/live/kick`, { zone, stopMs })).state);
       } else {
         const col = this.diveCol();
         if (col === null) return;
         this.localLocked.set(true);
+        this.audio.buzz(20);
         this.apply((await this.api.post<{ state: ShootoutState }>(`/matches/${this.code()}/live/dive`, { col })).state);
       }
     } catch (err) {

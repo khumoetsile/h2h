@@ -25,7 +25,7 @@ export const MAX_KICKS_EACH = 10;
 export const DECISION_MS = 12000;
 /** Pause before the first kick, and between kicks (lets the previous result play out). */
 export const FIRST_KICK_DELAY_MS = 3000;
-export const NEXT_KICK_DELAY_MS = 3500;
+export const NEXT_KICK_DELAY_MS = 4800;
 
 // Timing bar: distance of the stop position from the centre (0..0.5 of the track).
 export const PERFECT_BAND = 0.07;
