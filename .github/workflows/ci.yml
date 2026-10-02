@@ -36,8 +36,19 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - run: npm ci
         working-directory: backend
-      - run: npm test
+      - name: Run backend tests
+        run: |
+          set -o pipefail
+          npm test 2>&1 | tee test-output.txt
         working-directory: backend
+      # Put the failing tests in the run's annotations, where they can be read without opening the full log.
+      - name: Summarise failures
+        if: failure()
+        working-directory: backend
+        run: |
+          msg=$(grep -E "✖|failing tests|AssertionError|Error:|expected|actual|test/.*.test.js:[0-9]+" test-output.txt | head -60 | sed 's/%/%25/g' | sed ':a;N;$!ba;s/
+/%0A/g')
+          echo "::error title=Backend test failures::$msg"
 
   frontend:
     runs-on: ubuntu-latest
