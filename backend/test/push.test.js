@@ -163,13 +163,15 @@ describe('notifications stay welcome: preferences, quiet hours, gaps', () => {
     for (const p of [W, N, S]) await api().post('/api/push/subscribe').set(auth(p.token)).send(sub('wait' + p.id));
     for (const p of [W, N]) assert.equal((await api().post('/api/matches/practice').set(auth(p.token)).send({ gameId: game.id, stake: 10 })).status, 201);
     for (const p of [W, S]) await api().put('/api/me/notification-settings').set(auth(p.token)).send({ waiting: true });
+    await until(() => false, 300);
+    sent.length = 0; // the practice matches above sent their own "opponent found" pings; only the "looking" ones matter here
 
     // Night: nothing goes out.
     push.setClockForTests(NIGHT);
     const looker = await player();
     await api().post('/api/matches/find').set(auth(looker.token)).send({ gameId: game.id, stake: 10 });
     await until(() => false, 300);
-    assert.equal(sent.length, 0);
+    assert.equal(sent.filter((x) => x.tag === 'WAITING_PLAYER').length, 0);
     await api().post(`/api/matches/${(await queryOne('SELECT code FROM matches WHERE created_by = ? ORDER BY id DESC LIMIT 1', [looker.id])).code}/cancel`).set(auth(looker.token));
 
     // Daytime: only W hears about it.
@@ -177,10 +179,10 @@ describe('notifications stay welcome: preferences, quiet hours, gaps', () => {
     const looker2 = await player();
     const f = await api().post('/api/matches/find').set(auth(looker2.token)).send({ gameId: game.id, stake: 10 });
     assert.equal(f.status, 201, JSON.stringify(f.body));
-    await until(() => sent.length >= 1);
-    assert.equal(sent.length, 1);
-    assert.equal(sent[0].endpoint, `https://push.example.test/send/wait${W.id}`);
-    assert.equal(sent[0].tag, 'WAITING_PLAYER');
+    await until(() => sent.some((x) => x.tag === 'WAITING_PLAYER'));
+    const looking = sent.filter((x) => x.tag === 'WAITING_PLAYER');
+    assert.equal(looking.length, 1);
+    assert.equal(looking[0].endpoint, `https://push.example.test/send/wait${W.id}`);
 
     // Again straight away: W was just told, so nobody is.
     assert.equal(await push.announceWaiting({ gameId: game.id, gameName: 'Penalty Shootout', creatorId: looker2.id }), 0);
