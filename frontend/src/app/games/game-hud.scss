@@ -23,3 +23,39 @@
   i { flex: 1; height: 4px; border-radius: 2px; background: var(--surface-3); }
   i.hit { background: var(--win); } i.miss { background: var(--loss); } i.cur { background: var(--text-2); }
 }
+
+// ---- Shared look for the polished quick games --------------------------------------------------
+.gx-top { display: flex; align-items: flex-end; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.gx-score { display: flex; flex-direction: column; line-height: 1;
+  span { color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  strong { font-family: var(--font-display); font-size: 44px; font-variant-numeric: tabular-nums; color: var(--text); }
+  strong.bump { animation: gx-bump .3s ease-out; }
+}
+.gx-mid { flex: 1; display: flex; justify-content: center; min-height: 30px; }
+.gx-streak { align-self: center; padding: 3px 10px; border-radius: 99px; background: var(--accent); color: var(--accent-ink); font-family: var(--font-display); font-size: 18px; font-weight: 700; animation: gx-bump .3s ease-out; }
+.gx-round { text-align: right; line-height: 1;
+  span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+  strong { font-family: var(--font-display); font-size: 28px; font-variant-numeric: tabular-nums; }
+}
+.gx-arena {
+  position: relative; width: 100%; height: min(66vh, 600px); min-height: 360px; border-radius: var(--radius-lg); overflow: hidden;
+  background: radial-gradient(circle at 50% 40%, var(--gx-glow, rgba(34, 211, 238, .12)), transparent 60%), linear-gradient(180deg, #121614, #0c0f0d);
+  border: 1px solid var(--border-strong); touch-action: manipulation; user-select: none; -webkit-user-select: none;
+}
+.gx-arena::before { content: ''; position: absolute; inset: 0; background:
+  linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 44px 44px,
+  linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px) 0 0 / 44px 44px; pointer-events: none; }
+.gx-center { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; padding: 20px; pointer-events: none; z-index: 3; }
+.gx-count { font-family: var(--font-display); font-size: 120px; line-height: 1; font-weight: 700; color: var(--text); animation: gx-pop .9s ease both; }
+.gx-hint { color: var(--text-2); font-size: 18px; max-width: 22em; line-height: 1.35; }
+.gx-big { font-family: var(--font-display); font-size: 56px; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; animation: gx-pop .35s cubic-bezier(.2, 1.3, .4, 1) both; }
+.gx-label { font-family: var(--font-display); font-size: 26px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.gx-pips { display: flex; gap: 4px; margin-top: 10px;
+  i { flex: 1; height: 5px; border-radius: 3px; background: var(--surface-3); transition: background .2s; }
+  i.hit { background: var(--win); } i.miss { background: var(--loss); } i.cur { background: var(--text-2); }
+}
+.gx-good { color: var(--win); } .gx-bad { color: var(--loss); } .gx-warn { color: #eab308; }
+@keyframes gx-pop { 0% { transform: scale(.55); opacity: 0; } 55% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); opacity: 1; } }
+@keyframes gx-bump { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .gx-count, .gx-big, .gx-streak, .gx-score strong.bump { animation: none; } }
+@media (orientation: landscape) and (max-height: 540px) { .gx-arena { height: calc(100vh - 150px); min-height: 220px; } .gx-score strong { font-size: 32px; } }

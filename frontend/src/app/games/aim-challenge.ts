@@ -1,56 +1,77 @@
-import { Component, computed, input, OnDestroy, OnInit, output, signal } from '@angular/core';
+import { Component, computed, ElementRef, input, OnDestroy, OnInit, output, signal, viewChild } from '@angular/core';
 import { GameFinish, nextPaint, sleep } from './game-types';
+import { buzz, burst, floatText, GameAudio, ripple } from './game-fx';
 
 interface Target { x: number; y: number; size: number; }
 interface Spec { targets: Target[]; lifetimeMs: number; gapMs: number; countdownMs: number; }
 interface Shot { hit: boolean; reactionMs?: number; offset?: number; }
 
+const RED = '#ef4444';
+const GOLD = '#facc15';
+
+/** Mirrors the server formula for instant feedback. The server score is authoritative. */
+const pointsFor = (rt: number, offset: number) => Math.max(50, Math.min(600, Math.round(600 - (rt - 150) * 0.5))) + Math.round((1 - offset) * 100) * 4;
+const grade = (offset: number) => (offset < 0.18 ? { label: 'Bullseye', color: GOLD, q: 1 } : offset < 0.45 ? { label: 'Great', color: '#5ccb8a', q: 0.7 } : offset < 0.75 ? { label: 'Good', color: '#e8ece8', q: 0.45 } : { label: 'Edge', color: '#f0805a', q: 0.2 });
+
+/**
+ * Aim Challenge: twenty targets, one after another, each shrinking away. Tap close to the centre, and quickly:
+ * speed and accuracy both score. The same twenty targets, in the same places, for both players.
+ */
 @Component({
   selector: 'app-aim-challenge',
   styleUrl: './game-hud.scss',
   template: `
-    <div class="hud">
-      <div class="hud-item"><span>Target</span><strong>{{ Math.min(index() + 1, total()) }}/{{ total() }}</strong></div>
-      <div class="hud-item"><span>Hits</span><strong>{{ hits() }}</strong></div>
-      <div class="hud-item"><span>Accuracy</span><strong>{{ accuracy() }}</strong></div>
-      <div class="hud-item"><span>Last</span><strong>{{ last() }}</strong></div>
+    <div class="gx-top">
+      <div class="gx-score"><span>Score</span><strong [class.bump]="bump()">{{ score() }}</strong></div>
+      <div class="gx-mid">@if (streak() >= 2) { <span class="gx-streak">{{ streak() }} hits in a row</span> }</div>
+      <div class="gx-round"><span>Target</span><strong>{{ Math.min(index() + 1, total()) }}/{{ total() }}</strong></div>
     </div>
-    <div class="arena">
+
+    <div class="gx-arena" #arena style="--gx-glow: rgba(239, 68, 68, .14)">
       @if (phase() === 'countdown') {
-        <div class="overlay"><div class="count">{{ count() }}</div><div class="sub">Hit each target before it shrinks away, aim for the centre</div></div>
+        <div class="gx-center">
+          <div class="gx-count">{{ count() }}</div>
+          <p class="gx-hint">Tap each target before it shrinks away. Aim for the centre.</p>
+        </div>
       }
       @if (phase() === 'target') {
-        <button class="t" [style.left.%]="current().x" [style.top.%]="current().y" [style.width.px]="current().size" [style.height.px]="current().size"
+        <button class="t" [style.left.%]="current().x" [style.top.%]="current().y" [style.width.px]="current().size + 12" [style.height.px]="current().size + 12"
                 [style.animation-duration.ms]="spec().lifetimeMs" (pointerdown)="shoot($event)" aria-label="Target"></button>
       }
-      @if (phase() === 'done') { <div class="overlay"><div class="msg">Finished!</div><div class="sub">Checking your result…</div></div> }
+      @if (phase() === 'done') { <div class="gx-center"><div class="gx-label">Finished</div><div class="gx-hint">Checking your result…</div></div> }
     </div>
-    <div class="progress">
+
+    <div class="gx-pips">
       @for (s of shots(); track $index) { <i [class.hit]="s.hit" [class.miss]="!s.hit"></i> }
       @for (i of remaining(); track $index) { <i></i> }
     </div>
   `,
   styles: [`
-    .t { position: absolute; transform: translate(-50%, -50%) scale(1); border-radius: 50%; border: 0; padding: 0; cursor: crosshair; z-index: 2;
-      background: radial-gradient(circle, #fff 0 10%, var(--loss) 11% 30%, #fff 31% 45%, var(--loss) 46% 70%, #fff 71% 100%);
-      animation-name: shrink; animation-timing-function: linear; animation-fill-mode: forwards; touch-action: manipulation; }
-    @keyframes shrink { from { transform: translate(-50%, -50%) scale(1); } to { transform: translate(-50%, -50%) scale(.25); opacity: .6; } }
+    .t { position: absolute; transform: translate(-50%, -50%) scale(1); border-radius: 50%; border: 0; padding: 0; cursor: crosshair; z-index: 4; touch-action: manipulation;
+      background: radial-gradient(circle, #facc15 0 9%, #ef4444 10% 26%, #fff 27% 42%, #ef4444 43% 62%, #fff 63% 80%, #ef4444 81% 100%);
+      box-shadow: 0 0 0 3px rgba(239, 68, 68, .25), 0 0 26px rgba(239, 68, 68, .4);
+      animation-name: shrink; animation-timing-function: linear; animation-fill-mode: forwards; }
+    @keyframes shrink { from { transform: translate(-50%, -50%) scale(1.15); } to { transform: translate(-50%, -50%) scale(.28); opacity: .55; } }
+    @media (prefers-reduced-motion: reduce) { .t { animation-name: fade; } @keyframes fade { to { opacity: .4; } } }
   `],
 })
 export class AimChallengeGame implements OnInit, OnDestroy {
   readonly spec = input.required<Spec>();
   readonly finished = output<GameFinish>();
   protected Math = Math;
+  private arena = viewChild.required<ElementRef<HTMLElement>>('arena');
+  private audio = new GameAudio();
+
   protected phase = signal<'countdown' | 'target' | 'gap' | 'done'>('countdown');
   protected count = signal(3);
   protected index = signal(0);
   protected shots = signal<Shot[]>([]);
+  protected streak = signal(0);
+  protected bump = signal(false);
   protected total = computed(() => this.spec().targets.length);
   protected current = computed(() => this.spec().targets[Math.min(this.index(), this.total() - 1)]);
   protected remaining = computed(() => Array.from({ length: this.total() - this.shots().length }));
-  protected hits = computed(() => this.shots().filter((s) => s.hit).length);
-  protected accuracy = computed(() => (this.shots().length ? `${Math.round((this.hits() / this.shots().length) * 100)}%` : '-'));
-  protected last = computed(() => { const s = this.shots().at(-1); return !s ? '-' : s.hit ? `${s.reactionMs}ms` : 'Miss'; });
+  protected score = computed(() => this.shots().reduce((a, s) => a + (s.hit && s.reactionMs != null ? pointsFor(s.reactionMs, s.offset ?? 1) : 0), 0));
   private shownAt = 0;
   private resolve: ((s: Shot) => void) | null = null;
   private destroyed = false;
@@ -61,7 +82,7 @@ export class AimChallengeGame implements OnInit, OnDestroy {
   private async run() {
     const start = performance.now();
     const spec = this.spec();
-    for (let c = Math.round(spec.countdownMs / 1000); c > 0; c--) { this.count.set(c); await sleep(1000); if (this.destroyed) return; }
+    for (let c = Math.round(spec.countdownMs / 1000); c > 0; c--) { this.count.set(c); this.audio.tick(); await sleep(1000); if (this.destroyed) return; }
     for (let i = 0; i < spec.targets.length; i++) {
       this.index.set(i);
       const shot = await new Promise<Shot>(async (resolve) => {
@@ -69,11 +90,13 @@ export class AimChallengeGame implements OnInit, OnDestroy {
         const settle = (s: Shot) => { if (!done) { done = true; this.resolve = null; clearTimeout(t); resolve(s); } };
         this.phase.set('target');
         this.shownAt = await nextPaint();
+        this.audio.pop();
         this.resolve = settle;
         const t = setTimeout(() => settle({ hit: false }), spec.lifetimeMs);
       });
       if (this.destroyed) return;
       this.shots.update((s) => [...s, shot]);
+      if (!shot.hit) this.onMiss(spec.targets[i]);
       this.phase.set('gap');
       await sleep(spec.gapMs);
     }
@@ -81,13 +104,45 @@ export class AimChallengeGame implements OnInit, OnDestroy {
     this.finished.emit({ actions: { targets: this.shots() }, clientElapsedMs: Math.round(performance.now() - start) });
   }
 
+  private pos(t: Target) {
+    const box = this.arena().nativeElement.getBoundingClientRect();
+    return { x: (t.x / 100) * box.width, y: (t.y / 100) * box.height };
+  }
+
+  private onMiss(t: Target) {
+    this.streak.set(0);
+    const { x, y } = this.pos(t);
+    ripple(this.arena().nativeElement, x, y, '#6b7280', 50);
+    floatText(this.arena().nativeElement, x, y, 'Missed', '#9ca3af', 20);
+    this.audio.miss();
+  }
+
   protected shoot(ev: PointerEvent) {
     ev.stopPropagation();
+    this.audio.unlock();
     if (!this.resolve) return;
     const rect = (ev.target as HTMLElement).getBoundingClientRect();
     const cx = rect.left + rect.width / 2;
     const cy = rect.top + rect.height / 2;
+    // The ring shrinks over time, so measure against the size it has now.
     const offset = Math.min(1, Math.hypot(ev.clientX - cx, ev.clientY - cy) / (rect.width / 2));
-    this.resolve({ hit: true, reactionMs: Math.round(performance.now() - this.shownAt), offset: Math.round(offset * 1000) / 1000 });
+    const rt = Math.round(performance.now() - this.shownAt);
+    const o = Math.round(offset * 1000) / 1000;
+
+    const host = this.arena().nativeElement;
+    const box = host.getBoundingClientRect();
+    const g = grade(o);
+    const px = ev.clientX - box.left; const py = ev.clientY - box.top;
+    this.streak.update((n) => n + 1);
+    this.bump.set(true);
+    setTimeout(() => this.bump.set(false), 320);
+    burst(host, px, py, g.color, g.q > 0.9 ? 16 : 9);
+    ripple(host, px, py, g.color);
+    floatText(host, px, py - 14, g.label === 'Bullseye' ? `Bullseye +${pointsFor(rt, o)}` : `+${pointsFor(rt, o)}`, g.color, g.label === 'Bullseye' ? 26 : 22);
+    this.audio.hit(g.q);
+    if (this.streak() >= 4) this.audio.streak(this.streak());
+    buzz(g.q > 0.9 ? [12, 20, 12] : 12);
+
+    this.resolve({ hit: true, reactionMs: rt, offset: o });
   }
 }

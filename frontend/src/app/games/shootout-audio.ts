@@ -6,8 +6,8 @@
 const KEY = 'h2h.sound';
 
 export class ShootoutAudio {
-  private ctx: AudioContext | null = null;
-  private master: GainNode | null = null;
+  protected ctx: AudioContext | null = null;
+  protected master: GainNode | null = null;
   muted = false;
 
   constructor() {
@@ -34,9 +34,9 @@ export class ShootoutAudio {
     } catch { /* audio is a bonus, never an error */ }
   }
 
-  private ready() { return !this.muted && !!this.ctx && !!this.master && this.ctx.state === 'running'; }
+  protected ready() { return !this.muted && !!this.ctx && !!this.master && this.ctx.state === 'running'; }
 
-  private noise(seconds: number) {
+  protected noise(seconds: number) {
     const ctx = this.ctx!;
     const buf = ctx.createBuffer(1, Math.max(1, Math.floor(ctx.sampleRate * seconds)), ctx.sampleRate);
     const d = buf.getChannelData(0);
@@ -46,7 +46,7 @@ export class ShootoutAudio {
     return src;
   }
 
-  private env(g: GainNode, t: number, peak: number, attack: number, hold: number, release: number) {
+  protected env(g: GainNode, t: number, peak: number, attack: number, hold: number, release: number) {
     g.gain.cancelScheduledValues(t);
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(peak, t + attack);
