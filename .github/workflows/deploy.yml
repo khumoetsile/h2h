@@ -67,7 +67,7 @@ jobs:
           # node_modules is a cPanel-managed symlink; .env and logs live only on the server.
           rsync -az --delete -e "$SSH" \
             --exclude '.env' --exclude 'node_modules' --exclude 'tmp/' \
-            --exclude '.htaccess' --exclude 'stderr.log' \
+            --exclude '/.htaccess' --exclude 'stderr.log' \
             bundle/ "$SSH_USER@$SSH_HOST:$APP_DIR/"
           $SSH "$SSH_USER@$SSH_HOST" "set -e; source $ACTIVATE; cd $APP_DIR; npm ci --omit=dev; mkdir -p tmp; touch tmp/restart.txt"
 

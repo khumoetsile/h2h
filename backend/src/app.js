@@ -94,7 +94,9 @@ export function createApp() {
         else res.setHeader('Cache-Control', 'public, max-age=86400');
       },
     }));
-    app.get(/^\/(?!api\/|socket\.io\/).*/, (_req, res) => res.sendFile(path.join(webRoot, 'index.html')));
+    // A missing file (anything with an extension) is a real 404, not the app page.
+    app.get(/\.[A-Za-z0-9]{1,8}$/, (_req, res) => res.sendStatus(404));
+    app.get(/^\/(?!api\/|socket\.io\/).*/, (_req, res) => res.sendFile(path.join(webRoot, 'index.html'), { cacheControl: false, headers: { 'Cache-Control': 'no-cache' } }));
   }
   app.use(errorHandler);
   return app;

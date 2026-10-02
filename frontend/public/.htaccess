@@ -1,0 +1,10 @@
+# Served by LiteSpeed straight from this folder, so caching is declared here.
+# Build files carry a content hash in their name: they never change, so keep them for a year.
+<IfModule LiteSpeed>
+  <FilesMatch "-[A-Z0-9]{8}\.(js|css|woff2?)$">
+    Header set Cache-Control "public, max-age=31536000, immutable"
+  </FilesMatch>
+  <FilesMatch "^(material-symbols-subset\.woff2|favicon\.svg)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+</IfModule>
