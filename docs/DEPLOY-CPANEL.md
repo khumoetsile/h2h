@@ -49,6 +49,9 @@ On the same Node.js App screen → **Environment variables** → **Add Variable*
 | `FOOTBALL_SYNC_INTERVAL_SECONDS` | `60` (free plan allows ~10 calls/min; one sync costs 7) |
 | `FOOTBALL_FIXTURE_WINDOW_DAYS` | `21` |
 | `DEMO_BOTS_ENABLED` | `true` |
+| `VAPID_PUBLIC_KEY` | public half of the notification key pair (run `npm run vapid` in `backend` to make one). Leave unset to switch phone notifications off |
+| `VAPID_PRIVATE_KEY` | the private half. Keep it secret and never change it later, or every phone has to turn notifications on again |
+| `VAPID_SUBJECT` | `mailto:` plus an email you read, e.g. `mailto:you@khumo.co.bw` |
 
 Anything else in `backend/.env.example` (timers, fees, currency) has a sensible default; add it here only if you want a different value.
 

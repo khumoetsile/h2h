@@ -7,4 +7,15 @@
   <FilesMatch "^(material-symbols-subset\.woff2|favicon\.svg)$">
     Header set Cache-Control "public, max-age=604800"
   </FilesMatch>
+  # The service worker is re-checked on every visit so a fix reaches phones right away.
+  <FilesMatch "^sw\.js$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+  <FilesMatch "^manifest\.webmanifest$">
+    Header set Cache-Control "public, max-age=86400"
+  </FilesMatch>
+  <FilesMatch "\.png$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
 </IfModule>
+AddType application/manifest+json .webmanifest

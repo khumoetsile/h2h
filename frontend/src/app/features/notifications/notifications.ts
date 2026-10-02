@@ -5,6 +5,7 @@ import { Api } from '../../core/api.service';
 import { AuthService } from '../../core/auth.service';
 import { AppNotification } from '../../core/models';
 import { Toast } from '../../core/toast.service';
+import { GetApp } from '../../shared/get-app';
 import { AgoPipe } from '../../shared/pipes';
 import { EmptyState, LoadError, SkeletonList } from '../../shared/ui';
 
@@ -16,9 +17,10 @@ const ICONS: Record<string, string> = {
 
 @Component({
   selector: 'app-notifications',
-  imports: [MatIconModule, AgoPipe, EmptyState, LoadError, SkeletonList],
+  imports: [MatIconModule, GetApp, AgoPipe, EmptyState, LoadError, SkeletonList],
   template: `
     <div class="page page-narrow">
+      <app-get-app variant="settings" />
       <div class="page-head">
         <div><h1>Notifications</h1><p class="sub">{{ auth.unread() }} unread</p></div>
         <div class="row">

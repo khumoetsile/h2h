@@ -5,6 +5,7 @@ import { ConfigStore } from '../../core/config.store';
 import { MatchView } from '../../core/models';
 import { ServerClock } from '../../core/server-clock';
 import { Countdown } from '../../shared/countdown';
+import { GetApp } from '../../shared/get-app';
 import { InviteShare } from '../../shared/invite-share';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, GameIcon } from '../../shared/ui';
@@ -32,7 +33,7 @@ export function roomPhase(m: MatchView): RoomPhase {
  */
 @Component({
   selector: 'app-skill-room',
-  imports: [MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, Countdown, InviteShare],
+  imports: [MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, Countdown, InviteShare, GetApp],
   template: `
     @let m = match();
     <header class="head">
@@ -56,8 +57,9 @@ export function roomPhase(m: MatchView): RoomPhase {
             <p class="elapsed" role="timer">{{ elapsedText() }}</p>
             <p class="text-2">You will be matched with the next player who picks this game and stake.</p>
           }
+          <app-get-app variant="waiting" [who]="m.source === 'DIRECT' ? 'your friend' : null" />
           @if (config.config()?.demoBotsEnabled) {
-            <button class="btn btn-block btn-play" [class.btn-primary]="offerPractice()" [disabled]="!!busy()" (click)="practice.emit()">
+            <button class="btn btn-block btn-play" [class.btn-primary]="offerPractice() && m.source !== 'DIRECT'" [disabled]="!!busy()" (click)="practice.emit()">
               @if (busy() === 'bot') { <mat-spinner diameter="22" /> } @else { <mat-icon>smart_toy</mat-icon> }
               {{ offerPractice() ? 'No one yet? Play a practice match' : 'Play a practice match instead' }}
             </button>

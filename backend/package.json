@@ -8,6 +8,7 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
+    "vapid": "node -e \"const k=require('web-push').generateVAPIDKeys();console.log('VAPID_PUBLIC_KEY='+k.publicKey);console.log('VAPID_PRIVATE_KEY='+k.privateKey)\"",
     "migrate": "node scripts/migrate.js",
     "seed": "node scripts/seed.js",
     "db:reset": "node scripts/migrate.js --fresh && node scripts/seed.js",
@@ -24,6 +25,7 @@
     "morgan": "^1.12.1",
     "mysql2": "^3.24.4",
     "socket.io": "^4.8.4",
+    "web-push": "^3.6.7",
     "zod": "^4.6.5"
   },
   "devDependencies": {

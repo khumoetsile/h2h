@@ -9,6 +9,7 @@ import { routes } from './app.routes';
 import { authInterceptor } from './core/auth.interceptor';
 import { AuthService } from './core/auth.service';
 import { ConfigStore } from './core/config.store';
+import { PwaService } from './core/pwa.service';
 import { RealtimeService } from './core/realtime.service';
 
 export const appConfig: ApplicationConfig = {
@@ -22,6 +23,7 @@ export const appConfig: ApplicationConfig = {
     provideAppInitializer(async () => {
       inject(MatIconRegistry).setDefaultFontSetClass('material-symbols-rounded');
       inject(RealtimeService); // start listening to auth changes
+      inject(PwaService).init(); // install prompt + service worker
       await Promise.all([inject(AuthService).init(), inject(ConfigStore).load()]);
     }),
   ],

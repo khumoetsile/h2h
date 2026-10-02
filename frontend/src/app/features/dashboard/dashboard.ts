@@ -8,6 +8,7 @@ import { AuthService } from '../../core/auth.service';
 import { Challenge, FootballFixture, Game, MatchSummary, UserStats, Wallet } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
+import { GetApp } from '../../shared/get-app';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
 import { Avatar, EmptyState, GameIcon, LoadError, OutcomeChip } from '../../shared/ui';
 
@@ -28,7 +29,7 @@ interface Dashboard {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, MatIconModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
+  imports: [RouterLink, MatIconModule, GetApp, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })

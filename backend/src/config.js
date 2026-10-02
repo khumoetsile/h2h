@@ -56,6 +56,12 @@ export const config = {
     // Network allowance for a request that was sent just before a deadline.
     latencyGraceMs: num('TIMER_LATENCY_GRACE_MS', 2000),
   },
+  // Web push (notifications to a phone whose browser is closed). Generate a key pair with `npm run vapid`; leave empty to switch push off.
+  push: {
+    publicKey: process.env.VAPID_PUBLIC_KEY || '',
+    privateKey: process.env.VAPID_PRIVATE_KEY || '',
+    subject: process.env.VAPID_SUBJECT || 'mailto:admin@example.com',
+  },
   // Flat fee for leaving a challenge after both players locked in. Server-side only.
   abandonmentFee: positive('ABANDONMENT_FEE', 0.5),
   // The platform is a prototype: money is ALWAYS simulated. There is intentionally

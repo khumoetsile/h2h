@@ -1,5 +1,6 @@
 import { query } from '../db.js';
 import { emitToUser } from '../realtime.js';
+import { PUSH_TYPES, sendToUser } from './pushService.js';
 
 /**
  * Create an in-app notification. When `tx` is provided the insert joins that
@@ -12,7 +13,11 @@ export async function notify(tx, userId, { type, title, message, link = null }) 
     [userId, type, title.slice(0, 120), message.slice(0, 255), link],
   );
   const payload = { id: res.insertId, type, title, message, link, isRead: false, createdAt: new Date().toISOString() };
-  const push = () => emitToUser(userId, 'notification', payload);
+  const push = () => {
+    emitToUser(userId, 'notification', payload);
+    // The phone's own notification, for the moments a player is waiting on someone.
+    if (PUSH_TYPES.has(type)) void sendToUser(userId, { title, body: message, url: link || '/notifications', tag: type });
+  };
   if (tx) tx.afterCommit(push); else push();
   return payload;
 }
