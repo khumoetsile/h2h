@@ -7,7 +7,7 @@
     @let m = match()!;
     @let t = m.timers;
     @if (!isFootball()) {
-      <app-skill-room [match]="m" [busy]="busy()" (ready)="lockIn()" (practice)="practiceNow()" (leave)="openLeave()" (play)="play()" (expired)="onTimerExpired()" />
+      <app-skill-room [match]="m" [busy]="busy()" [manualReady]="manualReady()" (ready)="lockIn()" (practice)="practiceNow()" (leave)="openLeave()" (play)="play()" (expired)="onTimerExpired()" />
     } @else {
     <div class="lobby-head">
       <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="44" />

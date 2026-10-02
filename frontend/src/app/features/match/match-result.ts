@@ -12,6 +12,7 @@ import { MatchView } from '../../core/models';
 import { RematchService } from '../../core/rematch.service';
 import { Toast } from '../../core/toast.service';
 import { SaveAccount } from '../../shared/save-account';
+import { QuickPlay } from '../../core/quick-play';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, LoadError, Spinner } from '../../shared/ui';
 
@@ -124,6 +125,7 @@ export class MatchResultPage implements OnInit {
   private router = inject(Router);
   private toast = inject(Toast);
   private rematchSvc = inject(RematchService);
+  private quick = inject(QuickPlay);
   private config = inject(ConfigStore);
 
   protected match = signal<MatchView | null>(null);
@@ -220,11 +222,13 @@ export class MatchResultPage implements OnInit {
     }
   }
 
-  playAgain() {
+  /** One tap: straight into the next match for a skill game, no detour through the game page. */
+  async playAgain() {
     const m = this.match();
     if (m?.category === 'FOOTBALL') { this.router.navigate(['/football']); return; }
     const slug = m?.game.slug;
-    this.router.navigate(slug ? ['/games', slug] : ['/games']);
+    if (!slug) { this.router.navigate(['/dashboard']); return; }
+    try { await this.quick.playNow(slug); } catch (err) { this.toast.error(err); this.router.navigate(['/games', slug]); }
   }
 
   /** A brand-new challenge — never a reuse of this record. */

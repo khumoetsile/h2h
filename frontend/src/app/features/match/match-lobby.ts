@@ -47,6 +47,8 @@ export class MatchLobbyPage implements OnInit {
   protected error = signal('');
   protected busy = signal<string | null>(null);
   protected leaveOpen = signal(false);
+  /** Getting ready for the player failed once; show the button so they can do it themselves. */
+  protected manualReady = signal(false);
 
   protected me = computed(() => this.match()?.players.find((p) => p.userId === this.match()?.viewerId) ?? null);
   protected opponent = computed(() => this.match()?.players.find((p) => p.userId !== this.match()?.viewerId) ?? null);
@@ -115,10 +117,10 @@ export class MatchLobbyPage implements OnInit {
       else if (!opp?.isBot) { try { navigator.vibrate?.([120, 60, 120]); } catch { /* not supported */ } }
     }
     if (skill) {
-      // A bot is always ready, so there is nothing to wait for: get ready on the player's behalf.
-      if (m.status === 'MATCHED' && opp?.isBot && me?.owesAction && !this.autoReadied && !this.busy()) {
+      // Nobody taps "ready" any more: when an opponent is found we get ready on the player's behalf.
+      if (m.status === 'MATCHED' && me?.owesAction && !this.autoReadied && !this.busy()) {
         this.autoReadied = true;
-        void this.lockIn();
+        void this.lockIn().then((ok) => { if (!ok) this.manualReady.set(true); });
       }
       // Both ready: go straight into the game. Only when this page watched it happen, so coming back
       // from a game never throws the player back in.

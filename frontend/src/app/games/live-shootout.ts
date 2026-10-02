@@ -16,7 +16,9 @@ type Pip = 'goal' | 'saved' | 'miss' | 'now' | 'todo';
 /** After the final kick has played, how long before the end card is allowed to cover the pitch. */
 const END_AUTO_MS = 9000;
 const DEFAULT_AIM = 4;
-const HELP_KEY = 'h2h.shootout.seen';
+/** How many choices this phone has made. The first couple of kicks get a fuller hint; after that it stays short. */
+const ACTS_KEY = 'h2h.shootout.acts';
+const COACHED_ACTS = 2;
 const POLL_MS = 2500;
 
 /**
@@ -29,20 +31,15 @@ const POLL_MS = 2500;
  * transform from a single animation-frame loop), and this component is its
  * own lazy chunk.
  */
+function readActs() {
+  try { return Number(localStorage.getItem(ACTS_KEY)) || 0; } catch { return 0; }
+}
+
 @Component({
   selector: 'app-live-shootout',
   imports: [MatIconModule, ShootoutScene, Countdown],
   template: `
-    @if (showHelp()) {
-      <section class="help">
-        <h2>How a shootout works</h2>
-        <p>You and your opponent take turns. On every kick you <strong>both choose at the same time</strong>.</p>
-        <p><strong>Shooting:</strong> tap where to aim, then tap <strong>Shoot</strong> when the marker is in the green. A perfect shot in a top corner cannot be saved.</p>
-        <p><strong>Keeping goal:</strong> tap the spot you think they will shoot at, high or low. You only save it if you pick the exact same spot. You dive straight away.</p>
-        <p>Five kicks each. Most goals wins.</p>
-        <button class="btn btn-primary btn-play btn-block" (click)="startAfterHelp()">Got it, let's play</button>
-      </section>
-    } @else if (error()) {
+    @if (error()) {
       <div class="err"><p>{{ error() }}</p><button class="btn btn-primary" (click)="join()">Try again</button></div>
     } @else if (state(); as st) {
       <div class="so">
@@ -191,7 +188,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   private trackEl = viewChild<ElementRef<HTMLElement>>('track');
   private markerEl = viewChild<ElementRef<HTMLElement>>('marker');
 
-  protected showHelp = signal(false);
+  private acts = signal(readActs());
   protected state = signal<ShootoutState | null>(null);
   protected error = signal('');
   protected aimZone = signal<number | null>(null);
@@ -288,8 +285,9 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   protected hint = computed(() => {
     const c = this.cur();
     if (!c || this.revealed() || this.state()?.done || this.locked()) return '';
-    if (c.role === 'KEEPER') return 'Tap the spot you think they will shoot at';
-    return 'Tap the goal to change your aim. Tap Shoot when the marker is in the green';
+    const coached = this.acts() < COACHED_ACTS;
+    if (c.role === 'KEEPER') return coached ? 'Tap where you think they will shoot. High or low matters. You only save the exact spot.' : 'Tap the spot you think they will shoot at';
+    return coached ? '1. Tap a spot to aim.  2. Tap Shoot when the marker is in the green.' : 'Tap the goal to change your aim. Tap Shoot when the marker is in the green';
   });
 
   protected endTitle = computed(() => {
@@ -350,9 +348,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    let seen = true;
-    try { seen = localStorage.getItem(HELP_KEY) === '1'; } catch { /* storage unavailable */ }
-    if (seen) void this.join(); else this.showHelp.set(true);
+    void this.join();
     this.realtime.shootout$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((s) => { if (s.code === this.code()) this.apply(s); });
     this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.refresh());
     const poll = setInterval(() => { if (!document.hidden && !this.state()?.done) void this.refresh(); }, POLL_MS);
@@ -415,12 +411,10 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   /** Browsers only allow sound after a tap. Any press on this screen unlocks it. */
   @HostListener('pointerdown') unlockAudio() { this.audio.unlock(); }
 
-  /** First time only: explain the rules, then take the pitch. */
-  protected startAfterHelp() {
-    try { localStorage.setItem(HELP_KEY, '1'); } catch { /* storage unavailable */ }
-    this.audio.unlock();
-    this.showHelp.set(false);
-    void this.join();
+  private noteAct() {
+    const n = this.acts() + 1;
+    this.acts.set(n);
+    try { localStorage.setItem(ACTS_KEY, String(n)); } catch { /* storage unavailable */ }
   }
 
   protected toggleSound(ev: Event) {
@@ -507,6 +501,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     this.audio.unlock();
     this.busy.set(true);
     try {
+      this.noteAct();
       if (c.role === 'KICKER') {
         const zone = this.aimZone();
         if (zone === null || !c.timing) return;

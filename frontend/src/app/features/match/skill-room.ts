@@ -65,7 +65,7 @@ export function roomPhase(m: MatchView): RoomPhase {
             </button>
           }
           <button class="btn btn-ghost btn-block" [disabled]="!!busy()" (click)="leave.emit()">Cancel</button>
-          <p class="muted tiny">Your {{ m.stake | money }} is returned in full if nobody joins.</p>
+          <p class="muted tiny">Your {{ m.stake | money }} is returned in full if nobody joins. Once a match has started, leaving it costs {{ config.abandonmentFee() }}.</p>
         </section>
       }
 
@@ -76,14 +76,16 @@ export function roomPhase(m: MatchView): RoomPhase {
             <span class="vs-t">vs</span>
             <div class="who"><app-avatar [name]="opponent()?.username ?? '?'" [color]="opponent()?.avatarColor ?? '#64748B'" [size]="64" /><strong>{{ opponent()?.username }}</strong></div>
           </div>
-          <h2>Opponent found</h2>
-          <p class="text-2">{{ opponent()?.lockedIn ? opponent()?.username + ' is ready and waiting for you.' : 'Tap ready when you are.' }}</p>
-          <button class="btn btn-primary btn-play btn-block" [disabled]="!!busy()" (click)="ready.emit()">
-            @if (busy() === 'lock') { <mat-spinner diameter="22" /> } @else { I'm ready }
-          </button>
-          <p class="muted small">Ready within <app-countdown [deadline]="match().timers.myDeadline" [icon]="false" (expired)="expired.emit()" /></p>
-          <p class="muted tiny">Ready holds your {{ m.stake | money }} entry. Leaving after both of you are ready costs {{ config.abandonmentFee() }}.</p>
-          <button class="btn btn-ghost btn-block" [disabled]="!!busy()" (click)="leave.emit()">Leave (free until you are ready)</button>
+          <h2>{{ opponent()?.username }} is here</h2>
+          @if (manualReady()) {
+            <p class="text-2">Tap ready to start.</p>
+            <button class="btn btn-primary btn-play btn-block" [disabled]="!!busy()" (click)="ready.emit()">
+              @if (busy() === 'lock') { <mat-spinner diameter="22" /> } @else { I'm ready }
+            </button>
+            <p class="muted small">Ready within <app-countdown [deadline]="match().timers.myDeadline" [icon]="false" (expired)="expired.emit()" /></p>
+          } @else {
+            <p class="text-2 starting"><mat-spinner diameter="18" /> Starting your match</p>
+          }
         </section>
       }
 
@@ -138,6 +140,7 @@ export function roomPhase(m: MatchView): RoomPhase {
     .grow { flex: 1; min-width: 0; }
     .panel { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 12px; padding: 24px 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
     .panel h2 { font-size: 28px; }
+    .starting { display: flex; align-items: center; justify-content: center; gap: 10px; }
     .elapsed { font-family: var(--font-display); font-size: 40px; line-height: 1; font-variant-numeric: tabular-nums; color: var(--text-2); }
     .vs { display: flex; align-items: center; justify-content: center; gap: 18px; width: 100%; }
     .who { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; max-width: 40%; }
@@ -157,6 +160,8 @@ export class SkillRoom {
 
   readonly match = input.required<MatchView>();
   readonly busy = input<string | null>(null);
+  /** Getting ready automatically failed, so show the button. */
+  readonly manualReady = input(false);
   readonly ready = output<void>();
   readonly practice = output<void>();
   readonly leave = output<void>();
