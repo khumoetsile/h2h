@@ -43,6 +43,18 @@ async function createSession(userId, remember, meta) {
   return { token: signToken(id, userId, expiresAt), expiresAt };
 }
 
+/**
+ * Account with only a username and password, for people joining from an invite link. Name, email and phone get
+ * placeholders (the email domain is reserved and can never receive mail); they can be filled in from the profile later.
+ */
+export async function quickSignup({ username, password }, meta = {}) {
+  return register({
+    firstName: username, lastName: 'Player', username,
+    email: `${username.toLowerCase()}@quick.invalid`, phone: '+26700000000',
+    password, remember: true,
+  }, meta);
+}
+
 export async function register(data, meta = {}) {
   const settings = await getSettings();
   const email = data.email.toLowerCase();

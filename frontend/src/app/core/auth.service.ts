@@ -69,6 +69,14 @@ export class AuthService {
     return res.user;
   }
 
+  /** Account with just a name and password, for people arriving from an invite link. */
+  async quickSignup(username: string, password: string) {
+    const res = await this.api.post<AuthResponse>('/auth/quick', { username, password });
+    this.storeToken(res.token, true);
+    await this.refreshMe();
+    return res.user;
+  }
+
   async logout() {
     try { await this.api.post('/auth/logout'); } catch { /* token may already be invalid */ }
     this.clear();

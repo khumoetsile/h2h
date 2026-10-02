@@ -5,6 +5,8 @@ import { Shell } from './layout/shell';
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
   { path: 'login', canActivate: [guestGuard], title: 'Sign in', loadComponent: () => import('./features/auth/login').then((m) => m.LoginPage) },
+  // Shared challenge link: open to everyone (new players sign up on the page itself).
+  { path: 'join/:code', title: 'Challenge', loadComponent: () => import('./features/invite/invite').then((m) => m.InvitePage) },
   { path: 'register', canActivate: [guestGuard], title: 'Create account', loadComponent: () => import('./features/auth/register').then((m) => m.RegisterPage) },
   // Gameplay and its result are standalone, full-screen routes — no header,
   // no bottom nav, no balance shown, so the player can focus on the game.

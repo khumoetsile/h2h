@@ -5,6 +5,7 @@ import { ConfigStore } from '../../core/config.store';
 import { MatchView } from '../../core/models';
 import { ServerClock } from '../../core/server-clock';
 import { Countdown } from '../../shared/countdown';
+import { InviteShare } from '../../shared/invite-share';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, GameIcon } from '../../shared/ui';
 
@@ -31,7 +32,7 @@ export function roomPhase(m: MatchView): RoomPhase {
  */
 @Component({
   selector: 'app-skill-room',
-  imports: [MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, Countdown],
+  imports: [MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, Countdown, InviteShare],
   template: `
     @let m = match();
     <header class="head">
@@ -46,9 +47,15 @@ export function roomPhase(m: MatchView): RoomPhase {
       @case ('searching') {
         <section class="panel fade-in">
           <div class="radar" aria-hidden="true"><i></i><i></i><i></i><mat-icon>search</mat-icon></div>
-          <h2>Looking for an opponent</h2>
-          <p class="elapsed" role="timer">{{ elapsedText() }}</p>
-          <p class="text-2">You will be matched with the next player who picks this game and stake.</p>
+          @if (m.source === 'DIRECT') {
+            <h2>Challenge a friend</h2>
+            <app-invite-share [code]="m.code" [game]="m.game.name" />
+            <p class="elapsed" role="timer">Waiting {{ elapsedText() }}</p>
+          } @else {
+            <h2>Looking for an opponent</h2>
+            <p class="elapsed" role="timer">{{ elapsedText() }}</p>
+            <p class="text-2">You will be matched with the next player who picks this game and stake.</p>
+          }
           @if (config.config()?.demoBotsEnabled) {
             <button class="btn btn-block btn-play" [class.btn-primary]="offerPractice()" [disabled]="!!busy()" (click)="practice.emit()">
               @if (busy() === 'bot') { <mat-spinner diameter="22" /> } @else { <mat-icon>smart_toy</mat-icon> }

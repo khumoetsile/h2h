@@ -109,7 +109,7 @@ export function standing(kicks, firstId, secondId) {
 
 /** A keeper who never chose gets a random dive (reproducible from the seed, never a free save). */
 export function autoKeeperZone(seed, roundNo) {
-  return createRng(((Number(seed) >>> 0) ^ Math.imul(roundNo, 40503) ^ 0x51ed270b) >>> 0).int(0, COLS - 1);
+  return createRng(((Number(seed) >>> 0) ^ Math.imul(roundNo, 40503) ^ 0x51ed270b) >>> 0).int(0, ZONES - 1);
 }
 
 /** House bot as kicker: picks a zone and aims the bar with a little human-like error. */
@@ -129,7 +129,7 @@ export function botKick(seed, roundNo, params) {
 
 /** House bot as keeper: dives to any of the six zones. */
 export function botDive(seed, roundNo) {
-  return createRng(((Number(seed) >>> 0) ^ Math.imul(roundNo, 1103515245) ^ 0x2545f491) >>> 0).int(0, COLS - 1);
+  return createRng(((Number(seed) >>> 0) ^ Math.imul(roundNo, 1103515245) ^ 0x2545f491) >>> 0).int(0, ZONES - 1);
 }
 
 // ---- Legacy interface -------------------------------------------------------------------

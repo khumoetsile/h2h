@@ -13,6 +13,7 @@ import { getSettings } from './services/settingsService.js';
 import { computePrize } from './utils/money.js';
 import { publicTimerConfig } from './timers.js';
 import authRoutes from './routes/auth.js';
+import inviteRoutes from './routes/invites.js';
 import meRoutes from './routes/me.js';
 import walletRoutes from './routes/wallet.js';
 import gameRoutes from './routes/games.js';
@@ -70,6 +71,7 @@ export function createApp() {
   }));
 
   app.use('/api/auth', authRoutes);
+  app.use('/api/invites', inviteRoutes);
   app.use('/api', requireAuth, meRoutes); // /api/me, /api/dashboard
   app.use('/api/wallet', requireAuth, walletRoutes);
   app.use('/api/games', requireAuth, gameRoutes);

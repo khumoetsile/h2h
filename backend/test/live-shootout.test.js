@@ -113,7 +113,8 @@ describe('shootout rules', () => {
       assert.ok(Number.isInteger(k.zone) && k.zone >= 0 && k.zone < rules.ZONES);
       assert.ok(k.stopMs >= 600 && k.stopMs < 4000);
       const d = rules.botDive(777, r);
-      assert.ok(Number.isInteger(d) && d >= 0 && d < rules.COLS);
+      assert.ok(Number.isInteger(d) && d >= 0 && d < rules.ZONES);
+      assert.ok(Number.isInteger(rules.autoKeeperZone(777, r)) && rules.autoKeeperZone(777, r) < rules.ZONES);
     }
   });
 });
@@ -478,5 +479,14 @@ describe('one-tap practice', () => {
     assert.ok(r.status >= 400 && r.status < 500, `expected a client error, got ${r.status}`);
     const rows = await query('SELECT COUNT(*) AS n FROM matches WHERE created_by = ?', [A.user.id]);
     assert.equal(rows[0].n, 0);
+  });
+});
+
+describe('bot and auto dives use every zone, low and high', () => {
+  test('across many rounds both rows and all columns appear', () => {
+    const bot = new Set(); const auto = new Set();
+    for (let r = 1; r <= 300; r++) { bot.add(rules.botDive(4242, r)); auto.add(rules.autoKeeperZone(4242, r)); }
+    assert.deepEqual([...bot].sort(), [0, 1, 2, 3, 4, 5]);
+    assert.deepEqual([...auto].sort(), [0, 1, 2, 3, 4, 5]);
   });
 });

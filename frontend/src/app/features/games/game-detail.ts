@@ -83,7 +83,9 @@ const DEFAULT_STAKE = 10;
                 </button>
               }
             }
-            <a class="link small center" [routerLink]="['/challenges/new']" [queryParams]="{ gameId: g.id, stake: stake()?.stake }">Challenge a friend instead</a>
+            <button class="btn btn-block" [disabled]="!stake() || busy() || !g.isEnabled || stake()!.stake > available()" (click)="invite()">
+              @if (busy() === 'invite') { <mat-spinner diameter="20" /> } @else { <mat-icon>share</mat-icon> Invite a friend }
+            </button>
           </div>
           <p class="muted tiny note">Your entry is held while you play and returned if nobody joins. Leaving a match after both players are ready costs {{ config.abandonmentFee() }}.</p>
         </section>
@@ -136,7 +138,7 @@ export class GameDetailPage implements OnInit {
   protected stake = signal<StakeOption | null>(null);
   protected error = signal('');
   protected findError = signal('');
-  protected busy = signal<'find' | 'practice' | null>(null);
+  protected busy = signal<'find' | 'practice' | 'invite' | null>(null);
   protected available = computed(() => this.auth.wallet()?.available ?? 0);
   protected duration = durationLabel;
   /** The player has picked a stake themselves, so live queue updates must not move it. */
@@ -205,6 +207,23 @@ export class GameDetailPage implements OnInit {
   }
 
   /** A match against a bot, locked in and ready: straight onto the pitch. */
+  /** Open a match just for a friend and go to the screen with the share buttons. */
+  async invite() {
+    const g = this.game();
+    const s = this.stake();
+    if (!g || !s) return;
+    this.busy.set('invite');
+    this.findError.set('');
+    try {
+      const r = await this.api.post<{ match: MatchView }>('/matches', { gameId: g.id, stake: s.stake });
+      await this.router.navigate(['/match', r.match.code]);
+    } catch (err) {
+      this.findError.set(apiError(err).message);
+    } finally {
+      this.busy.set(null);
+    }
+  }
+
   async practice() {
     const g = this.game();
     const s = this.stake();

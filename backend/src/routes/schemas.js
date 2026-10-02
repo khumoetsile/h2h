@@ -28,6 +28,11 @@ export const registerSchema = z.object({
   remember: z.boolean().optional(),
 }).refine((d) => d.password === d.confirmPassword, { path: ['confirmPassword'], message: 'Passwords do not match.' });
 
+export const quickSignupSchema = z.object({
+  username,
+  password: z.string({ error: 'Password is required.' }).min(6, 'Password must be at least 6 characters.').max(72, 'Password must be at most 72 characters.'),
+});
+
 export const loginSchema = z.object({
   identifier: z.string({ error: 'Email or username is required.' }).trim().min(1, 'Email or username is required.').max(190),
   password: z.string({ error: 'Password is required.' }).min(1, 'Password is required.').max(200),

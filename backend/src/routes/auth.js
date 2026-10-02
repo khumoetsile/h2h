@@ -4,7 +4,7 @@ import { config } from '../config.js';
 import { ah } from '../utils/errors.js';
 import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
-import { loginSchema, registerSchema } from './schemas.js';
+import { loginSchema, quickSignupSchema, registerSchema } from './schemas.js';
 import * as auth from '../services/authService.js';
 
 const router = Router();
@@ -20,6 +20,11 @@ const meta = (req) => ({ userAgent: req.headers['user-agent'], ip: req.ip });
 
 router.post('/register', limiter, validate(registerSchema), ah(async (req, res) => {
   res.status(201).json(await auth.register(req.body, meta(req)));
+}));
+
+// Fast sign-up for someone arriving from an invite link: just a name and a password.
+router.post('/quick', limiter, validate(quickSignupSchema), ah(async (req, res) => {
+  res.status(201).json(await auth.quickSignup(req.body, meta(req)));
 }));
 
 router.post('/login', limiter, validate(loginSchema), ah(async (req, res) => {
