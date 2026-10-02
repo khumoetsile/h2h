@@ -7,13 +7,14 @@ import { createRng, gauss } from './rng.js';
 //
 //   Kicker: picks one of six zones (3 columns x high/low) AND stops a timing
 //           bar. The bar decides how well the ball is struck.
-//   Keeper: picks one of three columns to dive to.
+//   Keeper: picks one of the same six zones to dive to.
 //
 // Resolution (see resolveKick):
 //   - Struck badly (bar too far from the centre) -> MISSED: wide for a low
 //     shot, over the bar for a high one. High shots are harder to keep on target.
 //   - A PERFECT strike at a high zone cannot be saved.
-//   - Otherwise it is SAVED if the keeper dived to the shot's column, else GOAL.
+//   - Otherwise it is SAVED only if the keeper dived to the very same zone, else GOAL.
+//     (A keeper who goes low can't get to a shot in the top corner, and the other way round.)
 //
 // Format is the real one: five kicks each, alternating; it can end early once a
 // side cannot catch up; if level after five each it goes to sudden death.
@@ -65,14 +66,14 @@ export function kickerSlotFor(seed, roundNo) {
  * Resolve one kick. `zone` and `stopMs` may be null when the kicker never shot
  * (ran out of time): that kick is simply missed.
  */
-export function resolveKick({ zone, stopMs, keeperCol }, { periodMs, phase }) {
+export function resolveKick({ zone, stopMs, keeperZone }, { periodMs, phase }) {
   if (zone == null || stopMs == null) return { outcome: 'MISSED', quality: 'NONE', marker: null };
   const marker = markerAt(periodMs, phase, stopMs);
   const off = Math.abs(marker - 0.5);
   const high = isHigh(zone);
   if (off > (high ? HIGH_BAND : LOW_BAND)) return { outcome: 'MISSED', quality: 'POOR', marker };
   if (high && off <= PERFECT_BAND) return { outcome: 'GOAL', quality: 'PERFECT', marker };
-  return { outcome: keeperCol === zoneCol(zone) ? 'SAVED' : 'GOAL', quality: 'GOOD', marker };
+  return { outcome: keeperZone === zone ? 'SAVED' : 'GOAL', quality: 'GOOD', marker };
 }
 
 /**
@@ -107,7 +108,7 @@ export function standing(kicks, firstId, secondId) {
 // ---- Choices made for a player who ran out of time, and for house bots ----------------
 
 /** A keeper who never chose gets a random dive (reproducible from the seed, never a free save). */
-export function autoKeeperCol(seed, roundNo) {
+export function autoKeeperZone(seed, roundNo) {
   return createRng(((Number(seed) >>> 0) ^ Math.imul(roundNo, 40503) ^ 0x51ed270b) >>> 0).int(0, COLS - 1);
 }
 
@@ -126,7 +127,7 @@ export function botKick(seed, roundNo, params) {
   return { zone, stopMs: best };
 }
 
-/** House bot as keeper: leans on no particular side. */
+/** House bot as keeper: dives to any of the six zones. */
 export function botDive(seed, roundNo) {
   return createRng(((Number(seed) >>> 0) ^ Math.imul(roundNo, 1103515245) ^ 0x2545f491) >>> 0).int(0, COLS - 1);
 }

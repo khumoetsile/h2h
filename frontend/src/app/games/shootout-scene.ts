@@ -5,7 +5,7 @@ import { KickOutcome, KickQuality, zoneCol, zoneIsHigh } from './shootout.model'
 /** What the scene needs to replay one resolved kick. */
 export interface KickReplay {
   zone: number | null;
-  keeperCol: number;
+  keeperZone: number;
   outcome: KickOutcome;
   quality: KickQuality;
   /** True when the viewer took this kick (colours the kit, picks the cheer or the groan). */
@@ -144,11 +144,11 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
             </g>
           }
         } @else if (mode() === 'KEEPER') {
-          @for (c of cols; track c) {
-            <g class="col" [class.live]="interactive()" [class.sel]="diveCol() === c" (pointerdown)="onCol($event, c)">
-              <rect [attr.x]="70 + c * 73.33" y="112" width="73.33" height="84" fill="transparent"/>
-              <rect class="band" [attr.x]="70 + c * 73.33 + 2" y="126" width="69.33" height="62" rx="4"/>
-              <path class="chev" [attr.d]="c === 0 ? 'M ' + (colCentre(0) + 5) + ' 150 l -9 11 l 9 11' : c === 2 ? 'M ' + (colCentre(2) - 5) + ' 150 l 9 11 l -9 11' : 'M ' + (colCentre(1) - 8) + ' 168 l 8 -10 l 8 10'"/>
+          @for (z of zones; track z) {
+            <g class="col" [class.live]="interactive()" [class.sel]="diveZone() === z" (pointerdown)="onDive($event, z)">
+              <rect [attr.x]="70 + (z % 3) * 73.33" [attr.y]="z < 3 ? 112 : 157" width="73.33" [attr.height]="z < 3 ? 45 : 41" fill="transparent"/>
+              <rect class="band" [attr.x]="70 + (z % 3) * 73.33 + 3" [attr.y]="z < 3 ? 116 : 160" width="67.33" [attr.height]="z < 3 ? 37 : 34" rx="4"/>
+              <path class="chev" [attr.d]="diveChev(z)"/>
             </g>
           }
         }
@@ -216,7 +216,7 @@ export class ShootoutScene implements OnDestroy {
   readonly mode = input<'KICKER' | 'KEEPER' | null>(null);
   readonly interactive = input(false);
   readonly aimZone = input<number | null>(null);
-  readonly diveCol = input<number | null>(null);
+  readonly diveZone = input<number | null>(null);
   /** Who is kicking right now, for the kit colours (you are always orange). */
   readonly youKick = input(true);
   readonly countdown = input<number | null>(null);
@@ -224,12 +224,11 @@ export class ShootoutScene implements OnDestroy {
   readonly caption = input<string | null>(null);
   readonly audio = input<ShootoutAudio | null>(null);
   readonly pickZone = output<number>();
-  readonly pickCol = output<number>();
+  readonly pickDive = output<number>();
   /** Fires at the moment the ball reaches the goal (or the keeper): when the result becomes known on screen. */
   readonly contact = output<void>();
 
   protected zones = [0, 1, 2, 3, 4, 5];
-  protected cols = [0, 1, 2];
   protected banner = signal<{ kind: string; title: string; sub: string; tone: 'good' | 'bad' } | null>(null);
   protected confetti = signal(false);
   protected pieces = Array.from({ length: 22 }, (_, i) => ({
@@ -254,12 +253,23 @@ export class ShootoutScene implements OnDestroy {
   private run = 0;
   private timers: ReturnType<typeof setTimeout>[] = [];
 
-  /** Your keeper leans toward the side you have picked, so the choice feels real. */
+  /** Your keeper leans toward the spot you have picked (up on his toes for a high one), so the choice feels real. */
   protected lean = () => {
     if (this.mode() !== 'KEEPER') return 'none';
-    const c = this.diveCol();
-    return c === 0 ? 'translateX(-9px) rotate(-7deg)' : c === 2 ? 'translateX(9px) rotate(7deg)' : c === 1 ? 'scaleY(1.04)' : 'none';
+    const z = this.diveZone();
+    if (z === null) return 'none';
+    const c = zoneCol(z);
+    const up = zoneIsHigh(z);
+    const x = (c - 1) * 9;
+    return `translate(${x}px,${up ? -3 : 1}px) rotate(${(c - 1) * 7}deg) scaleY(${up ? 1.07 : 0.95})`;
   };
+  /** An arrow on each dive target pointing the way the keeper would go. */
+  protected diveChev(z: number) {
+    const cx = colX(zoneCol(z)); const cy = zoneIsHigh(z) ? 134 : 177; const c = zoneCol(z);
+    const v = zoneIsHigh(z) ? -1 : 1;
+    if (c === 1) return v < 0 ? `M ${cx - 8} ${cy + 5} l 8 -10 l 8 10` : `M ${cx - 8} ${cy - 5} l 8 10 l 8 -10`;
+    return c === 0 ? `M ${cx + 4} ${cy - 8} l -8 8 l 8 8` : `M ${cx - 4} ${cy - 8} l 8 8 l -8 8`;
+  }
   protected kickerKit = () => (this.youKick() ? ME : OPP);
   protected keeperKit = () => (this.youKick() ? OPP : ME);
   protected colCentre = colX;
@@ -267,7 +277,7 @@ export class ShootoutScene implements OnDestroy {
   ngOnDestroy() { this.reset(); }
 
   protected onZone(ev: Event, z: number) { if (this.interactive()) { ev.preventDefault(); this.pickZone.emit(z); } }
-  protected onCol(ev: Event, c: number) { if (this.interactive()) { ev.preventDefault(); this.pickCol.emit(c); } }
+  protected onDive(ev: Event, z: number) { if (this.interactive()) { ev.preventDefault(); this.pickDive.emit(z); } }
 
   private fx(el: Element, keyframes: Keyframe[], options: KeyframeAnimationOptions) {
     const a = el.animate(keyframes, { fill: 'forwards', ...options });
@@ -301,8 +311,8 @@ export class ShootoutScene implements OnDestroy {
     a?.whistle();
 
     // The keeper reads the strike a beat early, so the dive begins as the boot connects.
-    const diveCol = k.keeperCol;
-    const dir = diveCol - 1;
+    const dir = zoneCol(k.keeperZone) - 1;
+    const kHigh = zoneIsHigh(k.keeperZone);
     const high = k.zone != null && zoneIsHigh(k.zone);
 
     if (k.zone == null) {
@@ -347,14 +357,16 @@ export class ShootoutScene implements OnDestroy {
     const keeperDelay = Math.max(0, strikeAt - 60 * s);
     const sideDive = dir !== 0;
     const saving = k.outcome === 'SAVED';
-    const rot = sideDive ? dir * (saving ? (high ? 62 : 80) : 74) : 0;
-    const kdy = sideDive ? (saving ? (high ? -14 : 8) : -6) : (saving ? (high ? -12 : 4) : -10);
+    // Goes where the keeper chose: up for a top corner (a leap, body upright-ish), down low for a bottom one.
+    const rot = sideDive ? dir * (kHigh ? 52 : 82) : 0;
+    const kdy = kHigh ? (sideDive ? -14 : -16) : 6;
+    const kscale = sideDive ? 1 : (kHigh ? 1.04 : 0.84);
     this.fx(this.keeper().nativeElement, [
       { transform: 'translate(0px,0px) rotate(0deg) scale(1)' },
-      { transform: `translate(${dir * (COL_W * 0.92)}px,${kdy}px) rotate(${rot}deg) scale(${sideDive ? 1.04 : 1.1})` },
+      { transform: `translate(${dir * (COL_W * 0.92)}px,${kdy}px) rotate(${rot}deg) scale(${kscale})` },
     ], { duration: 460 * s, delay: keeperDelay, easing: 'cubic-bezier(.15,.75,.3,1)' });
-    this.fx(this.armL().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${sideDive ? 168 : 150}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
-    this.fx(this.armR().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${sideDive ? -168 : -150}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
+    this.fx(this.armL().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${kHigh ? 170 : sideDive ? 120 : 60}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
+    this.fx(this.armR().nativeElement, [{ transform: 'rotate(0deg)' }, { transform: `rotate(${kHigh ? -170 : sideDive ? -120 : -60}deg)` }], { duration: 260 * s, delay: keeperDelay, easing: 'ease-out' });
 
     // Camera leans in on the strike.
     this.fx(this.cam().nativeElement, [
@@ -392,7 +404,7 @@ export class ShootoutScene implements OnDestroy {
       if (run !== this.run) return;
       this.contact.emit();
       if (k.outcome === 'GOAL') {
-        this.banner.set({ kind: 'GOAL', title: 'Goal!', sub: perfect ? 'Perfect strike' : 'Keeper went the wrong way', tone: good ? 'good' : 'bad' });
+        this.banner.set({ kind: 'GOAL', title: 'Goal!', sub: perfect ? 'Perfect strike' : (kHigh !== high ? (high ? 'Keeper went low, shot went high' : 'Keeper went high, shot went low') : 'Keeper went the wrong way'), tone: good ? 'good' : 'bad' });
         const ring = this.ripple().nativeElement;
         ring.setAttribute('cx', String(tx));
         ring.setAttribute('cy', String(ty));
@@ -414,7 +426,7 @@ export class ShootoutScene implements OnDestroy {
         if (good) a?.cheer(); else a?.groan();
         a?.buzz(good ? [30, 40, 60] : [60]);
       } else if (k.outcome === 'SAVED') {
-        this.banner.set({ kind: 'SAVED', title: 'Saved!', sub: 'Keeper guessed right', tone: good ? 'good' : 'bad' });
+        this.banner.set({ kind: 'SAVED', title: 'Saved!', sub: high ? 'Keeper got up to it' : 'Keeper got down to it', tone: good ? 'good' : 'bad' });
         // The ball is turned away.
         const away = (col === 1 ? (dx >= 0 ? 1 : -1) : col === 0 ? -1 : 1);
         this.fx(this.ball().nativeElement, [

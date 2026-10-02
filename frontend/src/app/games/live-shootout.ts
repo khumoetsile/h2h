@@ -38,7 +38,7 @@ const POLL_MS = 2500;
         <h2>How a shootout works</h2>
         <p>You and your opponent take turns. On every kick you <strong>both choose at the same time</strong>.</p>
         <p><strong>Shooting:</strong> tap where to aim, then tap <strong>Shoot</strong> when the marker is in the green. A perfect shot in a top corner cannot be saved.</p>
-        <p><strong>Keeping goal:</strong> tap the side you think they will shoot at. You dive straight away.</p>
+        <p><strong>Keeping goal:</strong> tap the spot you think they will shoot at, high or low. You only save it if you pick the exact same spot. You dive straight away.</p>
         <p>Five kicks each. Most goals wins.</p>
         <button class="btn btn-primary btn-play btn-block" (click)="startAfterHelp()">Got it, let's play</button>
       </section>
@@ -71,9 +71,9 @@ const POLL_MS = 2500;
 
         <div class="stage">
           <app-shootout-scene #scene
-            [mode]="revealed() ? null : role()" [interactive]="canAct()" [aimZone]="aimZone()" [diveCol]="diveCol()"
+            [mode]="revealed() ? null : role()" [interactive]="canAct()" [aimZone]="aimZone()" [diveZone]="diveZone()"
             [youKick]="youKick()" [countdown]="countdownNum()" [caption]="caption()" [audio]="audio"
-            (pickZone)="pickZone($event)" (pickCol)="pickCol($event)" (contact)="onContact()" />
+            (pickZone)="pickZone($event)" (pickDive)="pickDive($event)" (contact)="onContact()" />
           @if (st.done && !revealed()) {
             <div class="end" [attr.data-w]="st.winnerId === st.viewerId ? 'win' : st.winnerId === null ? 'draw' : 'loss'">
               <h2>{{ endTitle() }}</h2>
@@ -195,7 +195,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   protected state = signal<ShootoutState | null>(null);
   protected error = signal('');
   protected aimZone = signal<number | null>(null);
-  protected diveCol = signal<number | null>(null);
+  protected diveZone = signal<number | null>(null);
   protected frozen = signal<number | null>(null); // marker position kept after the kicker has shot
   protected revealed = signal<ShootoutKick | null>(null);
   /** The kick being replayed: its result is held back from the scoreboard until the ball arrives. */
@@ -288,7 +288,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   protected hint = computed(() => {
     const c = this.cur();
     if (!c || this.revealed() || this.state()?.done || this.locked()) return '';
-    if (c.role === 'KEEPER') return 'Tap the side you think they will shoot at';
+    if (c.role === 'KEEPER') return 'Tap the spot you think they will shoot at';
     return 'Tap the goal to change your aim. Tap Shoot when the marker is in the green';
   });
 
@@ -319,7 +319,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
       const mine = this.state()?.myChoice;
       // The kicker starts with the bottom-centre spot chosen, so a first-timer can just tap Shoot.
       this.aimZone.set(mine?.zone ?? (c?.role === 'KICKER' ? DEFAULT_AIM : null));
-      this.diveCol.set(mine?.col ?? null);
+      this.diveZone.set(mine?.zone ?? null);
     });
     // A newly resolved kick: play it out on the stage.
     effect(() => {
@@ -387,11 +387,16 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     const role = this.role();
     const key = ev.key;
     if (role === 'KEEPER') {
-      const col = key === 'ArrowLeft' ? 0 : key === 'ArrowRight' ? 2 : key === 'ArrowDown' || key === 'ArrowUp' ? 1 : null;
-      if (col === null) return;
+      const z = this.diveZone() ?? DEFAULT_AIM;
+      let next: number | null = null;
+      if (key === 'ArrowLeft') next = z - (z % 3 === 0 ? 0 : 1);
+      else if (key === 'ArrowRight') next = z + (z % 3 === 2 ? 0 : 1);
+      else if (key === 'ArrowUp') next = z % 3;
+      else if (key === 'ArrowDown') next = 3 + (z % 3);
+      else if (key === ' ' || key === 'Enter') { ev.preventDefault(); if (this.diveZone() !== null) void this.act(null); return; }
+      if (next === null) return;
       ev.preventDefault();
-      this.diveCol.set(col);
-      void this.act(null);
+      this.diveZone.set(next);
       return;
     }
     if (role !== 'KICKER') return;
@@ -428,7 +433,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   private async replay(kick: ShootoutKick, st: ShootoutState) {
     const scene = this.scene();
     if (!scene) { this.pending.set(null); this.revealed.set(null); return; }
-    await scene.play({ zone: kick.zone, keeperCol: kick.keeperCol, outcome: kick.outcome, quality: kick.quality, meKicker: kick.kickerId === st.viewerId });
+    await scene.play({ zone: kick.zone, keeperZone: kick.keeperZone, outcome: kick.outcome, quality: kick.quality, meKicker: kick.kickerId === st.viewerId });
     if (this.pending() === kick) this.pending.set(null);
     if (this.revealed() === kick) this.revealed.set(null);
     const now = this.state();
@@ -489,10 +494,10 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     this.audio.buzz(8);
   }
 
-  /** For the keeper, tapping a side of the goal is the whole decision: dive straight away. */
-  protected pickCol(c: number) {
+  /** For the keeper, tapping a spot in the goal is the whole decision: dive straight away. */
+  protected pickDive(z: number) {
     if (!this.canAct() || this.role() !== 'KEEPER') return;
-    this.diveCol.set(c);
+    this.diveZone.set(z);
     void this.act(null);
   }
 
@@ -513,11 +518,11 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
         this.audio.buzz(20);
         this.apply((await this.api.post<{ state: ShootoutState }>(`/matches/${this.code()}/live/kick`, { zone, stopMs })).state);
       } else {
-        const col = this.diveCol();
-        if (col === null) return;
+        const zone = this.diveZone();
+        if (zone === null) return;
         this.localLocked.set(true);
         this.audio.buzz(20);
-        this.apply((await this.api.post<{ state: ShootoutState }>(`/matches/${this.code()}/live/dive`, { col })).state);
+        this.apply((await this.api.post<{ state: ShootoutState }>(`/matches/${this.code()}/live/dive`, { zone })).state);
       }
     } catch (err) {
       this.localLocked.set(false);

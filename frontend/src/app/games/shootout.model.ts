@@ -22,7 +22,7 @@ export interface ShootoutKick {
   kickerId: number;
   keeperId: number;
   zone: number | null;
-  keeperCol: number;
+  keeperZone: number;
   outcome: KickOutcome;
   quality: KickQuality;
   marker: number | null;
@@ -49,7 +49,7 @@ export interface ShootoutState {
   winnerId: number | null;
   current: ShootoutRound | null;
   history: ShootoutKick[];
-  myChoice: { zone?: number; col?: number } | null;
+  myChoice: { zone?: number } | null;
 }
 
 // Timing bar bands: distance of the stop from the centre, as a fraction of the track (matches the server).

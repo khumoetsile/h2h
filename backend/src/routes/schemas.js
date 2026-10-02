@@ -63,7 +63,7 @@ export const kickSchema = z.object({
 });
 
 export const diveSchema = z.object({
-  col: z.number().int().min(0).max(2),
+  zone: z.number().int().min(0).max(5),
 });
 
 export const resultSchema = z.object({

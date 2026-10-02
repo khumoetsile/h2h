@@ -32,28 +32,35 @@ function kicksFrom(a, b, outcomesA, outcomesB) {
 }
 
 describe('shootout rules', () => {
-  test('timing bar: a perfect high shot is unsavable, a low shot is saved by the matching column only', () => {
+  test('timing bar: a perfect high shot is unsavable, a low shot is saved by the exact zone only', () => {
     const p = { periodMs: 2000, phase: 0 }; // marker is at the exact centre at t = 500
     assert.equal(rules.markerAt(2000, 0, 500), 0.5);
-    const perfectHigh = rules.resolveKick({ zone: 0, stopMs: 500, keeperCol: 0 }, p); // top-left, keeper dives left
+    const perfectHigh = rules.resolveKick({ zone: 0, stopMs: 500, keeperZone: 0 }, p); // top-left, keeper dives there
     assert.deepEqual([perfectHigh.outcome, perfectHigh.quality], ['GOAL', 'PERFECT']);
-    const lowSaved = rules.resolveKick({ zone: 3, stopMs: 500, keeperCol: 0 }, p);
+    const lowSaved = rules.resolveKick({ zone: 3, stopMs: 500, keeperZone: 3 }, p);
     assert.deepEqual([lowSaved.outcome, lowSaved.quality], ['SAVED', 'GOOD']);
-    const lowGoal = rules.resolveKick({ zone: 3, stopMs: 500, keeperCol: 2 }, p);
+    const lowGoal = rules.resolveKick({ zone: 3, stopMs: 500, keeperZone: 5 }, p);
     assert.equal(lowGoal.outcome, 'GOAL');
+  });
+
+  test('height matters: a keeper in the same column but the wrong row does not save it', () => {
+    const p = { periodMs: 2000, phase: 0 };
+    assert.equal(rules.resolveKick({ zone: 4, stopMs: 500, keeperZone: 1 }, p).outcome, 'GOAL'); // shot low centre, keeper high centre
+    assert.equal(rules.resolveKick({ zone: 1, stopMs: 350, keeperZone: 4 }, p).outcome, 'GOAL'); // shot high centre, keeper low centre
+    assert.equal(rules.resolveKick({ zone: 4, stopMs: 500, keeperZone: 4 }, p).outcome, 'SAVED');
   });
 
   test('timing bar: high shots need a better stop than low shots; a very bad stop (or no shot) is a miss', () => {
     const p = { periodMs: 2000, phase: 0 };
     // t = 350 -> marker .35 (off .15): fine for high (<= .2) but not perfect
-    assert.equal(rules.resolveKick({ zone: 1, stopMs: 350, keeperCol: 1 }, p).outcome, 'SAVED');
+    assert.equal(rules.resolveKick({ zone: 1, stopMs: 350, keeperZone: 1 }, p).outcome, 'SAVED');
     // t = 200 -> marker .2 (off .3): too far for a high shot, still OK for a low one
-    assert.equal(rules.resolveKick({ zone: 1, stopMs: 200, keeperCol: 0 }, p).outcome, 'MISSED');
-    assert.equal(rules.resolveKick({ zone: 4, stopMs: 200, keeperCol: 0 }, p).outcome, 'GOAL');
+    assert.equal(rules.resolveKick({ zone: 1, stopMs: 200, keeperZone: 0 }, p).outcome, 'MISSED');
+    assert.equal(rules.resolveKick({ zone: 4, stopMs: 200, keeperZone: 0 }, p).outcome, 'GOAL');
     // t = 0 -> marker 0 (off .5): misses everything
-    assert.equal(rules.resolveKick({ zone: 4, stopMs: 0, keeperCol: 0 }, p).outcome, 'MISSED');
+    assert.equal(rules.resolveKick({ zone: 4, stopMs: 0, keeperZone: 0 }, p).outcome, 'MISSED');
     // kicker never shot
-    const none = rules.resolveKick({ zone: null, stopMs: null, keeperCol: 0 }, p);
+    const none = rules.resolveKick({ zone: null, stopMs: null, keeperZone: 0 }, p);
     assert.deepEqual([none.outcome, none.quality], ['MISSED', 'NONE']);
   });
 
@@ -194,13 +201,13 @@ async function playScoringRound(M, scorerId) {
     const zone = 3 + 1; // low centre
     const k = await api().post(`/api/matches/${M.code}/live/kick`).set(auth(kicker.token)).send({ zone, stopMs: t });
     assert.equal(k.status, 200, JSON.stringify(k.body));
-    const d = await api().post(`/api/matches/${M.code}/live/dive`).set(auth(keeper.token)).send({ col: 0 });
+    const d = await api().post(`/api/matches/${M.code}/live/dive`).set(auth(keeper.token)).send({ zone: 0 });
     assert.equal(d.status, 200, JSON.stringify(d.body));
   } else {
     const t = stopWhere(params, { minOff: 0.42 });
     await openWindow(M.id, t + 100);
     assert.equal((await api().post(`/api/matches/${M.code}/live/kick`).set(auth(kicker.token)).send({ zone: 3, stopMs: t })).status, 200);
-    assert.equal((await api().post(`/api/matches/${M.code}/live/dive`).set(auth(keeper.token)).send({ col: 1 })).status, 200);
+    assert.equal((await api().post(`/api/matches/${M.code}/live/dive`).set(auth(keeper.token)).send({ zone: 1 })).status, 200);
   }
 }
 
@@ -232,7 +239,7 @@ describe('live shootout: choices are sealed and only the right player can act', 
     await openWindow(M.id, 700);
     // The keeper cannot shoot, the kicker cannot keep goal.
     assert.equal((await api().post(`/api/matches/${M.code}/live/kick`).set(auth(keeper.token)).send({ zone: 4, stopMs: 500 })).status, 403);
-    assert.equal((await api().post(`/api/matches/${M.code}/live/dive`).set(auth(kicker.token)).send({ col: 1 })).status, 403);
+    assert.equal((await api().post(`/api/matches/${M.code}/live/dive`).set(auth(kicker.token)).send({ zone: 1 })).status, 403);
     // Bad input is rejected.
     assert.equal((await api().post(`/api/matches/${M.code}/live/kick`).set(auth(kicker.token)).send({ zone: 9, stopMs: 500 })).status, 400);
 
@@ -250,12 +257,12 @@ describe('live shootout: choices are sealed and only the right player can act', 
     assert.equal((await api().post(`/api/matches/${M.code}/live/kick`).set(auth(kicker.token)).send({ zone: 1, stopMs: 650 })).status, 200);
     assert.equal((await stateOf(kicker.token, M.code)).myChoice.zone, 4);
 
-    const dive = await api().post(`/api/matches/${M.code}/live/dive`).set(auth(keeper.token)).send({ col: 2 });
+    const dive = await api().post(`/api/matches/${M.code}/live/dive`).set(auth(keeper.token)).send({ zone: 2 });
     assert.equal(dive.status, 200, JSON.stringify(dive.body));
     const after = dive.body.state;
     assert.equal(after.history.length, 1);
     assert.equal(after.history[0].zone, 4);
-    assert.equal(after.history[0].keeperCol, 2);
+    assert.equal(after.history[0].keeperZone, 2);
     assert.ok(['GOAL', 'SAVED', 'MISSED'].includes(after.history[0].outcome));
     // Next kick: the roles have swapped.
     assert.equal(after.current.no, 2);
@@ -305,7 +312,7 @@ describe('live shootout: a full match', () => {
     assert.equal(afterB.locked, before[1].locked - 20);
 
     // Everything now refuses further moves.
-    const late = await api().post(`/api/matches/${M.code}/live/dive`).set(auth(M.B.token)).send({ col: 1 });
+    const late = await api().post(`/api/matches/${M.code}/live/dive`).set(auth(M.B.token)).send({ zone: 1 });
     assert.equal(late.status, 409);
     // The finished match view carries the shootout as normal rounds for the result screen.
     const view = await api().get(`/api/matches/${M.code}`).set(auth(M.A.token));
@@ -323,7 +330,7 @@ describe('live shootout: timeouts and forfeits', () => {
     const keeper = M.byId[s0.current.keeperId];
     await openWindow(M.id, 500);
     // Keeper chooses, kicker freezes.
-    assert.equal((await api().post(`/api/matches/${M.code}/live/dive`).set(auth(keeper.token)).send({ col: 1 })).status, 200);
+    assert.equal((await api().post(`/api/matches/${M.code}/live/dive`).set(auth(keeper.token)).send({ zone: 1 })).status, 200);
     // Not due yet.
     assert.equal(await sweepLiveShootouts(new Date()), 0);
     // Past the deadline (plus grace).
@@ -350,7 +357,7 @@ describe('live shootout: timeouts and forfeits', () => {
       const cur = (await stateOf(active.token, M.code)).current;
       await openWindow(M.id, 500);
       const path = cur.kickerId === active.user.id ? 'kick' : 'dive';
-      const body = path === 'kick' ? { zone: 4, stopMs: 450 } : { col: 0 };
+      const body = path === 'kick' ? { zone: 4, stopMs: 450 } : { zone: 0 };
       assert.equal((await api().post(`/api/matches/${M.code}/live/${path}`).set(auth(active.token)).send(body)).status, 200);
       await query('UPDATE shootout_rounds SET deadline = ? WHERE match_id = ? AND resolved_at IS NULL', [new Date(Date.now() - 10000), M.id]);
       await sweepLiveShootouts(new Date());
@@ -432,7 +439,7 @@ describe('live shootout: against a house bot', () => {
       const t = stopWhere(params, { maxOff: 0.05 });
       await openWindow(id, t + 100);
       // The bot may already have locked in; that must not reveal anything.
-      const body = cur.role === 'KICKER' ? { zone: 3 + (guard % 3), stopMs: t } : { col: guard % 3 };
+      const body = cur.role === 'KICKER' ? { zone: 3 + (guard % 3), stopMs: t } : { zone: guard % 6 };
       const path = cur.role === 'KICKER' ? 'kick' : 'dive';
       const r = await api().post(`/api/matches/${code}/live/${path}`).set(auth(A.token)).send(body);
       assert.equal(r.status, 200, JSON.stringify(r.body));

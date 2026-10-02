@@ -52,8 +52,8 @@ function buildView(m, players, rounds, viewerId) {
   let current = null;
   if (open) {
     const iAmKicker = open.kicker_id === viewerId;
-    const myLocked = iAmKicker ? open.kicker_zone != null : open.keeper_col != null;
-    const theirLocked = iAmKicker ? open.keeper_col != null : open.kicker_zone != null;
+    const myLocked = iAmKicker ? open.kicker_zone != null : open.keeper_zone != null;
+    const theirLocked = iAmKicker ? open.keeper_zone != null : open.kicker_zone != null;
     current = {
       no: open.round_no,
       kickerId: open.kicker_id,
@@ -91,7 +91,7 @@ function buildView(m, players, rounds, viewerId) {
       kickerId: r.kicker_id,
       keeperId: r.keeper_id,
       zone: r.kicker_zone,
-      keeperCol: r.keeper_col,
+      keeperZone: r.keeper_zone,
       outcome: r.outcome,
       quality: r.quality,
       marker: r.marker == null ? null : Number(r.marker),
@@ -102,7 +102,7 @@ function buildView(m, players, rounds, viewerId) {
     myChoice: open
       ? (open.kicker_id === viewerId
         ? (open.kicker_zone != null ? { zone: open.kicker_zone } : null)
-        : (open.keeper_col != null ? { col: open.keeper_col } : null))
+        : (open.keeper_zone != null ? { zone: open.keeper_zone } : null))
       : null,
   };
 }
@@ -236,7 +236,7 @@ async function createRound(tx, m, players, roundNo, now) {
     await tx.q('UPDATE shootout_rounds SET kicker_zone = ?, kicker_stop_ms = ?, kicker_at = ? WHERE match_id = ? AND round_no = ?', [k.zone, k.stopMs, now, m.id, roundNo]);
   }
   if (keeper.is_bot) {
-    await tx.q('UPDATE shootout_rounds SET keeper_col = ?, keeper_at = ? WHERE match_id = ? AND round_no = ?', [rules.botDive(m.seed, roundNo), now, m.id, roundNo]);
+    await tx.q('UPDATE shootout_rounds SET keeper_zone = ?, keeper_at = ? WHERE match_id = ? AND round_no = ?', [rules.botDive(m.seed, roundNo), now, m.id, roundNo]);
   }
 }
 
@@ -273,7 +273,7 @@ export async function submitKick(userId, matchIdOrCode, { zone, stopMs }) {
   return getLiveState(userId, matchId);
 }
 
-export async function submitDive(userId, matchIdOrCode, { col }) {
+export async function submitDive(userId, matchIdOrCode, { zone, col }) {
   const matchId = await withTransaction(async (tx) => {
     const { m, players } = await lockMatch(tx, matchIdOrCode);
     requireMember(players, userId);
@@ -282,10 +282,10 @@ export async function submitDive(userId, matchIdOrCode, { col }) {
     const round = await openRound(tx, m.id);
     if (!round) throw conflict('NO_ACTIVE_KICK', 'There is no kick to save right now.');
     if (round.keeper_id !== userId) throw forbidden('It is not your turn to keep goal.');
-    if (round.keeper_col != null) { afterCommitEmit(tx, m.id); return m.id; }
+    if (round.keeper_zone != null) { afterCommitEmit(tx, m.id); return m.id; }
     const now = new Date();
     assertWindowOpen(round, now);
-    await tx.q('UPDATE shootout_rounds SET keeper_col = ?, keeper_at = ? WHERE id = ?', [col, now, round.id]);
+    await tx.q('UPDATE shootout_rounds SET keeper_zone = ?, keeper_at = ? WHERE id = ?', [zone ?? col, now, round.id]);
     await afterChoice(tx, m, players, round.round_no, now);
     return m.id;
   });
@@ -295,7 +295,7 @@ export async function submitDive(userId, matchIdOrCode, { col }) {
 /** After a choice is stored: resolve the round if both sides are in, otherwise just tell the players. */
 async function afterChoice(tx, m, players, roundNo, now) {
   const r = await tx.one('SELECT * FROM shootout_rounds WHERE match_id = ? AND round_no = ?', [m.id, roundNo]);
-  if (r.kicker_zone != null && r.keeper_col != null) await resolveRound(tx, m, players, roundNo, now);
+  if (r.kicker_zone != null && r.keeper_zone != null) await resolveRound(tx, m, players, roundNo, now);
   afterCommitEmit(tx, m.id);
 }
 
@@ -319,18 +319,18 @@ function autoStreak(rounds, userId) {
 async function resolveRound(tx, m, players, roundNo, now) {
   const r = await tx.one('SELECT * FROM shootout_rounds WHERE match_id = ? AND round_no = ? FOR UPDATE', [m.id, roundNo]);
   if (!r || r.resolved_at) return;
-  const keeperAuto = r.keeper_col == null;
-  const keeperCol = keeperAuto ? rules.autoKeeperCol(m.seed, roundNo) : r.keeper_col;
+  const keeperAuto = r.keeper_zone == null;
+  const keeperZone = keeperAuto ? rules.autoKeeperZone(m.seed, roundNo) : r.keeper_zone;
   const kickerAuto = r.kicker_zone == null;
-  const res = rules.resolveKick({ zone: r.kicker_zone, stopMs: r.kicker_stop_ms, keeperCol }, { periodMs: r.period_ms, phase: Number(r.phase) });
+  const res = rules.resolveKick({ zone: r.kicker_zone, stopMs: r.kicker_stop_ms, keeperZone }, { periodMs: r.period_ms, phase: Number(r.phase) });
   await tx.q(
-    `UPDATE shootout_rounds SET keeper_col = ?, kicker_auto = ?, keeper_auto = ?, outcome = ?, quality = ?, marker = ?, resolved_at = ? WHERE id = ? AND resolved_at IS NULL`,
-    [keeperCol, kickerAuto ? 1 : 0, keeperAuto ? 1 : 0, res.outcome, res.quality, res.marker, now, r.id],
+    `UPDATE shootout_rounds SET keeper_zone = ?, kicker_auto = ?, keeper_auto = ?, outcome = ?, quality = ?, marker = ?, resolved_at = ? WHERE id = ? AND resolved_at IS NULL`,
+    [keeperZone, kickerAuto ? 1 : 0, keeperAuto ? 1 : 0, res.outcome, res.quality, res.marker, now, r.id],
   );
   await recordAudit(tx, {
     actorType: 'SYSTEM', action: 'SHOOTOUT_KICK', entityType: 'MATCH', entityId: m.id, matchId: m.id,
     newState: res.outcome,
-    metadata: { round: roundNo, kickerId: r.kicker_id, keeperId: r.keeper_id, zone: r.kicker_zone, keeperCol, quality: res.quality, kickerAuto, keeperAuto, stopMs: r.kicker_stop_ms, serverMs: r.kicker_server_ms },
+    metadata: { round: roundNo, kickerId: r.kicker_id, keeperId: r.keeper_id, zone: r.kicker_zone, keeperZone, quality: res.quality, kickerAuto, keeperAuto, stopMs: r.kicker_stop_ms, serverMs: r.kicker_server_ms },
   });
 
   const rounds = await tx.q('SELECT * FROM shootout_rounds WHERE match_id = ? ORDER BY round_no', [m.id]);
@@ -366,7 +366,7 @@ async function finishShootout(tx, m, players, rounds, stand) {
     const entries = kicks.map((r, i) => ({
       round: i + 1,
       status: r.outcome === 'GOAL' ? 'GOAL' : r.outcome === 'SAVED' ? 'SAVED' : 'WIDE',
-      zone: r.kicker_zone, quality: r.quality, keeperCol: r.keeper_col,
+      zone: r.kicker_zone, quality: r.quality, keeperZone: r.keeper_zone,
     }));
     const summary = {
       goals, shots: kicks.length,

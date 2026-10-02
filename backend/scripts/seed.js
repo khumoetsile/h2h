@@ -25,7 +25,7 @@ const GAMES = [
   {
     slug: 'penalty-shootout', name: 'Penalty Shootout', tagline: 'Take turns shooting and keeping goal.', accent: '#10B981', duration: 120,
     description: 'A live penalty shootout against another player. Five kicks each, one at a time. When you shoot, your opponent dives. When they shoot, you dive.',
-    how: 'Every kick, you both choose in secret. Shooting: pick a corner, then stop the timing bar in the green. High corners need a tight stop and low shots are more forgiving, and a perfect strike at a high corner cannot be saved. Keeping goal: pick the side you think they will shoot at. Five kicks each, then sudden death if it is level.',
+    how: 'Every kick, you both choose in secret. Shooting: pick one of six spots, then stop the timing bar in the green. High spots need a tight stop and low shots are more forgiving, and a perfect strike at a high spot cannot be saved. Keeping goal: pick the spot you think they will shoot at. You only save it if you dive to the exact same spot, so high and low matter. Five kicks each, then sudden death if it is level.',
   },
   {
     slug: 'word-battle', name: 'Word Battle', tagline: 'Think faster than your opponent.', accent: '#A855F7', duration: 90,
