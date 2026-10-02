@@ -31,13 +31,17 @@ const WAITING_MAX_RECIPIENTS = 25;
 
 const { publicKey, privateKey, subject, quietStartHour, quietEndHour, utcOffsetHours } = config.push;
 let configured = !!(publicKey && privateKey);
+/** Why push is on or off, safe to show (never contains a key). */
+let status = configured ? 'on' : (publicKey || privateKey ? 'missing one of the two keys' : 'no keys set');
 if (configured) {
   try { webpush.setVapidDetails(subject, publicKey, privateKey); } catch (err) {
     // A mistyped key must not stop the server from starting: push just stays off.
     console.warn(`Web push disabled: ${err.message}`);
     configured = false;
+    status = `rejected: ${err.message.replace(/[A-Za-z0-9_-]{30,}/g, '…')}`;
   }
 }
+export const pushStatus = () => (forcedEnabled === null ? status : forcedEnabled ? 'on' : 'off');
 
 const defaultSender = (sub, body) => webpush.sendNotification(sub, body, { TTL: 120, urgency: 'high' });
 let sender = defaultSender;

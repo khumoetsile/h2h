@@ -15,6 +15,7 @@ import { publicTimerConfig } from './timers.js';
 import authRoutes from './routes/auth.js';
 import inviteRoutes from './routes/invites.js';
 import pushRoutes from './routes/push.js';
+import { pushStatus } from './services/pushService.js';
 import meRoutes from './routes/me.js';
 import walletRoutes from './routes/wallet.js';
 import gameRoutes from './routes/games.js';
@@ -44,7 +45,7 @@ export function createApp() {
   app.use(express.json({ limit: '100kb' }));
   if (!config.isTest) app.use(morgan('dev'));
 
-  app.get('/api/health', (_req, res) => res.json({ ok: true, app: config.appName, demoMode: true, time: new Date().toISOString() }));
+  app.get('/api/health', (_req, res) => res.json({ ok: true, app: config.appName, demoMode: true, push: pushStatus(), time: new Date().toISOString() }));
   // Server clock for countdown display. Clients estimate their offset from
   // this; they never use their own clock to decide whether time is up.
   // Tells Google which sellers may sell this site's ads. Only exists once a publisher ID is configured.
