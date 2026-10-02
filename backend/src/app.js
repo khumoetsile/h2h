@@ -84,7 +84,16 @@ export function createApp() {
   app.use('/api', notFoundHandler);
   // Single-origin hosting (cPanel): serve the built Angular app with SPA fallback.
   if (webRoot) {
-    app.use(express.static(webRoot, { index: false, maxAge: '1h' }));
+    // Hashed build files never change, so browsers may keep them for a year. index.html and
+    // the unhashed icon font are revalidated so a deploy shows up straight away.
+    app.use(express.static(webRoot, {
+      index: false,
+      setHeaders: (res, file) => {
+        if (/-[A-Z0-9]{8}\.(js|css|woff2?)$/.test(file)) res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        else if (/\.html$/.test(file)) res.setHeader('Cache-Control', 'no-cache');
+        else res.setHeader('Cache-Control', 'public, max-age=86400');
+      },
+    }));
     app.get(/^\/(?!api\/|socket\.io\/).*/, (_req, res) => res.sendFile(path.join(webRoot, 'index.html')));
   }
   app.use(errorHandler);

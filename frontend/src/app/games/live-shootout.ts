@@ -14,6 +14,8 @@ type Pip = 'goal' | 'saved' | 'miss' | 'now' | 'todo';
 
 /** After the final kick has played, how long before the end card is allowed to cover the pitch. */
 const END_AUTO_MS = 9000;
+const DEFAULT_AIM = 4;
+const HELP_KEY = 'h2h.shootout.seen';
 const POLL_MS = 2500;
 
 /**
@@ -30,7 +32,16 @@ const POLL_MS = 2500;
   selector: 'app-live-shootout',
   imports: [MatIconModule, ShootoutScene],
   template: `
-    @if (error()) {
+    @if (showHelp()) {
+      <section class="help">
+        <h2>How a shootout works</h2>
+        <p>You and your opponent take turns. On every kick you <strong>both choose at the same time</strong>.</p>
+        <p><strong>Shooting:</strong> tap where to aim, then tap <strong>Shoot</strong> when the marker is in the green. A perfect shot in a top corner cannot be saved.</p>
+        <p><strong>Keeping goal:</strong> tap the side you think they will shoot at. You dive straight away.</p>
+        <p>Five kicks each. Most goals wins.</p>
+        <button class="btn btn-primary btn-play btn-block" (click)="startAfterHelp()">Got it, let's play</button>
+      </section>
+    } @else if (error()) {
       <div class="err"><p>{{ error() }}</p><button class="btn btn-primary" (click)="join()">Try again</button></div>
     } @else if (state(); as st) {
       <div class="so">
@@ -71,7 +82,7 @@ const POLL_MS = 2500;
         </div>
 
         @if (role() === 'KICKER' && !st.done && !revealed()) {
-          <div class="gauge" [class.dim]="!canAct() && frozen() === null">
+          <div class="gauge" [class.dim]="!canAct() && frozen() === null" (pointerdown)="act($event)">
             <div class="track" #track>
               <i class="b-low"></i><i class="b-high"></i><i class="b-perfect"></i>
               <i class="marker" #marker></i>
@@ -81,10 +92,10 @@ const POLL_MS = 2500;
         }
 
         @if (!st.done) {
-          <button class="act" type="button" [disabled]="!canAct() || (role() === 'KICKER' ? aimZone() === null : diveCol() === null)" (pointerdown)="act($event)">
-            {{ role() === 'KEEPER' ? 'Dive' : 'Shoot' }}
-          </button>
-          <p class="hint">{{ hint() }}</p>
+          @if (role() === 'KICKER') {
+            <button class="act" type="button" [disabled]="!canAct()" (pointerdown)="act($event)">Shoot</button>
+          }
+          <p class="hint" [class.big]="role() === 'KEEPER'">{{ hint() }}</p>
         }
       </div>
     } @else {
@@ -141,6 +152,11 @@ const POLL_MS = 2500;
     .act:active:not(:disabled) { transform: scale(.985); }
     .act:disabled { opacity: .35; cursor: default; }
     .hint { text-align: center; color: var(--muted); font-size: 15px; min-height: 20px; }
+    .hint.big { color: var(--text); font-size: 19px; font-weight: 600; padding: 6px 0 14px; }
+    .help { display: flex; flex-direction: column; gap: 12px; max-width: 520px; margin: 0 auto; padding: 8px 0 24px; }
+    .help h2 { font-size: 30px; }
+    .help p { font-size: 18px; line-height: 1.45; color: var(--text-2); }
+    .help strong { color: var(--text); }
   `],
 })
 export class LiveShootoutGame implements OnInit, OnDestroy {
@@ -159,6 +175,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   private trackEl = viewChild<ElementRef<HTMLElement>>('track');
   private markerEl = viewChild<ElementRef<HTMLElement>>('marker');
 
+  protected showHelp = signal(false);
   protected state = signal<ShootoutState | null>(null);
   protected error = signal('');
   protected aimZone = signal<number | null>(null);
@@ -247,8 +264,8 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   protected hint = computed(() => {
     const c = this.cur();
     if (!c || this.revealed() || this.state()?.done || this.locked()) return '';
-    if (c.role === 'KEEPER') return this.diveCol() === null ? 'Tap the side of the goal you think they will shoot at' : 'Now dive';
-    return this.aimZone() === null ? 'Tap where you want to aim, then stop the gauge in the green' : 'Stop the gauge in the green, then shoot';
+    if (c.role === 'KEEPER') return 'Tap the side you think they will shoot at';
+    return 'Tap the goal to change your aim. Tap Shoot when the marker is in the green';
   });
 
   protected endTitle = computed(() => {
@@ -276,7 +293,8 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
       this.frozen.set(null);
       this.scene()?.reset();
       const mine = this.state()?.myChoice;
-      this.aimZone.set(mine?.zone ?? null);
+      // The kicker starts with the bottom-centre spot chosen, so a first-timer can just tap Shoot.
+      this.aimZone.set(mine?.zone ?? (c?.role === 'KICKER' ? DEFAULT_AIM : null));
       this.diveCol.set(mine?.col ?? null);
     });
     // A newly resolved kick: play it out on the stage.
@@ -307,7 +325,9 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   }
 
   ngOnInit() {
-    void this.join();
+    let seen = true;
+    try { seen = localStorage.getItem(HELP_KEY) === '1'; } catch { /* storage unavailable */ }
+    if (seen) void this.join(); else this.showHelp.set(true);
     this.realtime.shootout$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((s) => { if (s.code === this.code()) this.apply(s); });
     this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.refresh());
     const poll = setInterval(() => { if (!document.hidden && !this.state()?.done) void this.refresh(); }, POLL_MS);
@@ -328,6 +348,14 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
 
   /** Browsers only allow sound after a tap. Any press on this screen unlocks it. */
   @HostListener('pointerdown') unlockAudio() { this.audio.unlock(); }
+
+  /** First time only: explain the rules, then take the pitch. */
+  protected startAfterHelp() {
+    try { localStorage.setItem(HELP_KEY, '1'); } catch { /* storage unavailable */ }
+    this.audio.unlock();
+    this.showHelp.set(false);
+    void this.join();
+  }
 
   protected toggleSound(ev: Event) {
     ev.stopPropagation();
@@ -400,13 +428,14 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
     this.audio.buzz(8);
   }
 
+  /** For the keeper, tapping a side of the goal is the whole decision: dive straight away. */
   protected pickCol(c: number) {
     if (!this.canAct() || this.role() !== 'KEEPER') return;
     this.diveCol.set(c);
-    this.audio.buzz(8);
+    void this.act(null);
   }
 
-  protected async act(ev: PointerEvent) {
+  protected async act(ev: PointerEvent | null) {
     const c = this.cur();
     if (!c || !this.canAct()) return;
     this.audio.unlock();
@@ -416,7 +445,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
         const zone = this.aimZone();
         if (zone === null || !c.timing) return;
         // The tap's own timestamp, not "when this handler ran", so a slow frame can't move the shot.
-        const at = ev.timeStamp > 1e11 ? performance.now() : ev.timeStamp;
+        const at = !ev || ev.timeStamp > 1e11 ? performance.now() : ev.timeStamp;
         const stopMs = Math.max(0, Math.round(this.clock.preciseAt(at) - Date.parse(c.startsAt)));
         this.frozen.set(markerAt(c.timing.periodMs, c.timing.phase, stopMs));
         this.localLocked.set(true);

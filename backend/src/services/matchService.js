@@ -274,6 +274,23 @@ export async function findOpponent(userId, gameId, stake) {
   });
 }
 
+/** The least busy house bot that can join this match, topped up with demo funds if its balance is short. */
+async function pickDemoBot(tx, m) {
+  const bot = await tx.one(
+      `SELECT u.id FROM users u JOIN wallets w ON w.user_id = u.id
+       WHERE u.is_bot = 1 AND u.status = 'ACTIVE'
+         AND u.id NOT IN (SELECT user_id FROM match_players WHERE match_id = ?)
+       ORDER BY (SELECT COUNT(*) FROM match_players mp JOIN matches mm ON mm.id = mp.match_id
+                 WHERE mp.user_id = u.id AND mm.status IN ('WAITING','MATCHED','READY','IN_PROGRESS')), RAND()
+       LIMIT 1`,
+    [m.id],
+  );
+  if (!bot) throw conflict('OPPONENT_UNAVAILABLE', 'No demo opponents are available right now. Try again shortly.');
+  const w = await tx.one('SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE', [bot.id]);
+  if (toCents(w.available_balance) < toCents(m.stake)) await houseBotFloat(tx, bot.id, 1000);
+  return bot;
+}
+
 /** Demo helper: a house bot joins a WAITING match so a single tester can play. */
 export async function addDemoOpponent(userId, matchIdOrCode) {
   if (!config.demoBotsEnabled) throw forbidden('Demo opponents are disabled.');
@@ -281,22 +298,27 @@ export async function addDemoOpponent(userId, matchIdOrCode) {
     const m = await tx.one('SELECT * FROM matches WHERE (id = ? OR code = ?) FOR UPDATE', [Number(matchIdOrCode) || 0, String(matchIdOrCode)]);
     if (!m) throw notFound('Match not found.');
     if (m.created_by !== userId) throw forbidden('Only the match creator can call in a demo opponent.');
-    const bot = await tx.one(
-      `SELECT u.id FROM users u JOIN wallets w ON w.user_id = u.id
-       WHERE u.is_bot = 1 AND u.status = 'ACTIVE'
-         AND u.id NOT IN (SELECT user_id FROM match_players WHERE match_id = ?)
-       ORDER BY (SELECT COUNT(*) FROM match_players mp JOIN matches mm ON mm.id = mp.match_id
-                 WHERE mp.user_id = u.id AND mm.status IN ('WAITING','MATCHED','READY','IN_PROGRESS')), RAND()
-       LIMIT 1`,
-      [m.id],
-    );
-    if (!bot) throw conflict('OPPONENT_UNAVAILABLE', 'No demo opponents are available right now. Try again shortly.');
-    // House bots are topped up with demo funds so they can always cover a stake.
-    const w = await tx.one('SELECT available_balance FROM wallets WHERE user_id = ? FOR UPDATE', [bot.id]);
-    if (toCents(w.available_balance) < toCents(m.stake)) {
-      await houseBotFloat(tx, bot.id, 1000);
-    }
+    const bot = await pickDemoBot(tx, m);
     await joinLockedMatch(tx, m, bot.id, { isBot: true });
+    return m.id;
+  });
+}
+
+/**
+ * One tap, no waiting: create a match against a house bot and lock the player in,
+ * leaving the match READY to play. Everything happens in one transaction, so a
+ * failure part-way (no bot free, not enough balance) leaves nothing behind.
+ * The player's tap on "Practice" is their Lock In.
+ */
+export async function startPractice(userId, gameId, stake) {
+  if (!config.demoBotsEnabled) throw forbidden('Practice opponents are disabled.');
+  return withTransaction(async (tx) => {
+    await assertActiveLimit(tx, userId);
+    const { match } = await createMatchTx(tx, userId, gameId, stake, { source: 'DIRECT' });
+    const m = await tx.one('SELECT * FROM matches WHERE id = ? FOR UPDATE', [match.id]);
+    const bot = await pickDemoBot(tx, m);
+    await joinLockedMatch(tx, m, bot.id, { isBot: true });
+    await recordLockIn(tx, m.id, userId);
     return m.id;
   });
 }
@@ -1111,6 +1133,7 @@ export function mapMatchRow(r) {
       myDeadline: r.me_id != null ? playerDeadline(r, { ready_at: r.me_ready, submitted_at: r.me_submitted, disconnected_at: r.me_disconnected, reconnect_deadline: r.me_reconnect }, r.fx_kickoff ?? null) : null,
     } : null,
     lockedIn: r.me_id != null ? !!r.me_ready : null,
+    submitted: r.me_id != null ? !!r.me_submitted : null,
     opponentLockedIn: r.opp_id ? !!r.opp_ready : null,
     game: { id: r.game_id, slug: r.game_slug, name: r.game_name, accentColor: r.accent_color },
     stake: Number(r.stake),

@@ -17,6 +17,7 @@ import { Toast } from '../../core/toast.service';
 import { Countdown } from '../../shared/countdown';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, GameIcon, LoadError, Spinner } from '../../shared/ui';
+import { SkillRoom } from './skill-room';
 
 /**
  * The live state of one 1v1 challenge. Every timer shown here is a deadline
@@ -25,7 +26,7 @@ import { Avatar, GameIcon, LoadError, Spinner } from '../../shared/ui';
  */
 @Component({
   selector: 'app-match-lobby',
-  imports: [RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, Spinner, Countdown],
+  imports: [RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, Spinner, Countdown, SkillRoom],
   templateUrl: './match-lobby.html',
   styleUrl: './match-lobby.scss',
 })
@@ -69,12 +70,31 @@ export class MatchLobbyPage implements OnInit {
     interval(4000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
   }
 
+  private autoReadied = false;
+  private autoStarted = false;
+
   private apply(m: MatchView) {
     const prev = this.match();
     this.match.set(m);
+    const skill = m.category !== 'FOOTBALL';
+    const opp = m.players.find((p) => p.userId !== m.viewerId);
+    const me = m.players.find((p) => p.userId === m.viewerId);
     if (prev && prev.status === 'WAITING' && m.status !== 'WAITING' && ['MATCHED', 'READY'].includes(m.status)) {
-      const opp = m.players.find((p) => p.userId !== m.viewerId);
-      this.toast.success(m.status === 'READY' ? `${opp?.username} joined, you're both locked in!` : `Opponent found: ${opp?.username}. Lock in now.`);
+      if (!skill) this.toast.success(m.status === 'READY' ? `${opp?.username} joined, you're both locked in!` : `Opponent found: ${opp?.username}. Lock in now.`);
+      else if (!opp?.isBot) { try { navigator.vibrate?.([120, 60, 120]); } catch { /* not supported */ } }
+    }
+    if (skill) {
+      // A bot is always ready, so there is nothing to wait for: get ready on the player's behalf.
+      if (m.status === 'MATCHED' && opp?.isBot && me?.owesAction && !this.autoReadied && !this.busy()) {
+        this.autoReadied = true;
+        void this.lockIn();
+      }
+      // Both ready: go straight into the game. Only when this page watched it happen, so coming back
+      // from a game never throws the player back in.
+      if (prev && prev.status !== m.status && ['READY', 'IN_PROGRESS'].includes(m.status) && !me?.submitted && !this.autoStarted) {
+        this.autoStarted = true;
+        setTimeout(() => this.play(), 700);
+      }
     }
     if (m.status === 'COMPLETED' || m.status === 'CANCELLED' || m.status === 'VOID') {
       this.router.navigate(['/match', m.code, 'result'], { replaceUrl: true });
@@ -114,6 +134,11 @@ export class MatchLobbyPage implements OnInit {
 
   lockIn() { return this.act('lock', 'ready'); }
   demoOpponent() { return this.act('bot', 'demo-opponent'); }
+
+  /** Waiting too long: bring in a bot and get ready in one go (the bot is ready already). */
+  async practiceNow() {
+    if (await this.act('bot', 'demo-opponent')) await this.lockIn();
+  }
   play() { this.router.navigate(['/match', this.code(), 'play']); }
 
   openLeave() { this.leaveOpen.set(true); }

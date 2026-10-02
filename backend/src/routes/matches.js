@@ -35,6 +35,12 @@ router.post('/find', requirePlayer, validate(createMatchSchema), ah(async (req, 
   res.status(r.matched ? 200 : 201).json({ matched: r.matched, alreadyQueued: !!r.alreadyQueued, match: await view(req, r.matchId) });
 }));
 
+// One tap, no waiting: a match against a house bot, locked in and ready to play.
+router.post('/practice', requirePlayer, validate(createMatchSchema), ah(async (req, res) => {
+  const id = await svc.startPractice(req.user.id, req.body.gameId, req.body.stake);
+  res.status(201).json({ match: await view(req, id) });
+}));
+
 router.get('/queue', ah(async (_req, res) => res.json({ queue: await svc.queueCounts() })));
 
 router.get('/:id', ah(async (req, res) => res.json({ match: await view(req, req.params.id) })));

@@ -6,6 +6,9 @@
   } @else {
     @let m = match()!;
     @let t = m.timers;
+    @if (!isFootball()) {
+      <app-skill-room [match]="m" [busy]="busy()" (ready)="lockIn()" (practice)="practiceNow()" (leave)="openLeave()" (play)="play()" (expired)="onTimerExpired()" />
+    } @else {
     <div class="lobby-head">
       <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="44" />
       <div class="grow">
@@ -216,6 +219,7 @@
           }
         }
       }
+    }
     }
     <p class="muted tiny center"><a [routerLink]="isFootball() ? '/football' : '/games'" class="link">{{ isFootball() ? 'Football' : 'Games' }}</a> · Challenge {{ m.code }}</p>
   }

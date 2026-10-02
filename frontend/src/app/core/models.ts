@@ -199,6 +199,8 @@ export interface MatchSummary {
   } | null;
   timers: Omit<MatchTimers, 'serverNow' | 'kickoffAt'> | null;
   lockedIn: boolean | null;
+  /** True once this player has finished their part of a skill game. */
+  submitted: boolean | null;
   opponentLockedIn: boolean | null;
   game: { id: number; slug: string; name: string; accentColor: string };
   stake: number;

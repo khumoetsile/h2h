@@ -442,3 +442,31 @@ describe('live shootout: against a house bot', () => {
     assert.equal(results[0].n, 2);
   });
 });
+
+describe('one-tap practice', () => {
+  test('creates a locked-in match against a bot in a single call, ready to play', async () => {
+    const A = await newPlayer('pr');
+    const before = await walletOf(A.token);
+    const r = await api().post('/api/matches/practice').set(auth(A.token)).send({ gameId: await gameId(), stake: 10 });
+    assert.equal(r.status, 201, JSON.stringify(r.body));
+    const m = r.body.match;
+    assert.equal(m.status, 'READY');
+    assert.equal(m.players.length, 2);
+    assert.ok(m.players.some((p) => p.isBot));
+    assert.ok(m.players.every((p) => p.lockedIn), 'both sides are locked in');
+    assert.equal((await walletOf(A.token)).locked, before.locked + 10);
+    // And it plays straight away.
+    const joined = await api().post(`/api/matches/${m.code}/live/join`).set(auth(A.token));
+    assert.equal(joined.status, 200, JSON.stringify(joined.body));
+    assert.equal(joined.body.state.phase, 'ROUND');
+  });
+
+  test('failing part-way leaves nothing behind (no match, no stake locked)', async () => {
+    const A = await newPlayer('pf');
+    await query('UPDATE wallets w JOIN users u ON u.id = w.user_id SET w.available_balance = 0 WHERE u.username = ?', [A.user.username]);
+    const r = await api().post('/api/matches/practice').set(auth(A.token)).send({ gameId: await gameId(), stake: 10 });
+    assert.ok(r.status >= 400 && r.status < 500, `expected a client error, got ${r.status}`);
+    const rows = await query('SELECT COUNT(*) AS n FROM matches WHERE created_by = ?', [A.user.id]);
+    assert.equal(rows[0].n, 0);
+  });
+});
