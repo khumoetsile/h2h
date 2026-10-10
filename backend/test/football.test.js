@@ -149,7 +149,7 @@ describe('football: browsing', () => {
       counts: { FIRE: 0, SHOCK: 0, GOAL: 0 },
       mine: null,
     });
-    assert.equal(detail.body.fixture.headToHead.status, 'UNSUPPORTED');
+    assert.equal(detail.body.fixture.headToHead.status, 'AVAILABLE');
     assert.equal(detail.body.fixture.headToHead.source, 'SYNCED');
     assert.ok(detail.body.fixture.headToHead.matches.some((meeting) => meeting.homeTeam === 'Arsenal' && meeting.awayTeam === 'Chelsea'));
     assert.deepEqual(detail.body.fixture.headToHead.summary, { homeWins: 1, draws: 0, awayWins: 0 });
