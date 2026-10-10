@@ -153,11 +153,13 @@ Open **http://localhost:4200** and log in with a [development account](#developm
 | `FOOTBALL_RESULT_TIMEOUT_MINUTES` | `240` | After kickoff: wait this long for a verifiable result, then void (full refunds) |
 | `TIMER_LATENCY_GRACE_MS` | `2000` | Allowance for a request sent just before a deadline |
 | `ABANDONMENT_FEE` | `0.50` | Fee charged to a player who leaves after BOTH players locked in |
-| `FOOTBALL_PROVIDER` | `mock` | `mock` (deterministic simulated fixtures, no API key needed) or `football-data` (real data from football-data.org) |
+| `FOOTBALL_PROVIDER` | `mock` in development; `football-data` in production | `mock` (deterministic simulated fixtures, no API key needed) or `football-data` (real data from football-data.org) |
+| `FOOTBALL_ALLOW_SIMULATED` | `false` | Explicit opt-in required to enable the mock provider in production |
 | `FOOTBALL_API_KEY` | — | Required when `FOOTBALL_PROVIDER=football-data`; never sent to the browser — the backend is the only thing that ever calls the provider |
 | `FOOTBALL_API_BASE_URL` | `https://api.football-data.org/v4` | Provider base URL |
-| `FOOTBALL_SYNC_INTERVAL_SECONDS` | `20` | How often the background job pulls competitions/fixtures and checks for results |
+| `FOOTBALL_SYNC_INTERVAL_SECONDS` | `60` for real provider, otherwise `20` | How often the background job pulls competitions/fixtures and checks for results |
 | `FOOTBALL_FIXTURE_WINDOW_DAYS` | `21` | How far ahead upcoming fixtures are synced |
+| `PUBLIC_BASE_URL` | — | Public site origin; enables a sitemap of real, recently synced football pages |
 
 Business settings (fee, stakes, bonus, limits, timeouts) live in the `admin_settings` table and
 are edited in the admin panel — see [Changing the platform fee](#changing-the-platform-fee).
@@ -376,13 +378,30 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
 - **Providers** (`backend/src/football/providers/`) implement one small interface —
   `capabilities()`, `listCompetitions()`, `listUpcomingFixtures()`, `getFixture()` — selected at
   runtime via `FOOTBALL_PROVIDER`:
-  - `mock` (default) — a fully-featured, deterministic simulated provider. Fixtures, scores,
+  - `mock` (development default) — a fully-featured, deterministic simulated provider. Fixtures, scores,
     shots, corners, cards and goal events are derived from a seeded hash, not stored mutable
     state, so the same fixture always "plays out" the same way and no timers are needed. Every
     mock fixture is flagged `isSimulated: true` in the API and UI.
   - `football-data` — a real implementation against api.football-data.org. Its free tier does
-    not provide shot/corner/card/event data, so it honestly reports
+    not provide historical archives, standings, shot/corner/card statistics, or event
+    timelines, so it honestly reports
     `capabilities() = { statistics: false, events: false }`.
+- **Public browsing**: `GET /api/football/competitions`, `/fixtures`, `/fixtures/:id`, and
+  `/teams/:id` do not
+  require an account. Fixtures support status, competition, team, date-range and pagination
+  filters. Completed results and match centres use only synchronized provider records; statistics
+  and events remain absent when the provider does not supply them. Recent meetings are limited to
+  completed records already cached locally. Challenge discovery that identifies players, plus all
+  challenge creation/acceptance actions, still requires an authenticated player.
+- **Production data safety**: production forces `football-data`, even if the development
+  `.env.example` sets `FOOTBALL_PROVIDER=mock`. Simulated fixtures can only be enabled in
+  production through the explicit `FOOTBALL_ALLOW_SIMULATED=true` opt-in, remain labelled, and
+  are excluded from the sitemap. The real provider requires `FOOTBALL_API_KEY`.
+- **Search metadata**: public football routes publish page-specific titles/descriptions and
+  canonical URLs in the browser. Set `PUBLIC_BASE_URL` to enable the sitemap for real upcoming,
+  live and recently completed fixtures. The Angular app is client-rendered (not SSR), so this
+  does not provide the same crawl guarantees as server rendering; SSR remains a separate
+  deployment decision.
 - **Challenge types are capability-gated**: each football challenge type
   (`football_challenge_types.requires_stats`) is only offered to players when the configured
   provider's `capabilities()` can actually supply what settling it requires. A provider that
@@ -454,7 +473,8 @@ All endpoints are under `/api`, JSON in/out. Authenticated endpoints need
 | `GET /challenges?box&status` · `POST /challenges` · `GET /challenges/:id` | Challenges (skill games and football, dispatched automatically) |
 | `POST /challenges/:id/accept` · `/decline` (alias `/reject`) · `/cancel` | Respond / withdraw |
 | `GET /football/competitions` · `GET /football/challenge-types` | Enabled leagues; question types the current provider can settle |
-| `GET /football/fixtures?competitionId&status` · `GET /football/fixtures/:id` | Upcoming/live fixtures; one fixture with its challenge questions |
+| `GET /football/fixtures?competitionId&status&dateFrom&dateTo&teamId&page&pageSize` · `GET /football/fixtures/:id` · `GET /football/teams/:id` | Public synced fixtures/results, match-centre and team details (provider data only) |
+| `GET /robots.txt` · `GET /sitemap.xml` | Public crawler rules; sitemap enabled when `PUBLIC_BASE_URL` is configured |
 | `POST /football/find` | Matchmaking `{ fixtureId, challengeTypeSlug, pick, stake }` |
 | `POST /football/challenges` | Direct challenge `{ opponent, fixtureId, challengeTypeSlug, pick, stake, message }` |
 | `GET /leaderboard?period=daily\|weekly\|all&gameId` | Leaderboard from real results |

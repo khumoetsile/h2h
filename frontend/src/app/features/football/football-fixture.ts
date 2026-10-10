@@ -9,6 +9,7 @@ import { interval, Subject, debounceTime, distinctUntilChanged } from 'rxjs';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
 import { AuthService } from '../../core/auth.service';
+import { SeoService } from '../../core/seo.service';
 import { ConfigStore } from '../../core/config.store';
 import { FootballChallengeType, FootballFixture, MatchView, OpenFootballChallenge, Pick as FootballPickValue, PlayerSearchResult } from '../../core/models';
 import { RematchIntent, RematchService } from '../../core/rematch.service';
@@ -35,7 +36,8 @@ import { JoinSheet, OpenChallengeCard } from './open-challenge';
 export class FootballFixturePage implements OnInit {
   readonly fixtureId = input.required<string>();
   private api = inject(Api);
-  private auth = inject(AuthService);
+  private seo = inject(SeoService);
+  protected auth = inject(AuthService);
   private router = inject(Router);
   private toast = inject(Toast);
   private clock = inject(ServerClock);
@@ -112,7 +114,7 @@ export class FootballFixturePage implements OnInit {
       this.mode.set('direct');
     }
     this.load();
-    interval(15000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
+    interval(60000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
   }
 
   async load(silent = false) {
@@ -121,9 +123,18 @@ export class FootballFixturePage implements OnInit {
       const res = await this.api.get<{ fixture: FootballFixture; openChallenges: OpenFootballChallenge[] }>(`/football/fixtures/${this.fixtureId()}`);
       const first = !this.fixture();
       this.fixture.set(res.fixture);
+      const result = res.fixture.homeScore !== null && res.fixture.awayScore !== null
+        ? `${res.fixture.homeScore}-${res.fixture.awayScore}`
+        : (res.fixture.status === 'SCHEDULED' ? 'Upcoming fixture' : res.fixture.status.toLowerCase());
+      this.seo.publish(
+        `${res.fixture.homeTeam.name} vs ${res.fixture.awayTeam.name}: ${result}`,
+        `${res.fixture.competition.name}: ${res.fixture.homeTeam.name} vs ${res.fixture.awayTeam.name}. Check the match status, score and available match details.`,
+        `/football/${res.fixture.id}`,
+        !res.fixture.isSimulated,
+      );
       this.openChallenges.set(res.openChallenges ?? []);
       if (first) this.applyDefaults(res.fixture);
-      if (!silent) this.auth.refreshMe().catch(() => {});
+      if (!silent && this.auth.isLoggedIn()) this.auth.refreshMe().catch(() => {});
     } catch (err) {
       if (!silent) this.error.set(apiError(err).message);
     }

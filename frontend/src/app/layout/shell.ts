@@ -39,6 +39,7 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Settings', icon: 'tune', link: '/admin/settings' },
 ];
 const ADMIN_BOTTOM = ['/admin', '/admin/users', '/admin/matches', '/admin/transactions', '/admin/settings'];
+const PUBLIC_NAV: NavItem[] = [{ label: 'Football', icon: 'sports_soccer', link: '/football' }];
 
 @Component({
   selector: 'app-shell',
@@ -53,8 +54,9 @@ export class Shell {
   private router = inject(Router);
   protected brand = BRAND;
 
-  protected nav = computed(() => (this.auth.isAdmin() ? ADMIN_NAV : PLAYER_NAV));
+  protected nav = computed(() => !this.auth.isLoggedIn() ? PUBLIC_NAV : (this.auth.isAdmin() ? ADMIN_NAV : PLAYER_NAV));
   protected bottomNav = computed(() => {
+    if (!this.auth.isLoggedIn()) return PUBLIC_NAV;
     const keys = this.auth.isAdmin() ? ADMIN_BOTTOM : PLAYER_BOTTOM;
     return this.nav().filter((n) => keys.includes(n.link));
   });

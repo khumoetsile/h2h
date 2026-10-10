@@ -22,6 +22,7 @@ import { PitchArt } from '../../shared/pitch-art';
 
       <h1>Penalty shootouts against real people.</h1>
       <p class="lead">Take turns shooting and saving. A match takes about two minutes.</p>
+      <a class="football-link" routerLink="/football">Browse football fixtures, live scores and results</a>
 
       <div class="cta">
         <button class="btn btn-primary btn-play btn-block" [disabled]="busy()" (click)="play()">
@@ -39,6 +40,7 @@ import { PitchArt } from '../../shared/pitch-art';
     .art { width: 100%; border-radius: var(--radius); overflow: hidden; }
     h1 { font-size: 36px; line-height: 1.05; }
     .lead { color: var(--text-2); font-size: 18px; line-height: 1.4; }
+    .football-link { color: var(--accent); text-decoration: underline; padding: 8px; }
     .cta { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 6px; }
     .link { padding: 10px; color: var(--text-2); text-decoration: underline; }
   `],

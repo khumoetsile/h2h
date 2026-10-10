@@ -1,7 +1,7 @@
 import { Component, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { AbstractControl, FormBuilder, ReactiveFormsModule, ValidationErrors, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatIconModule } from '@angular/material/icon';
@@ -117,6 +117,7 @@ export class RegisterPage {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private router = inject(Router);
+  private route = inject(ActivatedRoute);
   private toast = inject(Toast);
   private configStore = inject(ConfigStore);
   protected brand = BRAND;
@@ -166,7 +167,8 @@ export class RegisterPage {
     try {
       await this.auth.register(this.form.getRawValue());
       this.toast.success(`Welcome to ${this.brand.name}! Your demo wallet is ready.`);
-      await this.router.navigateByUrl('/dashboard');
+      const next = this.route.snapshot.queryParamMap.get('next');
+      await this.router.navigateByUrl(next?.startsWith('/') && !next.startsWith('//') ? next : '/dashboard');
     } catch (err) {
       const e = apiError(err);
       this.error.set(e.message);

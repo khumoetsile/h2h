@@ -289,6 +289,16 @@ export interface FootballFixture {
   openChallenges: number;
   challengeTypes?: FootballChallengeType[];
   stakes?: number[];
+  stats?: {
+    shots: { home: number | null; away: number | null };
+    shotsOnTarget: { home: number | null; away: number | null };
+    possession: { home: number | null; away: number | null };
+    corners: { home: number | null; away: number | null };
+    cards: { home: number | null; away: number | null };
+  };
+  events?: Array<{ minute: number | null; type: string; team: 'HOME' | 'AWAY'; playerName: string | null; detail: string | null }>;
+  recentMeetings?: FootballFixture[];
+  lastUpdatedAt?: string | null;
 }
 
 /** A publicly discoverable "Find an opponent" challenge, waiting for a second player to join. */

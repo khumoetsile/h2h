@@ -6,8 +6,10 @@ import { MatIconModule } from '@angular/material/icon';
 import { interval } from 'rxjs';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
+import { AuthService } from '../../core/auth.service';
+import { SeoService } from '../../core/seo.service';
 import { DISPLAY_STATE } from '../../core/challenge-state';
-import { FootballFixture, MatchSummary, OpenFootballChallenge, Paged } from '../../core/models';
+import { FootballCompetition, FootballFixture, MatchSummary, OpenFootballChallenge, Paged } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { RematchService } from '../../core/rematch.service';
 import { ServerClock } from '../../core/server-clock';
@@ -38,10 +40,17 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       <header class="hero">
         <div class="grow">
           <h1>Football</h1>
-          <p class="sub">Don't play against the house. Challenge another player.</p>
+          <p class="sub">Follow the game. Challenge another player.</p>
         </div>
-        <button class="btn btn-primary btn-lg create" (click)="scrollToFixtures()"><mat-icon>swords</mat-icon> Create challenge</button>
+        <button class="btn btn-primary btn-lg create" (click)="scrollToFixtures()"><mat-icon>{{ auth.isLoggedIn() ? 'swords' : 'sports_soccer' }}</mat-icon> {{ auth.isLoggedIn() ? 'Create challenge' : 'Browse fixtures' }}</button>
       </header>
+
+      @if (!auth.isLoggedIn()) {
+        <div class="card public-join">
+          <div class="grow"><strong>Follow the fixtures. Challenge a player when you're ready.</strong><p class="muted small">Browse football without an account. Joining a 1v1 challenge requires an account; all funds in this demo are simulated.</p></div>
+          <a class="btn btn-primary btn-sm" routerLink="/register">Create account</a>
+        </div>
+      }
 
       @if (rematch.current(); as r) {
         <div class="card target-banner fade-in">
@@ -51,6 +60,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         </div>
       }
 
+      @if (auth.isLoggedIn()) {
       <!-- Open challenges -->
       <section>
         <div class="section-title">
@@ -76,6 +86,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
           </div>
         }
       </section>
+      }
 
       <!-- My challenges (active) -->
       @if (active() && active()!.length) {
@@ -111,8 +122,19 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       <!-- Fixtures -->
       <section id="fixtures">
         <div class="section-title">
-          <div><h2>Starting soon</h2><p class="sub">Real fixtures, pick one to create a challenge</p></div>
+          <div><h2>Fixtures</h2><p class="sub">Browse upcoming matches and live scores</p></div>
         </div>
+        <div class="football-filters">
+          <label>Competition
+            <select #competition (change)="selectCompetition(competition.value)">
+              <option value="">All competitions</option>
+              @for (c of competitions(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+            </select>
+          </label>
+          <label>From <input #dateFrom type="date" (change)="selectDates(dateFrom.value, dateTo.value)" /></label>
+          <label>To <input #dateTo type="date" (change)="selectDates(dateFrom.value, dateTo.value)" /></label>
+        </div>
+        @if (competitionError()) { <p class="muted small">{{ competitionError() }}</p> }
         <div class="segmented tabs day-tabs">
           @for (t of dayTabs; track t.key) {
             <button [class.active]="day() === t.key" (click)="day.set(t.key)">
@@ -123,6 +145,8 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         </div>
         @if (error()) {
           <app-load-error [message]="error()" (retry)="load()" />
+        } @else if (!lastUpdatedAt() && fixtures()?.length === 0) {
+          <div class="card notice"><mat-icon>cloud_off</mat-icon><div><strong>Football data is not available yet</strong><p class="muted small">No synced fixtures are available. Please check back after the football data source has been configured and synchronized.</p></div></div>
         } @else if (!fixtures()) {
           <div class="card-grid">@for (i of [1,2,3]; track i) { <div class="card sk"><div class="skeleton" style="height:90px"></div></div> }</div>
         } @else if (byDay()[day()].length === 0) {
@@ -147,7 +171,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
                 <div class="fx-foot">
                   @if (f.status === 'SCHEDULED') {
                     <span class="small muted">Kickoff in <app-countdown [deadline]="f.kickoffAt" [icon]="false" /></span>
-                    <span class="btn btn-sm btn-primary">Challenge<mat-icon>chevron_right</mat-icon></span>
+                    <span class="btn btn-sm btn-primary">{{ auth.isLoggedIn() ? 'Challenge' : 'View match' }}<mat-icon>chevron_right</mat-icon></span>
                   } @else {
                     <span class="small muted">Challenges closed at kickoff</span>
                   }
@@ -160,13 +184,29 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
           </div>
         }
         @if (anySimulated()) { <p class="muted tiny sim-note">Simulated demo fixtures are shown because no live football data provider is configured.</p> }
+        @if (lastUpdatedAt()) { <p class="muted tiny">Football data last updated {{ lastUpdatedAt() | date: 'EEE d MMM, HH:mm' }}. Live updates may be delayed.</p> }
       </section>
 
-      <!-- Recent results -->
+      @if (results()?.length) {
+        <section>
+          <div class="section-title"><div><h2>Recent results</h2><p class="sub">Completed matches from available football data</p></div></div>
+          <div class="card-grid">
+            @for (f of results(); track f.id) {
+              <a class="card fixture card-interactive" [routerLink]="['/football', f.id]">
+                <div class="fx-top"><span class="muted tiny ellip">{{ f.competition.name }}</span><span class="small kick">{{ f.kickoffAt | date: 'EEE d MMM' }}</span></div>
+                <div class="teams-line"><span class="team">{{ f.homeTeam.name }}</span><span class="score">{{ f.homeScore }}–{{ f.awayScore }}</span><span class="team">{{ f.awayTeam.name }}</span></div>
+                <div class="fx-foot"><span class="small muted">Final score</span><span class="btn btn-sm btn-ghost">Match centre<mat-icon>chevron_right</mat-icon></span></div>
+              </a>
+            }
+          </div>
+        </section>
+      }
+
+      <!-- Recent player challenges -->
       @if (recent() && recent()!.length) {
         <section>
           <div class="section-title">
-            <div><h2>Recent results</h2><p class="sub">Your latest battles</p></div>
+            <div><h2>Your recent challenges</h2><p class="sub">Your latest battles</p></div>
             <a class="btn btn-ghost btn-sm" routerLink="/matches">History</a>
           </div>
           <div class="list card card-flush">
@@ -222,12 +262,19 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
     .fx-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
     .waiting { color: var(--demo); display: flex; align-items: center; gap: 4px; }
     .sim-note { margin-top: 10px; }
+    .public-join { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0; padding: 16px;
+      .grow { flex: 1; min-width: 0; } }
+    .football-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0;
+      label { display: grid; gap: 4px; color: var(--text-2); font-size: 12px; }
+      select, input { min-height: 40px; padding: 7px 10px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); } }
   `],
 })
 export class FootballListPage implements OnInit {
   /** ?opponent=<username> — arriving from a profile's "Challenge" button. */
   readonly opponent = input<string | undefined>();
   private api = inject(Api);
+  private seo = inject(SeoService);
+  protected auth = inject(AuthService);
   private router = inject(Router);
   private realtime = inject(RealtimeService);
   private clock = inject(ServerClock);
@@ -235,7 +282,14 @@ export class FootballListPage implements OnInit {
   protected rematch = inject(RematchService);
 
   protected fixtures = signal<FootballFixture[] | null>(null);
+  protected results = signal<FootballFixture[] | null>(null);
+  protected competitions = signal<FootballCompetition[]>([]);
+  protected lastUpdatedAt = signal<string | null>(null);
+  private competitionId = signal<number | null>(null);
+  private dateFrom = signal('');
+  private dateTo = signal('');
   protected error = signal('');
+  protected competitionError = signal('');
   protected open = signal<OpenFootballChallenge[] | null>(null);
   protected openError = signal('');
   protected showAllOpen = signal(false);
@@ -273,11 +327,15 @@ export class FootballListPage implements OnInit {
   protected emptyTitle = computed(() => ({ live: 'No matches are live right now', today: 'No more fixtures today', tomorrow: 'No fixtures tomorrow', later: 'No later fixtures yet' })[this.day()]);
 
   ngOnInit() {
+    this.seo.publish('Football fixtures, live scores and results', 'Browse upcoming football fixtures, live scores and recent results. View match centres and find relevant Head2Head challenges.', '/football');
     const opp = this.opponent();
     if (opp) this.rematch.setPending({ username: opp.replace(/^@/, ''), avatarColor: '#64748B' });
     this.load();
-    this.loadOpen();
-    this.loadMine();
+    this.loadCompetitions();
+    if (this.auth.isLoggedIn()) {
+      this.loadOpen();
+      this.loadMine();
+    }
     const refresh = () => { this.loadOpen(); this.loadMine(); };
     this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => { this.load(); refresh(); });
     this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(refresh);
@@ -285,7 +343,7 @@ export class FootballListPage implements OnInit {
     this.realtime.config$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
     // Other players' new challenges aren't pushed to everyone — poll gently.
     interval(10000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.loadOpen());
-    interval(30000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => { this.load(); this.loadMine(); });
+    interval(60000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => { this.load(); this.loadMine(); });
   }
 
   state(m: MatchSummary) { return DISPLAY_STATE[m.displayState]; }
@@ -328,8 +386,20 @@ export class FootballListPage implements OnInit {
   async load() {
     this.error.set('');
     try {
-      const fixtures = (await this.api.get<{ fixtures: FootballFixture[] }>('/football/fixtures')).fixtures;
-      this.fixtures.set(fixtures);
+      const filters = { competitionId: this.competitionId(), dateFrom: this.dateFrom(), dateTo: this.dateTo(), pageSize: 100 };
+      const [upcoming, results] = await Promise.all([
+        this.api.get<{ fixtures: FootballFixture[]; lastUpdatedAt: string | null }>('/football/fixtures', filters),
+        this.api.get<{ fixtures: FootballFixture[] }>('/football/fixtures', { ...filters, status: 'completed', pageSize: 12 }),
+      ]);
+      this.fixtures.set(upcoming.fixtures);
+      this.results.set(results.fixtures);
+      this.lastUpdatedAt.set(upcoming.lastUpdatedAt);
+      this.seo.publish(
+        'Football fixtures, live scores and results',
+        'Browse upcoming football fixtures, live scores and recent results. View match centres and find relevant Head2Head challenges.',
+        '/football',
+        upcoming.fixtures.length > 0 && !upcoming.fixtures.some((f) => f.isSimulated),
+      );
       if (!this.dayChosen) {
         // Open on the first day that actually has something to show.
         const b = this.byDay();
@@ -341,7 +411,28 @@ export class FootballListPage implements OnInit {
     }
   }
 
+  async loadCompetitions() {
+    this.competitionError.set('');
+    try {
+      this.competitions.set((await this.api.get<{ competitions: FootballCompetition[] }>('/football/competitions')).competitions);
+    } catch (err) {
+      this.competitionError.set(`Competition filters are unavailable. ${apiError(err).message}`);
+    }
+  }
+
+  selectCompetition(value: string) {
+    this.competitionId.set(value ? Number(value) : null);
+    this.load();
+  }
+
+  selectDates(from: string, to: string) {
+    this.dateFrom.set(from);
+    this.dateTo.set(to);
+    this.load();
+  }
+
   async loadOpen() {
+    if (!this.auth.isLoggedIn()) return;
     this.openError.set('');
     try {
       this.open.set((await this.api.get<{ challenges: OpenFootballChallenge[] }>('/football/open-challenges')).challenges);
@@ -351,6 +442,7 @@ export class FootballListPage implements OnInit {
   }
 
   async loadMine() {
+    if (!this.auth.isLoggedIn()) return;
     try {
       const [a, r] = await Promise.all([
         this.api.get<Paged<MatchSummary>>('/matches', { category: 'FOOTBALL', status: 'active', pageSize: 20 }),

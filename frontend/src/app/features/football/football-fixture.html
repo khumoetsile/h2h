@@ -18,13 +18,13 @@
             }
           </div>
           <div class="fh-teams">
-            <span class="team">{{ f.homeTeam.name }}</span>
+            <a class="team team-link" [routerLink]="['/football/teams', f.homeTeam.id]">{{ f.homeTeam.name }}</a>
             @if (f.status === 'LIVE' || f.status === 'FINISHED') {
               <span class="score">{{ f.homeScore }} - {{ f.awayScore }}</span>
             } @else {
               <span class="vs-sep">vs</span>
             }
-            <span class="team">{{ f.awayTeam.name }}</span>
+            <a class="team team-link" [routerLink]="['/football/teams', f.awayTeam.id]">{{ f.awayTeam.name }}</a>
           </div>
           @if (f.status === 'SCHEDULED' && !closed()) {
             <div class="kickoff-row">
@@ -34,7 +34,52 @@
             <p class="muted tiny">Challenges on this match close at kickoff. The challenge becomes active when the match begins.</p>
           }
           @if (f.isSimulated) { <p class="muted tiny">Simulated demo fixture (for testing only).</p> }
+          @if (f.lastUpdatedAt) { <p class="muted tiny">Football data last updated {{ f.lastUpdatedAt | date: 'EEE d MMM, HH:mm' }}.</p> }
         </div>
+
+        @if (f.stats; as stats) {
+          @if (stats.shots.home !== null || stats.shots.away !== null || stats.possession.home !== null || stats.possession.away !== null || stats.corners.home !== null || stats.corners.away !== null) {
+            <div class="card how">
+              <h3>Match statistics</h3>
+              @if (stats.shots.home !== null && stats.shots.away !== null) {
+                <p>{{ f.homeTeam.shortName || f.homeTeam.name }} shots {{ stats.shots.home }}–{{ stats.shots.away }} {{ f.awayTeam.shortName || f.awayTeam.name }}</p>
+              }
+              @if (stats.shotsOnTarget.home !== null && stats.shotsOnTarget.away !== null) {
+                <p>Shots on target {{ stats.shotsOnTarget.home }}–{{ stats.shotsOnTarget.away }}</p>
+              }
+              @if (stats.possession.home !== null && stats.possession.away !== null) {
+                <p>Possession {{ stats.possession.home }}%–{{ stats.possession.away }}%</p>
+              }
+              @if (stats.corners.home !== null && stats.corners.away !== null) {
+                <p>Corners {{ stats.corners.home }}–{{ stats.corners.away }}</p>
+              }
+              @if (stats.cards.home !== null && stats.cards.away !== null) {
+                <p>Cards {{ stats.cards.home }}–{{ stats.cards.away }}</p>
+              }
+            </div>
+          }
+        }
+
+        @if (f.events?.length) {
+          <div class="card how">
+            <h3>Match timeline</h3>
+            @for (event of f.events; track $index) {
+              <p>{{ event.minute ?? '—' }}' · {{ event.type.replace('_', ' ') }} · {{ event.team === 'HOME' ? f.homeTeam.name : f.awayTeam.name }}@if (event.playerName) { · {{ event.playerName }} }@if (event.detail) { ({{ event.detail }}) }</p>
+            }
+          </div>
+        }
+
+        @if (f.recentMeetings?.length) {
+          <div class="card how">
+            <h3>Recent meetings</h3>
+            @for (meeting of f.recentMeetings; track meeting.id) {
+              <a class="meeting-row" [routerLink]="['/football', meeting.id]">
+                <span>{{ meeting.homeTeam.name }} {{ meeting.homeScore }}–{{ meeting.awayScore }} {{ meeting.awayTeam.name }}</span>
+                <span class="muted small">{{ meeting.kickoffAt | date: 'd MMM yyyy' }}</span>
+              </a>
+            }
+          </div>
+        }
 
         @if (target()) {
           <div class="card notice rematch-notice">
@@ -63,6 +108,17 @@
             </div>
           }
 
+          @if (!auth.isLoggedIn()) {
+            <div class="card notice">
+              <mat-icon>person_outline</mat-icon>
+              <div>
+                <strong>Want to challenge someone on this match?</strong>
+                <p class="text-2">Create an account to join a 1-vs-1 challenge. This demo uses simulated funds only.</p>
+                <a class="btn btn-primary btn-sm" routerLink="/register" [queryParams]="{ next: '/football/' + f.id }">Create account</a>
+                <a class="btn btn-ghost btn-sm" routerLink="/login" [queryParams]="{ next: '/football/' + f.id }">Sign in</a>
+              </div>
+            </div>
+          } @else {
           <div class="card how">
             <h3>Choose a question</h3>
             <div class="type-list">
@@ -74,10 +130,11 @@
               }
             </div>
           </div>
+          }
         }
       </section>
 
-      @if (!closed()) {
+      @if (!closed() && auth.isLoggedIn()) {
         <aside class="screen entry" id="builder">
           @if (!type()) {
             <div class="screen-body">

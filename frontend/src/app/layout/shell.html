@@ -1,6 +1,6 @@
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="logo" [routerLink]="auth.homeUrl()">
+    <a class="logo" [routerLink]="auth.isLoggedIn() ? auth.homeUrl() : '/football'">
       <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path d="M6 26 L13 6 L18 6 L11 26 Z" fill="var(--accent)"/><path d="M15 26 L22 6 L27 6 L20 26 Z" fill="var(--text)"/></svg>
       <span>{{ brand.name }}</span>
       @if (auth.isAdmin()) { <span class="chip chip-info admin-tag">Admin</span> }
@@ -20,10 +20,15 @@
       </a>
     }
 
-    <button class="icon-btn" [matMenuTriggerFor]="notifMenu" (menuOpened)="loadNotifications()" aria-label="Notifications">
-      <mat-icon>notifications</mat-icon>
-      @if (auth.unread() > 0) { <span class="badge">{{ auth.unread() > 99 ? '99+' : auth.unread() }}</span> }
-    </button>
+    @if (auth.isLoggedIn()) {
+      <button class="icon-btn" [matMenuTriggerFor]="notifMenu" (menuOpened)="loadNotifications()" aria-label="Notifications">
+        <mat-icon>notifications</mat-icon>
+        @if (auth.unread() > 0) { <span class="badge">{{ auth.unread() > 99 ? '99+' : auth.unread() }}</span> }
+      </button>
+    } @else {
+      <a class="btn btn-ghost btn-sm" routerLink="/login">Sign in</a>
+      <a class="btn btn-primary btn-sm" routerLink="/register">Join</a>
+    }
 
     @if (auth.user(); as u) {
       <button class="user-btn" [matMenuTriggerFor]="userMenu" aria-label="Account menu">
@@ -78,7 +83,7 @@
   <button mat-menu-item (click)="logout()"><mat-icon>logout</mat-icon>Sign out</button>
 </mat-menu>
 
-<app-active-match-bar />
+@if (auth.isLoggedIn()) { <app-active-match-bar /> }
 <app-ads-consent />
 
 <main class="content">

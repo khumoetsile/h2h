@@ -64,7 +64,7 @@ const DEMO_PLAYER_PASSWORD = 'Player123!';
             @if (loading()) { <mat-spinner diameter="20" /> } @else { Sign in }
           </button>
         </form>
-        <p class="foot">New here? <a class="link" routerLink="/register">Create an account</a></p>
+        <p class="foot">New here? <a class="link" routerLink="/register" [queryParams]="{ next: route.snapshot.queryParamMap.get('next') }">Create an account</a></p>
 
         <div class="dev-creds">
           <div class="row-between"><strong>Demo accounts</strong><app-demo-badge label="Demo data" /></div>
@@ -80,7 +80,7 @@ export class LoginPage {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private router = inject(Router);
-  private route = inject(ActivatedRoute);
+  protected route = inject(ActivatedRoute);
   protected brand = BRAND;
 
   protected form = this.fb.nonNullable.group({
