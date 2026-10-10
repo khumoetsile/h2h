@@ -269,7 +269,7 @@ export type FixtureStatus = 'SCHEDULED' | 'LIVE' | 'FINISHED' | 'POSTPONED' | 'C
 
 export interface FootballCompetition { id: number; code: string; name: string; country: string | null; emblemUrl: string | null; }
 
-export interface FootballTeam { id: number; name: string; shortName: string | null; crestUrl: string | null; }
+export interface FootballTeam { id: number; providerId?: string | null; name: string; shortName: string | null; crestUrl: string | null; }
 
 export interface FootballChallengeType {
   id: number; slug: string; name: string; question: string; pickType: PickType; settlementSummary: string;
@@ -302,17 +302,7 @@ export interface FootballFixture {
   headToHead?: {
     status: 'AVAILABLE' | 'UNAVAILABLE' | 'UNSUPPORTED';
     source: 'PROVIDER' | 'SYNCED' | null;
-    matches: Array<{
-      id: string;
-      competition: string | null;
-      kickoffAt: string;
-      homeTeam: string;
-      awayTeam: string;
-      homeTeamProviderId: string | null;
-      awayTeamProviderId: string | null;
-      homeScore: number;
-      awayScore: number;
-    }>;
+    matches: FootballHeadToHeadMeeting[];
     summary: {
       played: number;
       wins: number;
@@ -339,6 +329,18 @@ export interface FootballFixture {
     };
   };
   lastUpdatedAt?: string | null;
+}
+
+export interface FootballHeadToHeadMeeting {
+  id: string;
+  competition: string | null;
+  kickoffAt: string;
+  homeTeam: string;
+  awayTeam: string;
+  homeTeamProviderId: string | null;
+  awayTeamProviderId: string | null;
+  homeScore: number;
+  awayScore: number;
 }
 
 export interface FootballTeamForm {

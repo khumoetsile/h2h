@@ -158,15 +158,16 @@
 .form-draw { color: var(--text-2); }
 .form-loss { color: var(--danger, #e05252); }
 .form-record { margin: 8px 0 0; line-height: 1.45; }
-.h2h-list { list-style: none; padding: 0; margin: 0; }
-.h2h-row { display: grid; grid-template-columns: minmax(68px, auto) minmax(0, 1fr) minmax(0, auto); gap: 8px; align-items: center; min-height: 52px; padding: 8px 0; }
-.h2h-row + .h2h-row { border-top: 1px solid var(--border); }
-.h2h-date, .h2h-competition { white-space: nowrap; }
-.h2h-scoreline { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 8px; align-items: center; min-width: 0; font-size: 13px; text-align: center; }
-.h2h-scoreline span { overflow-wrap: anywhere; }
-.h2h-scoreline span:first-child { text-align: right; }
-.h2h-scoreline span:last-child { text-align: left; }
-.h2h-scoreline strong { white-space: nowrap; color: var(--text); }
+.h2h-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.h2h-table-wrap:focus-visible { outline: 2px solid var(--accent); }
+.h2h-table { min-width: 620px; border-collapse: collapse; font-size: 12px; }
+.h2h-table th { padding: 9px 10px; background: var(--accent); color: var(--text); text-align: left; font-weight: 700; white-space: nowrap; }
+.h2h-table td { padding: 8px 10px; border-top: 1px solid var(--border); }
+.h2h-table tbody tr:nth-child(even) { background: var(--surface-2); }
+.h2h-date, .h2h-score { white-space: nowrap; }
+.h2h-match { min-width: 190px; }
+.h2h-score { font-weight: 700; text-align: center; }
+.h2h-outcome { display: inline-grid; min-width: 24px; height: 24px; padding: 0 5px; place-items: center; border-radius: 4px; background: var(--surface-3); font-weight: 800; }
 @media (max-width: 560px) {
   .fixture-head, .how, .pulse-card { padding: 14px; }
   .h2h-insights { grid-template-columns: repeat(2, minmax(0, 1fr)); }

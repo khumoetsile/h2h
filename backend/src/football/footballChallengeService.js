@@ -68,8 +68,14 @@ function mapFixtureRow(r) {
   return {
     id: r.id,
     competition: { id: r.competition_id, code: r.competition_code, name: r.competition_name },
-    homeTeam: { id: r.home_team_id, name: r.home_name, shortName: r.home_short, crestUrl: r.home_crest },
-    awayTeam: { id: r.away_team_id, name: r.away_name, shortName: r.away_short, crestUrl: r.away_crest },
+    homeTeam: {
+      id: r.home_team_id, providerId: r.home_provider_team_id,
+      name: r.home_name, shortName: r.home_short, crestUrl: r.home_crest,
+    },
+    awayTeam: {
+      id: r.away_team_id, providerId: r.away_provider_team_id,
+      name: r.away_name, shortName: r.away_short, crestUrl: r.away_crest,
+    },
     kickoffAt: r.kickoff_at,
     status: r.status,
     minute: r.minute,
@@ -235,7 +241,7 @@ export async function getFixtureDetail(fixtureId) {
     `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND fx.home_score IS NOT NULL AND fx.away_score IS NOT NULL
        AND comp.is_enabled = 1${simulatedFilter}
        AND ((fx.home_team_id = ? AND fx.away_team_id = ?) OR (fx.home_team_id = ? AND fx.away_team_id = ?))
-       AND fx.id <> ? AND fx.kickoff_at < ? ORDER BY fx.kickoff_at DESC LIMIT 10`,
+       AND fx.id <> ? AND fx.kickoff_at < ? ORDER BY fx.kickoff_at DESC LIMIT 50`,
     [row.home_team_id, row.away_team_id, row.away_team_id, row.home_team_id, fixtureId, row.kickoff_at],
   );
   const providerHistoryPromise = typeof provider.getHeadToHead === 'function'
@@ -301,7 +307,7 @@ export async function getFixtureDetail(fixtureId) {
         awayScore: meeting.awayScore,
       }))
       .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
-      .slice(0, 10);
+      .slice(0, 50);
   }
   if (!headToHeadMatches.length && meetings.length) {
     headToHeadSource = 'SYNCED';

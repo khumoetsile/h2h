@@ -398,12 +398,13 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
   and events remain absent when the provider does not supply them. Live match centres refresh
   automatically and display only supplied statistics and events; no player or ball positions are
   inferred without tracking data. The football-data provider also requests its match-specific
-  Head2head subresource for up to 10 prior club meetings, caches the response for 15 minutes, and
+  Head2head subresource for up to 50 prior club meetings, caches the response for 15 minutes, and
   displays final scores, the clubs' win/draw record, and historical goal-pattern counts when the
   configured plan supplies it. If that endpoint fails or returns no matches, the backend intersects
   the two teams' cached completed-match histories as a fallback. Match centres also compare each
   club's last five completed results in the same competition, using synced records first and the
-  provider's team history when local sync has none. Every comparison is labelled with its sample
+  provider's team history (up to 500 completed team matches are considered) when local sync has
+  none. Every comparison is labelled with its sample
   size; missing history is not filled with guesses, and descriptive history is not presented as
   odds or a prediction. Previously synced meetings are used if provider history cannot be refreshed.
   Public visitors can view match reactions, while changing one requires an account (one reaction

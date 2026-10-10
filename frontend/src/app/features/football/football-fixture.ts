@@ -11,7 +11,7 @@ import { apiError } from '../../core/api-error';
 import { AuthService } from '../../core/auth.service';
 import { SeoService } from '../../core/seo.service';
 import { ConfigStore } from '../../core/config.store';
-import { FootballChallengeType, FootballFixture, FootballReaction, FootballFixtureReactions, MatchView, OpenFootballChallenge, Pick as FootballPickValue, PlayerSearchResult } from '../../core/models';
+import { FootballChallengeType, FootballFixture, FootballHeadToHeadMeeting, FootballReaction, FootballFixtureReactions, MatchView, OpenFootballChallenge, Pick as FootballPickValue, PlayerSearchResult } from '../../core/models';
 import { RematchIntent, RematchService } from '../../core/rematch.service';
 import { formatRemaining, ServerClock } from '../../core/server-clock';
 import { Toast } from '../../core/toast.service';
@@ -87,6 +87,16 @@ export class FootballFixturePage implements OnInit {
       { team: fixture.awayTeam, form: headToHead.recentForm.away },
     ];
   });
+  protected headToHeadResult(meeting: FootballHeadToHeadMeeting): 'W' | 'D' | 'L' {
+    const fixture = this.fixture();
+    if (!fixture) return 'D';
+    const homeIsFixtureHome = meeting.homeTeamProviderId
+      ? meeting.homeTeamProviderId === fixture.homeTeam.providerId
+      : meeting.homeTeam === fixture.homeTeam.name;
+    const fixtureHomeScore = homeIsFixtureHome ? meeting.homeScore : meeting.awayScore;
+    const fixtureAwayScore = homeIsFixtureHome ? meeting.awayScore : meeting.homeScore;
+    return fixtureHomeScore > fixtureAwayScore ? 'W' : fixtureHomeScore < fixtureAwayScore ? 'L' : 'D';
+  }
   protected pulseRows = computed(() => {
     const stats = this.fixture()?.stats;
     if (!stats) return [];

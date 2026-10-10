@@ -102,7 +102,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     if (cached) this.teamMatchesCache.delete(key);
 
     const entry = { expiresAt: Date.now() + 15 * 60 * 1000, promise: null };
-    entry.promise = this.#get(`/teams/${encodeURIComponent(key)}/matches?status=FINISHED&limit=100`)
+    entry.promise = this.#get(`/teams/${encodeURIComponent(key)}/matches?status=FINISHED&limit=500`)
       .then((data) => {
         if (!Array.isArray(data.matches)) throw new Error(`football-data.org team history for ${key} did not include a matches array.`);
         return data.matches.map((match) => ({
@@ -139,7 +139,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
       let headToHeadError = null;
       let matches = [];
       try {
-        const data = await this.#get(`/matches/${encodeURIComponent(key)}/head2head?limit=10`);
+        const data = await this.#get(`/matches/${encodeURIComponent(key)}/head2head?limit=50`);
         if (!Array.isArray(data.matches)) throw new Error('football-data.org head2head response did not include a matches array.');
         matches = data.matches.map((match) => ({
           ...this.#fixture(match),

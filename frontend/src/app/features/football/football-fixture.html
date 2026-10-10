@@ -46,14 +46,14 @@
         @if (f.headToHead; as h2h) {
           <section class="card how h2h-card" aria-labelledby="h2h-title">
             <div class="pulse-heading">
-              <div><h3 id="h2h-title">Past head-to-head results</h3><p class="muted small">{{ f.homeTeam.name }} vs {{ f.awayTeam.name }}</p></div>
+              <div><h3 id="h2h-title">Head-to-head history</h3><p class="muted small">This fixture: {{ f.homeTeam.name }} vs {{ f.awayTeam.name }}</p></div>
               @if (h2h.matches.length) { <span class="chip">{{ h2h.matches.length }} meetings</span> }
             </div>
             @if (h2h.matches.length) {
-              <div class="h2h-summary" aria-label="Head-to-head record">
-                <div><strong>{{ h2h.summary.homeWins }}</strong><span>{{ f.homeTeam.shortName || f.homeTeam.name }} wins</span></div>
-                <div><strong>{{ h2h.summary.draws }}</strong><span>Draws</span></div>
-                <div><strong>{{ h2h.summary.awayWins }}</strong><span>{{ f.awayTeam.shortName || f.awayTeam.name }} wins</span></div>
+              <div class="h2h-summary" [attr.aria-label]="f.homeTeam.name + ' versus ' + f.awayTeam.name + ' record'">
+                <div><strong>{{ h2h.summary.homeWins }}</strong><span>Games won by {{ f.homeTeam.shortName || f.homeTeam.name }}</span></div>
+                <div><strong>{{ h2h.summary.draws }}</strong><span>Drawn</span></div>
+                <div><strong>{{ h2h.summary.awayWins }}</strong><span>Games won by {{ f.awayTeam.shortName || f.awayTeam.name }}</span></div>
               </div>
               <p class="muted tiny h2h-sample">Scoring patterns across these {{ h2h.summary.played }} recorded meetings</p>
               <div class="h2h-insights" aria-label="Historical scoring patterns">
@@ -63,19 +63,24 @@
                 <div><strong>{{ h2h.summary.cleanSheets }}–{{ h2h.summary.opponentCleanSheets }}</strong><span>Clean sheets · home/away</span></div>
               </div>
               @if (h2h.source === 'SYNCED') { <p class="muted tiny">Showing meetings already synced by Head2Head; the provider did not return these results in its current response.</p> }
-              <ol class="h2h-list">
-                @for (meeting of h2h.matches; track meeting.id) {
-                  <li class="h2h-row">
-                    <span class="muted small h2h-date">{{ meeting.kickoffAt | date: 'd MMM yyyy' }}</span>
-                    <span class="h2h-scoreline">
-                      <span>{{ meeting.homeTeam }}</span>
-                      <strong>{{ meeting.homeScore }} – {{ meeting.awayScore }}</strong>
-                      <span>{{ meeting.awayTeam }}</span>
-                    </span>
-                    @if (meeting.competition) { <span class="muted tiny h2h-competition">{{ meeting.competition }}</span> }
-                  </li>
-                }
-              </ol>
+              <div class="h2h-table-wrap" role="region" aria-label="Past results between these fixture teams" tabindex="0">
+                <table class="h2h-table">
+                  <thead>
+                    <tr><th scope="col">Date</th><th scope="col">Match</th><th scope="col">Result for {{ f.homeTeam.shortName || f.homeTeam.name }}</th><th scope="col">Score</th><th scope="col">Competition</th></tr>
+                  </thead>
+                  <tbody>
+                    @for (meeting of h2h.matches; track meeting.id) {
+                      <tr>
+                        <td class="h2h-date">{{ meeting.kickoffAt | date: 'd MMM yyyy' }}</td>
+                        <td class="h2h-match">{{ meeting.homeTeam }} <span class="muted">vs</span> {{ meeting.awayTeam }}</td>
+                        <td><span class="h2h-outcome" [class.form-win]="headToHeadResult(meeting) === 'W'" [class.form-draw]="headToHeadResult(meeting) === 'D'" [class.form-loss]="headToHeadResult(meeting) === 'L'" [attr.aria-label]="f.homeTeam.name + ' result: ' + headToHeadResult(meeting)">{{ headToHeadResult(meeting) }}</span></td>
+                        <td class="h2h-score">{{ meeting.homeScore }}–{{ meeting.awayScore }}</td>
+                        <td class="h2h-competition">{{ meeting.competition || '—' }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
             } @else if (h2h.status === 'UNAVAILABLE') {
               <div class="data-unavailable">
                 <p class="muted small">The match-history service could not return these clubs’ past meetings. No results are being guessed.</p>
@@ -126,7 +131,7 @@
                 </section>
               }
             </div>
-            <p class="muted tiny h2h-disclaimer">Historical results describe recorded samples only; they are not odds, predictions, or a guarantee of future results. Form uses up to five earlier completed matches in this competition that are synced here.</p>
+            <p class="muted tiny h2h-disclaimer">History is tied to the two teams in this fixture. Results describe the available recorded sample; they are not odds, predictions, or a guarantee of future results. Form uses up to five earlier completed matches in this competition.</p>
           </section>
         }
 

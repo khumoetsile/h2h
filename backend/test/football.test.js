@@ -93,7 +93,7 @@ describe('football: browsing', () => {
     let calls = 0;
     globalThis.fetch = async (url) => {
       calls += 1;
-      assert.equal(url, 'https://football.example.test/v4/matches/123/head2head?limit=10');
+      assert.equal(url, 'https://football.example.test/v4/matches/123/head2head?limit=50');
       return {
         ok: true,
         json: async () => ({
@@ -142,13 +142,13 @@ describe('football: browsing', () => {
     };
     globalThis.fetch = async (url) => {
       calls += 1;
-      if (url.endsWith('/matches/123/head2head?limit=10')) {
+      if (url.endsWith('/matches/123/head2head?limit=50')) {
         return { ok: false, status: 403, text: async () => 'head2head unavailable on plan' };
       }
-      if (url.endsWith('/teams/10/matches?status=FINISHED&limit=100')) {
+      if (url.endsWith('/teams/10/matches?status=FINISHED&limit=500')) {
         return { ok: true, json: async () => ({ matches: [meeting] }) };
       }
-      if (url.endsWith('/teams/20/matches?status=FINISHED&limit=100')) {
+      if (url.endsWith('/teams/20/matches?status=FINISHED&limit=500')) {
         return { ok: true, json: async () => ({ matches: [meeting] }) };
       }
       throw new Error(`Unexpected football-data URL: ${url}`);
@@ -184,7 +184,7 @@ describe('football: browsing', () => {
       score: { fullTime: { home: 1, away: 1 } },
     };
     globalThis.fetch = async (url) => {
-      if (url.endsWith('/matches/123/head2head?limit=10')) {
+      if (url.endsWith('/matches/123/head2head?limit=50')) {
         return { ok: true, json: async () => ({ matches: [] }) };
       }
       if (url.includes('/teams/10/matches?') || url.includes('/teams/20/matches?')) {
