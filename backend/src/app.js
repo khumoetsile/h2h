@@ -110,13 +110,16 @@ export function createApp() {
 
   app.use('/api/auth', authRoutes);
   app.use('/api/invites', inviteRoutes);
+  // Public football reads must be routed before the authenticated /api
+  // profile/dashboard mount. Mutating football endpoints enforce auth in
+  // their own route handlers.
+  app.use('/api/football', footballRoutes);
   app.use('/api', requireAuth, meRoutes); // /api/me, /api/dashboard
   app.use('/api/push', requireAuth, pushRoutes);
   app.use('/api/wallet', requireAuth, walletRoutes);
   app.use('/api/games', requireAuth, gameRoutes);
   app.use('/api/matches', requireAuth, matchRoutes);
   app.use('/api/challenges', requireAuth, challengeRoutes);
-  app.use('/api/football', footballRoutes);
   app.use('/api/leaderboard', requireAuth, leaderboardRoutes);
   app.use('/api/notifications', requireAuth, notificationRoutes);
   app.use('/api/users', requireAuth, userRoutes);
