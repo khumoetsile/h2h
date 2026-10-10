@@ -39,9 +39,10 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
 
       <header class="hero">
         <div class="grow">
-          <h1>Football</h1>
-          <p class="sub">Follow the game. Challenge another player.</p>
+          <h1>Football fixtures &amp; results</h1>
+          <p class="sub">Browse upcoming matches, live scores and past results for free.</p>
         </div>
+        <button class="btn btn-ghost btn-lg" (click)="scrollToResults()"><mat-icon>history</mat-icon>Past results</button>
         <button class="btn btn-primary btn-lg create" (click)="scrollToFixtures()"><mat-icon>{{ auth.isLoggedIn() ? 'swords' : 'sports_soccer' }}</mat-icon> {{ auth.isLoggedIn() ? 'Create challenge' : 'Browse fixtures' }}</button>
       </header>
 
@@ -122,7 +123,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       <!-- Fixtures -->
       <section id="fixtures">
         <div class="section-title">
-          <div><h2>Fixtures</h2><p class="sub">Browse upcoming matches and live scores</p></div>
+          <div><h2>Upcoming fixtures &amp; live scores</h2><p class="sub">Browse by competition or date. Open any match for its match centre.</p></div>
         </div>
         <div class="football-filters">
           <label>Competition
@@ -131,8 +132,8 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
               @for (c of competitions(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
             </select>
           </label>
-          <label>From <input #dateFrom type="date" (change)="selectDates(dateFrom.value, dateTo.value)" /></label>
-          <label>To <input #dateTo type="date" (change)="selectDates(dateFrom.value, dateTo.value)" /></label>
+          <label>From <input #dateFrom type="date" aria-label="Filter fixtures and results from this date" (change)="selectDates(dateFrom.value, dateTo.value)" /></label>
+          <label>To <input #dateTo type="date" aria-label="Filter fixtures and results through this date" (change)="selectDates(dateFrom.value, dateTo.value)" /></label>
         </div>
         @if (competitionError()) { <p class="muted small">{{ competitionError() }}</p> }
         <div class="segmented tabs day-tabs">
@@ -187,9 +188,21 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         @if (lastUpdatedAt()) { <p class="muted tiny">Football data last updated {{ lastUpdatedAt() | date: 'EEE d MMM, HH:mm' }}. Live updates may be delayed.</p> }
       </section>
 
-      @if (results()?.length) {
-        <section>
-          <div class="section-title"><div><h2>Recent results</h2><p class="sub">Completed matches from available football data</p></div></div>
+      <section id="past-results">
+        <div class="section-title">
+          <div>
+            <h2>Past match results</h2>
+            <p class="sub">Browse completed scores. Use the competition and date filters above to narrow your search.</p>
+          </div>
+          @if (resultsTotal() > 0) { <span class="muted small">{{ results()?.length ?? 0 }} of {{ resultsTotal() }} matches</span> }
+        </div>
+        @if (resultsError()) {
+          <app-load-error [message]="resultsError()" (retry)="load()" />
+        } @else if (!results()) {
+          <div class="card-grid">@for (i of [1,2,3]; track i) { <div class="card sk"><div class="skeleton" style="height:90px"></div></div> }</div>
+        } @else if (results()!.length === 0) {
+          <app-empty icon="sports_soccer" title="No past results for these filters" text="Try a different competition or date range." />
+        } @else {
           <div class="card-grid">
             @for (f of results(); track f.id) {
               <a class="card fixture card-interactive" [routerLink]="['/football', f.id]">
@@ -199,8 +212,16 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
               </a>
             }
           </div>
-        </section>
-      }
+          @if (results()!.length < resultsTotal()) {
+            <div class="results-more">
+              <button class="btn btn-ghost" [disabled]="loadingMoreResults()" (click)="loadMoreResults()">
+                <mat-icon>{{ loadingMoreResults() ? 'hourglass_top' : 'expand_more' }}</mat-icon>
+                {{ loadingMoreResults() ? 'Loading results…' : 'Load more results' }}
+              </button>
+            </div>
+          }
+        }
+      </section>
 
       <!-- Recent player challenges -->
       @if (recent() && recent()!.length) {
@@ -240,6 +261,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       .grow { flex: 1; min-width: 200px; } .sub { color: var(--text-2); margin-top: 4px; } }
     .create { flex: 1 1 100%; }
     @media (min-width: 640px) { .create { flex: 0 0 auto; } }
+    .results-more { display: flex; justify-content: center; margin-top: 16px; }
     .target-banner { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-top: 16px; border-color: var(--accent);
       mat-icon { color: var(--accent); } .grow { flex: 1; min-width: 0; } }
     .empty-open { display: flex; align-items: center; gap: 12px; padding: 16px; mat-icon { color: var(--muted); } .grow { flex: 1; min-width: 0; } }
@@ -283,6 +305,11 @@ export class FootballListPage implements OnInit {
 
   protected fixtures = signal<FootballFixture[] | null>(null);
   protected results = signal<FootballFixture[] | null>(null);
+  protected resultsTotal = signal(0);
+  protected loadingMoreResults = signal(false);
+  protected resultsError = signal('');
+  private resultsPage = 1;
+  private resultsQueryVersion = 0;
   protected competitions = signal<FootballCompetition[]>([]);
   protected lastUpdatedAt = signal<string | null>(null);
   private competitionId = signal<number | null>(null);
@@ -372,6 +399,10 @@ export class FootballListPage implements OnInit {
     document.getElementById('fixtures')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  scrollToResults() {
+    document.getElementById('past-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   rematchWith(m: MatchSummary) {
     if (!m.opponent) return;
     this.rematch.setPending({ username: m.opponent.username, avatarColor: m.opponent.avatarColor, challengeTypeSlug: m.football?.challengeTypeSlug, stake: m.stake });
@@ -384,15 +415,22 @@ export class FootballListPage implements OnInit {
   }
 
   async load() {
+    const queryVersion = ++this.resultsQueryVersion;
     this.error.set('');
+    this.resultsError.set('');
+    this.resultsPage = 1;
+    this.results.set(null);
+    this.resultsTotal.set(0);
     try {
       const filters = { competitionId: this.competitionId(), dateFrom: this.dateFrom(), dateTo: this.dateTo(), pageSize: 100 };
       const [upcoming, results] = await Promise.all([
         this.api.get<{ fixtures: FootballFixture[]; lastUpdatedAt: string | null }>('/football/fixtures', filters),
-        this.api.get<{ fixtures: FootballFixture[] }>('/football/fixtures', { ...filters, status: 'completed', pageSize: 12 }),
+        this.api.get<{ fixtures: FootballFixture[]; total: number }>('/football/fixtures', { ...filters, status: 'completed', pageSize: 12 }),
       ]);
+      if (queryVersion !== this.resultsQueryVersion) return;
       this.fixtures.set(upcoming.fixtures);
       this.results.set(results.fixtures);
+      this.resultsTotal.set(results.total);
       this.lastUpdatedAt.set(upcoming.lastUpdatedAt);
       this.seo.publish(
         'Football fixtures, live scores and results',
@@ -407,10 +445,40 @@ export class FootballListPage implements OnInit {
         this.dayChosen = true;
       }
     } catch (err) {
-      this.error.set(apiError(err).message);
+      if (queryVersion === this.resultsQueryVersion) {
+        const message = apiError(err).message;
+        this.error.set(message);
+        this.resultsError.set(message);
+        this.results.set([]);
+      }
     }
   }
 
+  async loadMoreResults() {
+    if (this.loadingMoreResults() || this.resultsPage * 12 >= this.resultsTotal()) return;
+    this.loadingMoreResults.set(true);
+    this.resultsError.set('');
+    const queryVersion = this.resultsQueryVersion;
+    const nextPage = this.resultsPage + 1;
+    try {
+      const response = await this.api.get<{ fixtures: FootballFixture[]; total: number }>('/football/fixtures', {
+        competitionId: this.competitionId(),
+        dateFrom: this.dateFrom(),
+        dateTo: this.dateTo(),
+        status: 'completed',
+        page: nextPage,
+        pageSize: 12,
+      });
+      if (queryVersion !== this.resultsQueryVersion) return;
+      this.results.update((current) => [...(current ?? []), ...response.fixtures]);
+      this.resultsPage = nextPage;
+      this.resultsTotal.set(response.total);
+    } catch (err) {
+      if (queryVersion === this.resultsQueryVersion) this.resultsError.set(apiError(err).message);
+    } finally {
+      this.loadingMoreResults.set(false);
+    }
+  }
   async loadCompetitions() {
     this.competitionError.set('');
     try {
