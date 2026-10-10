@@ -11,7 +11,7 @@ import { apiError } from '../../core/api-error';
 import { AuthService } from '../../core/auth.service';
 import { SeoService } from '../../core/seo.service';
 import { ConfigStore } from '../../core/config.store';
-import { FootballChallengeType, FootballFixture, MatchView, OpenFootballChallenge, Pick as FootballPickValue, PlayerSearchResult } from '../../core/models';
+import { FootballChallengeType, FootballFixture, FootballReaction, FootballFixtureReactions, MatchView, OpenFootballChallenge, Pick as FootballPickValue, PlayerSearchResult } from '../../core/models';
 import { RematchIntent, RematchService } from '../../core/rematch.service';
 import { formatRemaining, ServerClock } from '../../core/server-clock';
 import { Toast } from '../../core/toast.service';
@@ -44,10 +44,14 @@ export class FootballFixturePage implements OnInit {
   protected config = inject(ConfigStore);
   private destroyRef = inject(DestroyRef);
   private rematchSvc = inject(RematchService);
+  private loading = false;
 
   protected fixture = signal<FootballFixture | null>(null);
   protected openChallenges = signal<OpenFootballChallenge[]>([]);
   protected error = signal('');
+  protected refreshError = signal('');
+  protected activeEventId = signal<number | null>(null);
+  protected reactionBusy = signal(false);
   protected target = signal<RematchIntent | null>(null);
 
   protected type = signal<FootballChallengeType | null>(null);
@@ -74,6 +78,46 @@ export class FootballFixturePage implements OnInit {
     return !!f && (f.status !== 'SCHEDULED' || this.clock.remainingMs(f.kickoffAt) === 0);
   });
   protected visibleOpen = computed(() => this.openChallenges().filter((c) => this.clock.remainingMs(c.acceptanceDeadline) > 0));
+  protected pulseRows = computed(() => {
+    const stats = this.fixture()?.stats;
+    if (!stats) return [];
+    const values = [
+      { label: 'Possession', home: stats.possession.home, away: stats.possession.away, suffix: '%', proportional: true },
+      { label: 'Shots on target', home: stats.shotsOnTarget.home, away: stats.shotsOnTarget.away, suffix: '', proportional: false },
+      { label: 'Shots', home: stats.shots.home, away: stats.shots.away, suffix: '', proportional: false },
+      { label: 'Corners', home: stats.corners.home, away: stats.corners.away, suffix: '', proportional: false },
+      { label: 'Cards', home: stats.cards.home, away: stats.cards.away, suffix: '', proportional: false },
+    ];
+    return values.filter((row) => row.home !== null && row.away !== null).map((row) => {
+      const home = row.home!;
+      const away = row.away!;
+      const total = row.proportional ? home + away : Math.max(home, away);
+      return {
+        ...row,
+        homeWidth: total ? Math.round(home / total * 100) : 50,
+        awayWidth: total ? Math.round(away / total * 100) : 50,
+      };
+    });
+  });
+  protected pulseInsight = computed(() => {
+    const fixture = this.fixture();
+    const rows = this.pulseRows();
+    if (!fixture) return '';
+    const target = rows.find((row) => row.label === 'Shots on target');
+    if (target && target.home !== null && target.away !== null && target.home !== target.away) {
+      return `${target.home > target.away ? fixture.homeTeam.name : fixture.awayTeam.name} have more shots on target`;
+    }
+    const possession = rows.find((row) => row.label === 'Possession');
+    if (possession && possession.home !== null && possession.away !== null && possession.home !== possession.away) {
+      return `${possession.home > possession.away ? fixture.homeTeam.name : fixture.awayTeam.name} have more possession`;
+    }
+    return rows.length ? 'Available match statistics are level' : '';
+  });
+  protected readonly reactionOptions: Array<{ code: FootballReaction; emoji: string; label: string }> = [
+    { code: 'FIRE', emoji: '🔥', label: 'Fire' },
+    { code: 'SHOCK', emoji: '😱', label: 'Surprised' },
+    { code: 'GOAL', emoji: '⚽', label: 'Goal' },
+  ];
 
   protected pickLabel = computed(() => {
     const t = this.type();
@@ -114,15 +158,26 @@ export class FootballFixturePage implements OnInit {
       this.mode.set('direct');
     }
     this.load();
-    interval(60000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
+    interval(15000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe((tick) => {
+      if (this.fixture()?.status === 'LIVE' || tick % 4 === 3) void this.load(true);
+    });
   }
 
   async load(silent = false) {
+    if (this.loading) return;
+    this.loading = true;
     if (!silent) this.error.set('');
     try {
       const res = await this.api.get<{ fixture: FootballFixture; openChallenges: OpenFootballChallenge[] }>(`/football/fixtures/${this.fixtureId()}`);
       const first = !this.fixture();
+      const previousEvents = new Set(this.fixture()?.events?.map((event) => event.id) ?? []);
+      const newEvents = res.fixture.events?.filter((event) => !previousEvents.has(event.id)) ?? [];
+      const latestNewEvent = newEvents[newEvents.length - 1];
       this.fixture.set(res.fixture);
+      if (latestNewEvent) this.activeEventId.set(latestNewEvent.id);
+      else if (first && res.fixture.events?.length) this.activeEventId.set(res.fixture.events[res.fixture.events.length - 1].id);
+      this.error.set('');
+      this.refreshError.set('');
       const result = res.fixture.homeScore !== null && res.fixture.awayScore !== null
         ? `${res.fixture.homeScore}-${res.fixture.awayScore}`
         : (res.fixture.status === 'SCHEDULED' ? 'Upcoming fixture' : res.fixture.status.toLowerCase());
@@ -137,6 +192,24 @@ export class FootballFixturePage implements OnInit {
       if (!silent && this.auth.isLoggedIn()) this.auth.refreshMe().catch(() => {});
     } catch (err) {
       if (!silent) this.error.set(apiError(err).message);
+      else this.refreshError.set('Could not refresh match data. Retrying automatically.');
+    } finally {
+      this.loading = false;
+    }
+  }
+
+  async react(reaction: FootballReaction) {
+    const fixture = this.fixture();
+    if (!fixture || this.reactionBusy()) return;
+    const selected = fixture.reactions?.mine === reaction ? null : reaction;
+    this.reactionBusy.set(true);
+    try {
+      const result = await this.api.put<{ reactions: FootballFixtureReactions }>(`/football/fixtures/${fixture.id}/reaction`, { reaction: selected });
+      this.fixture.update((current) => current?.id === fixture.id ? { ...current, reactions: result.reactions } : current);
+    } catch (err) {
+      this.toast.error(err);
+    } finally {
+      this.reactionBusy.set(false);
     }
   }
 

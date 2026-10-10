@@ -69,7 +69,7 @@ jobs:
             --exclude '.env' --exclude 'node_modules' --exclude 'tmp/' \
             --exclude '/.htaccess' --exclude 'stderr.log' \
             bundle/ "$SSH_USER@$SSH_HOST:$APP_DIR/"
-          $SSH "$SSH_USER@$SSH_HOST" "set -e; source $ACTIVATE; cd $APP_DIR; npm ci --omit=dev; mkdir -p tmp; touch tmp/restart.txt"
+          $SSH "$SSH_USER@$SSH_HOST" "set -e; source $ACTIVATE; cd $APP_DIR; npm ci --omit=dev; npm run migrate; mkdir -p tmp; touch tmp/restart.txt"
 
       - name: Verify site is up
         if: env.SSH_KEY != '' && vars.CPANEL_SITE_URL != ''

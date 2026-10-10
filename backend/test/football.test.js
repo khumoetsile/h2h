@@ -105,10 +105,45 @@ describe('football: browsing', () => {
     assert.equal(detail.body.fixture.stats.shots.home, 8);
     assert.equal(detail.body.fixture.stats.corners.home, null, 'unknown statistics stay unknown');
     assert.deepEqual(detail.body.openChallenges, []);
+    assert.deepEqual(detail.body.fixture.reactions, {
+      counts: { FIRE: 0, SHOCK: 0, GOAL: 0 },
+      mine: null,
+    });
     const team = await api().get(`/api/football/teams/${homeId}`);
     assert.equal(team.status, 200);
     assert.equal(team.body.team.id, homeId);
     assert.ok(Array.isArray(team.body.recentResults));
+  });
+
+  test('fixture reactions are public to read, authenticated to set, and unique per player', async () => {
+    const fixtureId = await makeFixture({ status: 'LIVE', kickoffMs: -10 * 60 * 1000 });
+    const path = `/api/football/fixtures/${fixtureId}/reaction`;
+    assert.equal((await api().put(path).send({ reaction: 'FIRE' })).status, 401);
+
+    const player = await newPlayer('react');
+    let res = await api().put(path).set(auth(player.token)).send({ reaction: 'FIRE' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.reactions.mine, 'FIRE');
+    assert.equal(res.body.reactions.counts.FIRE, 1);
+
+    res = await api().put(path).set(auth(player.token)).send({ reaction: 'GOAL' });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.reactions.mine, 'GOAL');
+    assert.equal(res.body.reactions.counts.FIRE, 0);
+    assert.equal(res.body.reactions.counts.GOAL, 1);
+
+    const publicDetail = await api().get(`/api/football/fixtures/${fixtureId}`);
+    assert.equal(publicDetail.status, 200);
+    assert.equal(publicDetail.body.fixture.reactions.counts.GOAL, 1);
+    assert.equal(publicDetail.body.fixture.reactions.mine, null);
+    const ownDetail = await api().get(`/api/football/fixtures/${fixtureId}`).set(auth(player.token));
+    assert.equal(ownDetail.body.fixture.reactions.mine, 'GOAL');
+
+    res = await api().put(path).set(auth(player.token)).send({ reaction: null });
+    assert.equal(res.status, 200);
+    assert.equal(res.body.reactions.mine, null);
+    assert.equal(res.body.reactions.counts.GOAL, 0);
+    assert.equal((await api().put(path).set(auth(player.token)).send({ reaction: 'CLAP' })).status, 400);
   });
 
   test('public fixture filters validate date ranges and support team/competition filtering', async () => {

@@ -139,7 +139,7 @@ export async function getFixtureDetail(fixtureId) {
   const settings = await getSettings();
   const types = (await listChallengeTypes()).map((t) => ({ ...t, question: fillQuestion(t.question, row.home_short, row.away_short) }));
   const events = await query(
-    'SELECT minute, type, team, player_name AS playerName, detail FROM football_events WHERE fixture_id = ? ORDER BY minute, id',
+    'SELECT id, minute, type, team, player_name AS playerName, detail FROM football_events WHERE fixture_id = ? ORDER BY minute, id',
     [fixtureId],
   );
   const meetings = await query(
@@ -163,6 +163,46 @@ export async function getFixtureDetail(fixtureId) {
     challengeTypes: types,
     stakes: settings.stake_amounts,
   };
+}
+
+const FOOTBALL_REACTIONS = ['FIRE', 'SHOCK', 'GOAL'];
+
+export async function getFixtureReactions(fixtureId, userId = null) {
+  const [rows, mine] = await Promise.all([
+    query(
+      'SELECT reaction, COUNT(*) AS count FROM football_fixture_reactions WHERE fixture_id = ? GROUP BY reaction',
+      [fixtureId],
+    ),
+    userId
+      ? query('SELECT reaction FROM football_fixture_reactions WHERE fixture_id = ? AND user_id = ?', [fixtureId, userId])
+      : Promise.resolve([]),
+  ]);
+  const counts = Object.fromEntries(FOOTBALL_REACTIONS.map((reaction) => [reaction, 0]));
+  for (const row of rows) counts[row.reaction] = Number(row.count);
+  return { counts, mine: mine[0]?.reaction ?? null };
+}
+
+export async function setFixtureReaction(fixtureId, userId, reaction) {
+  const provider = getFootballProvider();
+  const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
+  const fixture = await query(
+    `SELECT fx.id FROM football_fixtures fx
+     JOIN football_competitions c ON c.id = fx.competition_id AND c.is_enabled = 1 AND c.provider = ?
+     WHERE fx.id = ?${simulatedFilter}`,
+    [provider.name, fixtureId],
+  );
+  if (!fixture.length) throw notFound('Fixture not found.');
+
+  if (reaction === null) {
+    await query('DELETE FROM football_fixture_reactions WHERE fixture_id = ? AND user_id = ?', [fixtureId, userId]);
+  } else {
+    await query(
+      `INSERT INTO football_fixture_reactions (fixture_id, user_id, reaction) VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE reaction = VALUES(reaction)`,
+      [fixtureId, userId, reaction],
+    );
+  }
+  return getFixtureReactions(fixtureId, userId);
 }
 
 // ---------------------------------------------------------------------------

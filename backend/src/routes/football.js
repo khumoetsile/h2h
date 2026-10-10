@@ -30,6 +30,7 @@ const fixturesQuery = z.object({
 }, { message: 'Choose a valid date range of no more than 90 days.' });
 
 const fixtureIdParam = z.object({ id: z.coerce.number().int().positive() });
+const fixtureReactionSchema = z.object({ reaction: z.enum(['FIRE', 'SHOCK', 'GOAL']).nullable() });
 
 router.get('/competitions', ah(async (_req, res) => {
   res.json({ competitions: await svc.listCompetitions() });
@@ -49,11 +50,17 @@ router.get('/fixtures', validate(fixturesQuery, 'query'), ah(async (req, res) =>
 
 router.get('/fixtures/:id', optionalAuth, validate(fixtureIdParam, 'params'), ah(async (req, res) => {
   const id = Number(req.params.id);
-  const [fixture, openChallenges] = await Promise.all([
+  const [fixture, openChallenges, reactions] = await Promise.all([
     svc.getFixtureDetail(id),
     req.user?.role === 'PLAYER' ? svc.listOpenChallenges(req.user.id, { fixtureId: id }) : [],
+    svc.getFixtureReactions(id, req.user?.id),
   ]);
+  fixture.reactions = reactions;
   res.json({ fixture, openChallenges, serverNow: new Date() });
+}));
+
+router.put('/fixtures/:id/reaction', requireAuth, validate(fixtureIdParam, 'params'), validate(fixtureReactionSchema), ah(async (req, res) => {
+  res.json({ reactions: await svc.setFixtureReaction(Number(req.params.id), req.user.id, req.body.reaction) });
 }));
 
 // Matchmaking: find (or wait for) an opponent who picks the other side of the same question.

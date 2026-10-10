@@ -89,3 +89,41 @@
 .eyebrow { font-weight: 700; margin-bottom: 2px; }
 .lock-teams { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 12px; font-family: var(--font-display); font-weight: 700; font-size: 18px; text-align: center;
   span { min-width: 0; overflow-wrap: anywhere; } small { color: var(--muted); font-size: 12px; } }
+
+.refresh-error { color: var(--danger, #e05252); font-size: 12px; }
+.pulse-card { margin-top: 16px; padding: 18px; }
+.pulse-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pulse-heading h3 { margin: 0; }
+.pulse-heading .eyebrow { display: block; margin-bottom: 3px; letter-spacing: .08em; }
+.pulse-insight { color: var(--accent); font-weight: 700; margin: 14px 0; }
+.pulse-stats { display: grid; gap: 14px; margin-top: 14px; }
+.pulse-stat-label { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; color: var(--text-2); font-size: 13px; }
+.pulse-stat-label strong { color: var(--text); white-space: nowrap; }
+.pulse-bar { display: flex; overflow: hidden; height: 6px; margin-top: 6px; border-radius: 999px; background: var(--surface-3); gap: 2px; }
+.pulse-bar span { min-width: 0; transition: width .35s ease; }
+.home-bar { background: var(--accent); border-radius: 999px 0 0 999px; }
+.away-bar { background: var(--text-2); border-radius: 0 999px 999px 0; }
+.pitch-placeholder { position: relative; margin-top: 18px; overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius-sm); background: #154d36; min-height: 150px; }
+.pitch-illustration { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: rgb(255 255 255 / 28%); stroke-width: 1.2; }
+.pitch-illustration .pitch-dot { fill: rgb(255 255 255 / 60%); }
+.pitch-message { position: relative; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 5px; min-height: 150px; padding: 20px; text-align: center; color: white; background: rgb(10 30 22 / 45%); }
+.pitch-message span { max-width: 360px; font-size: 12px; line-height: 1.45; color: rgb(255 255 255 / 82%); }
+.timeline-card { overflow: hidden; }
+.timeline { list-style: none; margin: 8px 0 0; padding: 0; }
+.timeline li + li { border-top: 1px solid var(--border); }
+.timeline-event { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 58px; padding: 9px 4px; border: 0; background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.timeline-event:hover, .timeline-event.active { background: var(--surface-2); }
+.event-minute { flex: 0 0 42px; font-family: var(--font-display); font-weight: 700; color: var(--accent); }
+.event-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.event-copy strong { text-transform: capitalize; }
+.event-copy span { color: var(--text-2); }
+.event-selected { margin-left: auto; color: var(--muted); font-size: 11px; flex-shrink: 0; }
+.reactions-card { margin-top: 16px; }
+.reactions-card .pulse-heading { margin-bottom: 12px; }
+.reactions-card .pulse-heading p { margin-top: 4px; }
+.reaction-list { display: flex; flex-wrap: wrap; gap: 10px; }
+.reaction-button { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-width: 72px; min-height: 44px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-2); color: var(--text); text-decoration: none; font: inherit; cursor: pointer; }
+.reaction-button:hover, .reaction-button.selected { border-color: var(--accent); background: var(--surface-3); }
+.reaction-button:disabled { opacity: .65; cursor: wait; }
+.reaction-button span:first-child { font-size: 18px; }
+@media (prefers-reduced-motion: reduce) { .pulse-bar span { transition: none; } }

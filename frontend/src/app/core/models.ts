@@ -296,9 +296,16 @@ export interface FootballFixture {
     corners: { home: number | null; away: number | null };
     cards: { home: number | null; away: number | null };
   };
-  events?: Array<{ minute: number | null; type: string; team: 'HOME' | 'AWAY'; playerName: string | null; detail: string | null }>;
+  events?: Array<{ id: number; minute: number | null; type: string; team: 'HOME' | 'AWAY'; playerName: string | null; detail: string | null }>;
+  reactions?: FootballFixtureReactions;
   recentMeetings?: FootballFixture[];
   lastUpdatedAt?: string | null;
+}
+
+export type FootballReaction = 'FIRE' | 'SHOCK' | 'GOAL';
+export interface FootballFixtureReactions {
+  counts: Record<FootballReaction, number>;
+  mine: FootballReaction | null;
 }
 
 /** A publicly discoverable "Find an opponent" challenge, waiting for a second player to join. */
