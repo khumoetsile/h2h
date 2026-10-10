@@ -37,7 +37,30 @@ async function footballGameId(runner = query) {
 // ---------------------------------------------------------------------------
 
 export async function listCompetitions() {
-  return query('SELECT id, code, name, country, emblem_url AS emblemUrl FROM football_competitions WHERE is_enabled = 1 ORDER BY sort_order, name');
+  return query(
+    'SELECT id, code, name, country, emblem_url AS emblemUrl FROM football_competitions WHERE is_enabled = 1 AND provider = ? ORDER BY sort_order, name',
+    [getFootballProvider().name],
+  );
+}
+
+export async function getTeamDetail(teamId) {
+  const provider = getFootballProvider();
+  const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
+  const row = (await query(
+    `SELECT t.id, t.name, t.short_name AS shortName, t.crest_url AS crestUrl,
+       MAX(fx.last_synced_at) AS lastUpdatedAt
+     FROM football_teams t
+     JOIN football_fixtures fx ON (fx.home_team_id = t.id OR fx.away_team_id = t.id)${simulatedFilter}
+     JOIN football_competitions c ON c.id = fx.competition_id AND c.is_enabled = 1 AND c.provider = ?
+     WHERE t.id = ? GROUP BY t.id LIMIT 1`,
+    [provider.name, teamId],
+  ))[0];
+  if (!row) throw notFound('Team not found.');
+  const [upcoming, results] = await Promise.all([
+    listFixtures({ teamId, status: 'upcoming', pageSize: 20 }),
+    listFixtures({ teamId, status: 'completed', pageSize: 10 }),
+  ]);
+  return { team: row, upcoming: upcoming.fixtures, recentResults: results.fixtures, lastUpdatedAt: row.lastUpdatedAt };
 }
 
 function mapFixtureRow(r) {
@@ -67,7 +90,7 @@ const FIXTURE_SELECT = `
   JOIN football_teams ht ON ht.id = fx.home_team_id
   JOIN football_teams at ON at.id = fx.away_team_id`;
 
-export async function listFixtures({ competitionId, status } = {}) {
+export async function listFixtures({ competitionId, status, dateFrom, dateTo, teamId, page = 1, pageSize = 50 } = {}) {
   const where = ['comp.is_enabled = 1'];
   // Once a real data provider is connected, fixtures left over from the simulated one (seed data) must not be offered as real games.
   if (config.football.provider !== 'mock') where.push('fx.is_simulated = 0');
@@ -75,9 +98,30 @@ export async function listFixtures({ competitionId, status } = {}) {
   if (competitionId) { where.push('fx.competition_id = ?'); params.push(competitionId); }
   if (status === 'live') where.push(`fx.status = 'LIVE'`);
   else if (status === 'upcoming') where.push(`fx.status = 'SCHEDULED'`);
-  else where.push(`fx.status IN ('SCHEDULED','LIVE')`);
-  const rows = await query(`${FIXTURE_SELECT} WHERE ${where.join(' AND ')} ORDER BY fx.kickoff_at ASC LIMIT 150`, params);
-  return rows.map(mapFixtureRow);
+  else if (status === 'completed') where.push(`fx.status = 'FINISHED'`);
+  else if (!status) where.push(`fx.status IN ('SCHEDULED','LIVE')`);
+  if (dateFrom) { where.push('fx.kickoff_at >= ?'); params.push(`${dateFrom} 00:00:00`); }
+  if (dateTo) { where.push('fx.kickoff_at < DATE_ADD(?, INTERVAL 1 DAY)'); params.push(`${dateTo} 00:00:00`); }
+  if (teamId) { where.push('(fx.home_team_id = ? OR fx.away_team_id = ?)'); params.push(teamId, teamId); }
+  const whereSql = `WHERE ${where.join(' AND ')}`;
+  const [summary] = await query(
+    `SELECT COUNT(*) AS total, MAX(fx.last_synced_at) AS lastUpdatedAt FROM football_fixtures fx
+     JOIN football_competitions comp ON comp.id = fx.competition_id ${whereSql}`,
+    params,
+  );
+  const offset = (page - 1) * pageSize;
+  const rows = await query(
+    `${FIXTURE_SELECT} ${whereSql} ORDER BY fx.kickoff_at ${status === 'completed' ? 'DESC' : 'ASC'} LIMIT ? OFFSET ?`,
+    [...params, pageSize, offset],
+  );
+  return {
+    fixtures: rows.map(mapFixtureRow),
+    total: Number(summary.total),
+    page,
+    pageSize,
+    lastUpdatedAt: summary.lastUpdatedAt,
+    provider: getFootballProvider().name,
+  };
 }
 
 export async function listChallengeTypes() {
@@ -89,11 +133,36 @@ export async function listChallengeTypes() {
 }
 
 export async function getFixtureDetail(fixtureId) {
-  const row = (await query(`${FIXTURE_SELECT} WHERE fx.id = ?`, [fixtureId]))[0];
+  const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
+  const row = (await query(`${FIXTURE_SELECT} WHERE fx.id = ? AND comp.is_enabled = 1${simulatedFilter}`, [fixtureId]))[0];
   if (!row) throw notFound('Fixture not found.');
   const settings = await getSettings();
   const types = (await listChallengeTypes()).map((t) => ({ ...t, question: fillQuestion(t.question, row.home_short, row.away_short) }));
-  return { ...mapFixtureRow(row), challengeTypes: types, stakes: settings.stake_amounts };
+  const events = await query(
+    'SELECT minute, type, team, player_name AS playerName, detail FROM football_events WHERE fixture_id = ? ORDER BY minute, id',
+    [fixtureId],
+  );
+  const meetings = await query(
+    `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND comp.is_enabled = 1${simulatedFilter}
+       AND ((fx.home_team_id = ? AND fx.away_team_id = ?) OR (fx.home_team_id = ? AND fx.away_team_id = ?))
+       AND fx.id <> ? ORDER BY fx.kickoff_at DESC LIMIT 10`,
+    [row.home_team_id, row.away_team_id, row.away_team_id, row.home_team_id, fixtureId],
+  );
+  return {
+    ...mapFixtureRow(row),
+    stats: {
+      shots: { home: row.home_shots, away: row.away_shots },
+      shotsOnTarget: { home: row.home_shots_on_target, away: row.away_shots_on_target },
+      possession: { home: row.home_possession, away: row.away_possession },
+      corners: { home: row.home_corners, away: row.away_corners },
+      cards: { home: row.home_cards, away: row.away_cards },
+    },
+    events,
+    recentMeetings: meetings.map(mapFixtureRow),
+    lastUpdatedAt: row.last_synced_at,
+    challengeTypes: types,
+    stakes: settings.stake_amounts,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -101,7 +170,8 @@ export async function getFixtureDetail(fixtureId) {
 // ---------------------------------------------------------------------------
 
 async function loadEligibleTypeAndFixture(runner, fixtureId, challengeTypeSlug) {
-  const fixture = await runner(`${FIXTURE_SELECT} WHERE fx.id = ?`, [fixtureId]).then((r) => r[0]);
+  const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
+  const fixture = await runner(`${FIXTURE_SELECT} WHERE fx.id = ?${simulatedFilter}`, [fixtureId]).then((r) => r[0]);
   if (!fixture) throw notFound('Fixture not found.');
   const type = await runner('SELECT * FROM football_challenge_types WHERE slug = ? AND is_enabled = 1', [challengeTypeSlug]).then((r) => r[0]);
   if (!type) throw notFound('This challenge type is not available.');
@@ -176,7 +246,8 @@ export async function listOpenChallenges(viewerId, { fixtureId = null } = {}) {
   // disappears immediately, even before the sweeper has formally closed it.
   const extra = fixtureId ? ' AND fc.fixture_id = ?' : '';
   const params = fixtureId ? [new Date(), viewerId, fixtureId] : [new Date(), viewerId];
-  const rows = await query(`${OPEN_CHALLENGE_SELECT} AND m.acceptance_deadline > ? AND m.created_by <> ?${extra} ORDER BY m.acceptance_deadline ASC LIMIT 100`, params);
+  const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
+  const rows = await query(`${OPEN_CHALLENGE_SELECT}${simulatedFilter} AND m.acceptance_deadline > ? AND m.created_by <> ?${extra} ORDER BY m.acceptance_deadline ASC LIMIT 100`, params);
   return rows.map(mapOpenChallenge);
 }
 
@@ -387,6 +458,9 @@ export async function acceptFootballChallenge(userId, id, { pick: opponentPick }
     if (c.opponent_id !== userId) throw forbidden('Only the challenged player can accept.');
     assertPending(c);
     const fixture = await tx.one('SELECT * FROM football_fixtures WHERE id = ? FOR UPDATE', [c.fixture_id]);
+    if (config.football.provider !== 'mock' && fixture.is_simulated) {
+      throw conflict('FIXTURE_UNAVAILABLE', 'This simulated fixture is no longer available for challenges.');
+    }
     if (fixture.status !== 'SCHEDULED' || new Date(fixture.kickoff_at) <= new Date()) {
       throw conflict('CHALLENGE_CLOSED', 'This match has already kicked off, so this challenge is no longer available.');
     }

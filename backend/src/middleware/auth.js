@@ -51,6 +51,13 @@ export async function requireAuth(req, _res, next) {
   }
 }
 
+/** Allow public reads while honoring a supplied session token. */
+export function optionalAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  if (!header) return next();
+  return requireAuth(req, res, next);
+}
+
 export function requireAdmin(req, _res, next) {
   if (!req.user) return next(unauthorized());
   if (req.user.role !== 'ADMIN') return next(forbidden('Administrator access required.'));

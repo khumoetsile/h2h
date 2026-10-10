@@ -22,6 +22,7 @@ export const config = {
   isTest: env === 'test',
   port: num('PORT', 3000),
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:4200').split(',').map((s) => s.trim()).filter(Boolean),
+  publicBaseUrl: process.env.PUBLIC_BASE_URL || '',
   db: {
     host: process.env.DB_HOST || '127.0.0.1',
     port: num('DB_PORT', 3306),
@@ -90,10 +91,14 @@ export const config = {
     // mock capabilities (statistics/events available), so a developer's real
     // provider key for local manual testing must never change what `npm
     // test` exercises or silently disable the stats-dependent test cases.
-    provider: env === 'test' ? 'mock' : (process.env.FOOTBALL_PROVIDER || 'mock'),
+    provider: env === 'test' ? 'mock' : (
+      env === 'production' && process.env.FOOTBALL_ALLOW_SIMULATED !== 'true'
+        ? 'football-data'
+        : (process.env.FOOTBALL_PROVIDER || 'mock')
+    ),
     apiKey: process.env.FOOTBALL_API_KEY || '',
     apiBaseUrl: process.env.FOOTBALL_API_BASE_URL || 'https://api.football-data.org/v4',
-    syncIntervalSeconds: num('FOOTBALL_SYNC_INTERVAL_SECONDS', 20),
+    syncIntervalSeconds: num('FOOTBALL_SYNC_INTERVAL_SECONDS', process.env.FOOTBALL_PROVIDER === 'football-data' || env === 'production' ? 60 : 20),
     fixtureWindowDays: num('FOOTBALL_FIXTURE_WINDOW_DAYS', 21),
   },
 };

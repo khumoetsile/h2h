@@ -95,7 +95,9 @@ async function insertNewEvents(fixtureRow, events) {
 }
 
 async function syncUpcomingFixtures(provider, competitions) {
-  const from = new Date();
+  // Refresh the recent-results window alongside upcoming fixtures without
+  // adding another provider request per competition.
+  const from = new Date(Date.now() - 7 * 86400000);
   const to = new Date(Date.now() + config.football.fixtureWindowDays * 86400000);
   for (const comp of competitions) {
     try {

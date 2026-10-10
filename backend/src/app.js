@@ -6,6 +6,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import { config } from './config.js';
+import { query } from './db.js';
 import { requireAdmin, requireAuth } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { ah } from './utils/errors.js';
@@ -54,6 +55,34 @@ export function createApp() {
     if (!id) return res.sendStatus(404);
     res.type('text/plain').send(`google.com, ${id}, DIRECT, f08c47fec0942fa0\n`);
   });
+  app.get('/robots.txt', (_req, res) => {
+    res.type('text/plain').send(`User-agent: *\nAllow: /football\nDisallow: /admin\nDisallow: /wallet\nDisallow: /profile\nDisallow: /matches\nDisallow: /challenges\n${config.publicBaseUrl ? `Sitemap: ${config.publicBaseUrl.replace(/\/$/, '')}/sitemap.xml\n` : ''}`);
+  });
+  app.get('/sitemap.xml', ah(async (_req, res) => {
+    if (!config.publicBaseUrl) return res.sendStatus(404);
+    const base = config.publicBaseUrl.replace(/\/$/, '');
+    const rows = await query(
+      `SELECT id FROM football_fixtures
+       WHERE is_simulated = 0 AND ((status IN ('SCHEDULED','LIVE') AND kickoff_at >= NOW() - INTERVAL 1 DAY)
+         OR (status = 'FINISHED' AND kickoff_at >= NOW() - INTERVAL 14 DAY))
+       ORDER BY kickoff_at DESC LIMIT 500`,
+    );
+    const teams = await query(
+       `SELECT DISTINCT t.id FROM football_teams t
+        JOIN football_fixtures fx ON (fx.home_team_id = t.id OR fx.away_team_id = t.id)
+        JOIN football_competitions c ON c.id = fx.competition_id AND c.is_enabled = 1
+        WHERE fx.is_simulated = 0 AND ((fx.status IN ('SCHEDULED','LIVE') AND fx.kickoff_at >= NOW() - INTERVAL 1 DAY)
+          OR (fx.status = 'FINISHED' AND fx.kickoff_at >= NOW() - INTERVAL 14 DAY))
+        ORDER BY t.id LIMIT 200`,
+    );
+    const urls = [
+       `${base}/football`,
+       ...rows.map((row) => `${base}/football/${row.id}`),
+       ...teams.map((team) => `${base}/football/teams/${team.id}`),
+    ];
+    const xml = urls.map((url) => `  <url><loc>${url.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</loc></url>`).join('\n');
+    res.type('application/xml').send(`<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n${xml}\n</urlset>\n`);
+  }));
   app.get('/api/time', (_req, res) => res.json({ serverNow: new Date().toISOString() }));
 
   // Public runtime configuration (app name, demo flags, stakes, fee).
@@ -87,7 +116,7 @@ export function createApp() {
   app.use('/api/games', requireAuth, gameRoutes);
   app.use('/api/matches', requireAuth, matchRoutes);
   app.use('/api/challenges', requireAuth, challengeRoutes);
-  app.use('/api/football', requireAuth, footballRoutes);
+  app.use('/api/football', footballRoutes);
   app.use('/api/leaderboard', requireAuth, leaderboardRoutes);
   app.use('/api/notifications', requireAuth, notificationRoutes);
   app.use('/api/users', requireAuth, userRoutes);

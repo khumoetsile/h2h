@@ -6,6 +6,7 @@ import assert from 'node:assert/strict';
 
 process.env.NODE_ENV = 'test';
 process.env.DB_NAME = process.env.DB_NAME_TEST || 'rivalis_test';
+process.env.PUBLIC_BASE_URL = 'https://football.example.test';
 
 const { migrate } = await import('../scripts/migrate.js');
 const { seed } = await import('../scripts/seed.js');
@@ -84,6 +85,61 @@ describe('football: browsing', () => {
     assert.deepEqual(mock.capabilities(), { statistics: true, events: true });
     const real = new FootballDataOrgProvider({ apiKey: '', baseUrl: 'https://api.football-data.org/v4' });
     assert.deepEqual(real.capabilities(), { statistics: false, events: false });
+  });
+
+  test('public visitors can browse fixtures, completed results and fixture details', async () => {
+    const finishedId = await makeFixture({
+      status: 'FINISHED', kickoffMs: -86400000, homeScore: 2, awayScore: 1,
+      homeShots: 8, awayShots: 4, statsAvailable: 1,
+    });
+    const comps = await api().get('/api/football/competitions');
+    assert.equal(comps.status, 200);
+    const fixtures = await api().get('/api/football/fixtures?status=upcoming&page=1&pageSize=10');
+    assert.equal(fixtures.status, 200);
+    assert.ok(Array.isArray(fixtures.body.fixtures));
+    assert.equal(fixtures.body.page, 1);
+    const results = await api().get('/api/football/fixtures?status=completed');
+    assert.ok(results.body.fixtures.some((fx) => fx.id === finishedId));
+    const detail = await api().get(`/api/football/fixtures/${finishedId}`);
+    assert.equal(detail.status, 200);
+    assert.equal(detail.body.fixture.stats.shots.home, 8);
+    assert.equal(detail.body.fixture.stats.corners.home, null, 'unknown statistics stay unknown');
+    assert.deepEqual(detail.body.openChallenges, []);
+    const team = await api().get(`/api/football/teams/${homeId}`);
+    assert.equal(team.status, 200);
+    assert.equal(team.body.team.id, homeId);
+    assert.ok(Array.isArray(team.body.recentResults));
+  });
+
+  test('public fixture filters validate date ranges and support team/competition filtering', async () => {
+    const from = new Date().toISOString().slice(0, 10);
+    const fixtures = await api().get(`/api/football/fixtures?dateFrom=${from}&dateTo=${from}&pageSize=5`);
+    assert.equal(fixtures.status, 200);
+    assert.ok(fixtures.body.fixtures.every((fx) => fx.kickoffAt.slice(0, 10) === from));
+    const byCompetition = await api().get(`/api/football/fixtures?competitionId=${compId}`);
+    assert.ok(byCompetition.body.fixtures.every((fx) => fx.competition.id === compId));
+    const byTeam = await api().get(`/api/football/fixtures?teamId=${homeId}`);
+    assert.ok(byTeam.body.fixtures.every((fx) => fx.homeTeam.id === homeId || fx.awayTeam.id === homeId));
+    const badRange = await api().get('/api/football/fixtures?dateFrom=2026-10-10&dateTo=2026-09-01');
+    assert.equal(badRange.status, 400);
+    assert.equal((await api().get('/api/football/fixtures?dateFrom=2026-99-99')).status, 400);
+    const badPage = await api().get('/api/football/fixtures?pageSize=101');
+    assert.equal(badPage.status, 400);
+  });
+
+  test('football challenge mutations still require a player session', async () => {
+    assert.equal((await api().post('/api/football/find').send({})).status, 401);
+    assert.equal((await api().post('/api/football/challenges').send({})).status, 401);
+    assert.equal((await api().get('/api/football/open-challenges')).status, 401);
+  });
+
+  test('robots and sitemap do not publish simulated fixture URLs', async () => {
+    const robots = await api().get('/robots.txt');
+    assert.equal(robots.status, 200);
+    const sitemap = await api().get('/sitemap.xml');
+    assert.equal(sitemap.status, 200);
+    assert.match(sitemap.text, /https:\/\/football\.example\.test\/football/);
+    assert.doesNotMatch(sitemap.text, /\/football\/\d+/);
   });
 });
 
