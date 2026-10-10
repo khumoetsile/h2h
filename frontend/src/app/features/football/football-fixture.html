@@ -43,6 +43,42 @@
           @if (refreshError()) { <p class="refresh-error" role="status">{{ refreshError() }}</p> }
         </div>
 
+        @if (f.headToHead; as h2h) {
+          <section class="card how h2h-card" aria-labelledby="h2h-title">
+            <div class="pulse-heading">
+              <div><h3 id="h2h-title">Past head-to-head results</h3><p class="muted small">{{ f.homeTeam.name }} vs {{ f.awayTeam.name }}</p></div>
+              @if (h2h.matches.length) { <span class="chip">{{ h2h.matches.length }} meetings</span> }
+            </div>
+            @if (h2h.matches.length) {
+              <div class="h2h-summary" aria-label="Head-to-head record">
+                <div><strong>{{ h2h.summary.homeWins }}</strong><span>{{ f.homeTeam.shortName || f.homeTeam.name }} wins</span></div>
+                <div><strong>{{ h2h.summary.draws }}</strong><span>Draws</span></div>
+                <div><strong>{{ h2h.summary.awayWins }}</strong><span>{{ f.awayTeam.shortName || f.awayTeam.name }} wins</span></div>
+              </div>
+              @if (h2h.source === 'SYNCED') { <p class="muted tiny">Showing previously synced meetings. Provider history could not be refreshed just now.</p> }
+              <ol class="h2h-list">
+                @for (meeting of h2h.matches; track meeting.id) {
+                  <li class="h2h-row">
+                    <span class="muted small h2h-date">{{ meeting.kickoffAt | date: 'd MMM yyyy' }}</span>
+                    <span class="h2h-scoreline">
+                      <span>{{ meeting.homeTeam }}</span>
+                      <strong>{{ meeting.homeScore }} – {{ meeting.awayScore }}</strong>
+                      <span>{{ meeting.awayTeam }}</span>
+                    </span>
+                    @if (meeting.competition) { <span class="muted tiny h2h-competition">{{ meeting.competition }}</span> }
+                  </li>
+                }
+              </ol>
+            } @else if (h2h.status === 'UNAVAILABLE') {
+              <p class="muted small">Past head-to-head results could not be loaded right now. Please try again later.</p>
+            } @else if (h2h.status === 'UNSUPPORTED') {
+              <p class="muted small">Past head-to-head results are not available from this football data source yet.</p>
+            } @else {
+              <p class="muted small">No previous meetings between these teams were returned by the football data source.</p>
+            }
+          </section>
+        }
+
         @if (f.status === 'LIVE' || f.status === 'FINISHED') {
           <section class="card pulse-card" aria-labelledby="pulse-title">
             <div class="pulse-heading">
@@ -124,18 +160,6 @@
           @if (!auth.isLoggedIn()) { <p class="muted tiny">Create an account to add your reaction.</p> }
           @if (f.isSimulated) { <p class="muted tiny">Reactions on simulated demo matches are for testing only.</p> }
         </section>
-
-        @if (f.recentMeetings?.length) {
-          <div class="card how">
-            <h3>Recent meetings</h3>
-            @for (meeting of f.recentMeetings; track meeting.id) {
-              <a class="meeting-row" [routerLink]="['/football', meeting.id]">
-                <span>{{ meeting.homeTeam.name }} {{ meeting.homeScore }}–{{ meeting.awayScore }} {{ meeting.awayTeam.name }}</span>
-                <span class="muted small">{{ meeting.kickoffAt | date: 'd MMM yyyy' }}</span>
-              </a>
-            }
-          </div>
-        }
 
         @if (target()) {
           <div class="card notice rematch-notice">

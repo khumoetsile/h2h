@@ -299,6 +299,22 @@ export interface FootballFixture {
   events?: Array<{ id: number; minute: number | null; type: string; team: 'HOME' | 'AWAY'; playerName: string | null; detail: string | null }>;
   reactions?: FootballFixtureReactions;
   recentMeetings?: FootballFixture[];
+  headToHead?: {
+    status: 'AVAILABLE' | 'UNAVAILABLE' | 'UNSUPPORTED';
+    source: 'PROVIDER' | 'SYNCED' | null;
+    matches: Array<{
+      id: string;
+      competition: string | null;
+      kickoffAt: string;
+      homeTeam: string;
+      awayTeam: string;
+      homeTeamProviderId: string | null;
+      awayTeamProviderId: string | null;
+      homeScore: number;
+      awayScore: number;
+    }>;
+    summary: { homeWins: number; draws: number; awayWins: number };
+  };
   lastUpdatedAt?: string | null;
 }
 

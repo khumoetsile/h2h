@@ -17,6 +17,7 @@ import { assertPending } from '../services/challengeService.js';
 import { getFootballProvider } from './providerRegistry.js';
 import { recordAudit } from '../services/auditService.js';
 import { acceptanceDeadline } from '../timers.js';
+import { logSystemError } from '../services/systemErrorService.js';
 
 const PICKS_BY_TYPE = { TEAM: ['HOME', 'AWAY'], YES_NO: ['YES', 'NO'] };
 const opposite = (pickType, pick) => PICKS_BY_TYPE[pickType].find((p) => p !== pick);
@@ -82,7 +83,9 @@ function mapFixtureRow(r) {
 const FIXTURE_SELECT = `
   SELECT fx.*, comp.code AS competition_code, comp.name AS competition_name,
          ht.name AS home_name, ht.short_name AS home_short, ht.crest_url AS home_crest,
+         ht.provider_team_id AS home_provider_team_id,
          at.name AS away_name, at.short_name AS away_short, at.crest_url AS away_crest,
+         at.provider_team_id AS away_provider_team_id,
          (SELECT COUNT(*) FROM matches m JOIN football_challenges fc2 ON fc2.match_id = m.id
           WHERE fc2.fixture_id = fx.id AND m.status = 'WAITING' AND m.acceptance_deadline > NOW(3)) AS open_count
   FROM football_fixtures fx
@@ -145,9 +148,68 @@ export async function getFixtureDetail(fixtureId) {
   const meetings = await query(
     `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND comp.is_enabled = 1${simulatedFilter}
        AND ((fx.home_team_id = ? AND fx.away_team_id = ?) OR (fx.home_team_id = ? AND fx.away_team_id = ?))
-       AND fx.id <> ? ORDER BY fx.kickoff_at DESC LIMIT 10`,
-    [row.home_team_id, row.away_team_id, row.away_team_id, row.home_team_id, fixtureId],
+       AND fx.id <> ? AND fx.kickoff_at < ? ORDER BY fx.kickoff_at DESC LIMIT 10`,
+    [row.home_team_id, row.away_team_id, row.away_team_id, row.home_team_id, fixtureId, row.kickoff_at],
   );
+  let headToHeadStatus = 'UNSUPPORTED';
+  let headToHeadSource = null;
+  let headToHeadMatches = [];
+  const provider = getFootballProvider();
+  if (typeof provider.getHeadToHead === 'function') {
+    try {
+      const providerMeetings = await provider.getHeadToHead(row.provider_fixture_id);
+      headToHeadStatus = 'AVAILABLE';
+      headToHeadSource = 'PROVIDER';
+      headToHeadMatches = providerMeetings
+        .filter((meeting) => String(meeting.providerId) !== String(row.provider_fixture_id)
+          && new Date(meeting.kickoffAt) < new Date(row.kickoff_at)
+          && meeting.status === 'FINISHED'
+          && meeting.homeScore !== null && meeting.awayScore !== null
+          && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.home_provider_team_id))
+          && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.away_provider_team_id)))
+        .map((meeting) => ({
+          id: meeting.providerId,
+          competition: meeting.competitionName || meeting.competitionProviderId,
+          kickoffAt: meeting.kickoffAt,
+          homeTeam: meeting.homeTeam.name,
+          awayTeam: meeting.awayTeam.name,
+          homeTeamProviderId: meeting.homeTeam.providerId,
+          awayTeamProviderId: meeting.awayTeam.providerId,
+          homeScore: meeting.homeScore,
+          awayScore: meeting.awayScore,
+        }));
+    } catch (err) {
+      headToHeadStatus = 'UNAVAILABLE';
+      await logSystemError(`football-head2head:${row.provider_fixture_id}`, err);
+    }
+  }
+  if (!headToHeadMatches.length && meetings.length) {
+    headToHeadSource = 'SYNCED';
+    headToHeadMatches = meetings.map((meeting) => ({
+      id: String(meeting.id),
+      competition: meeting.competition_name,
+      kickoffAt: meeting.kickoff_at,
+      homeTeam: meeting.home_name,
+      awayTeam: meeting.away_name,
+      homeTeamProviderId: null,
+      awayTeamProviderId: null,
+      homeScore: meeting.home_score,
+      awayScore: meeting.away_score,
+    }));
+    if (headToHeadStatus === 'UNSUPPORTED') headToHeadStatus = 'AVAILABLE';
+  }
+  const headToHead = { status: headToHeadStatus, source: headToHeadSource, matches: headToHeadMatches };
+  headToHead.summary = headToHeadMatches.reduce((summary, meeting) => {
+    const homeIsFixtureHome = meeting.homeTeamProviderId
+      ? meeting.homeTeamProviderId === String(row.home_provider_team_id)
+      : meeting.homeTeam === row.home_name;
+    const homeScore = Number(meeting.homeScore);
+    const awayScore = Number(meeting.awayScore);
+    if (homeScore === awayScore) summary.draws += 1;
+    else if ((homeScore > awayScore) === homeIsFixtureHome) summary.homeWins += 1;
+    else summary.awayWins += 1;
+    return summary;
+  }, { homeWins: 0, draws: 0, awayWins: 0 });
   return {
     ...mapFixtureRow(row),
     stats: {
@@ -159,6 +221,7 @@ export async function getFixtureDetail(fixtureId) {
     },
     events,
     recentMeetings: meetings.map(mapFixtureRow),
+    headToHead,
     lastUpdatedAt: row.last_synced_at,
     challengeTypes: types,
     stakes: settings.stake_amounts,

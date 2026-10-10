@@ -381,14 +381,15 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
 
 - **Providers** (`backend/src/football/providers/`) implement one small interface —
   `capabilities()`, `listCompetitions()`, `listUpcomingFixtures()`, `getFixture()` — selected at
-  runtime via `FOOTBALL_PROVIDER`:
+  runtime via `FOOTBALL_PROVIDER`. Providers may also implement `getHeadToHead()` when they have
+  fixture-specific historical meetings:
   - `mock` (development default) — a fully-featured, deterministic simulated provider. Fixtures, scores,
     shots, corners, cards and goal events are derived from a seeded hash, not stored mutable
     state, so the same fixture always "plays out" the same way and no timers are needed. Every
     mock fixture is flagged `isSimulated: true` in the API and UI.
   - `football-data` — a real implementation against api.football-data.org. Its free tier does
-    not provide historical archives, standings, shot/corner/card statistics, or event
-    timelines, so it honestly reports
+    not provide historical competition-wide archives, standings, shot/corner/card statistics,
+    or event timelines, so it honestly reports
     `capabilities() = { statistics: false, events: false }`.
 - **Public browsing**: `GET /api/football/competitions`, `/fixtures`, `/fixtures/:id`, and
   `/teams/:id` do not
@@ -396,9 +397,12 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
   filters. Completed results and match centres use only synchronized provider records; statistics
   and events remain absent when the provider does not supply them. Live match centres refresh
   automatically and display only supplied statistics and events; no player or ball positions are
-  inferred without tracking data. Public visitors can view match reactions, while changing one
-  requires an account (one reaction per player per fixture). Recent meetings are limited to
-  completed records already cached locally. Challenge discovery that identifies players, plus all
+  inferred without tracking data. The football-data provider also requests its match-specific
+  Head2head subresource for up to 10 prior club meetings, caches the response for 15 minutes, and
+  displays final scores and the clubs' win/draw record when the configured plan supplies it.
+  Previously synced meetings are used if that request is unavailable; no results are invented.
+  Public visitors can view match reactions, while changing one requires an account (one reaction
+  per player per fixture). Challenge discovery that identifies players, plus all
   challenge creation/acceptance actions, still requires an authenticated player.
 - **Production data safety**: production forces `football-data`, even if the development
   `.env.example` sets `FOOTBALL_PROVIDER=mock`. Simulated fixtures can only be enabled in

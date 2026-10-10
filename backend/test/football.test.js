@@ -87,9 +87,49 @@ describe('football: browsing', () => {
     assert.deepEqual(real.capabilities(), { statistics: false, events: false });
   });
 
+  test('football-data provider maps and briefly caches historical head-to-head matches', async () => {
+    const provider = new FootballDataOrgProvider({ apiKey: '', baseUrl: 'https://football.example.test/v4' });
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async (url) => {
+      calls += 1;
+      assert.equal(url, 'https://football.example.test/v4/matches/123/head2head?limit=10');
+      return {
+        ok: true,
+        json: async () => ({
+          matches: [{
+            id: 456,
+            status: 'FINISHED',
+            utcDate: '2025-02-01T15:00:00Z',
+            competition: { code: 'PL', name: 'Premier League' },
+            homeTeam: { id: 10, name: 'Liverpool', tla: 'LIV' },
+            awayTeam: { id: 20, name: 'Chelsea', tla: 'CHE' },
+            score: { fullTime: { home: 2, away: 1 }, halfTime: { home: 1, away: 1 } },
+          }],
+        }),
+      };
+    };
+    try {
+      const [first, second] = await Promise.all([
+        provider.getHeadToHead('123'),
+        provider.getHeadToHead('123'),
+      ]);
+      assert.equal(calls, 1, 'simultaneous match-centre loads share the provider request');
+      assert.deepEqual(first, second);
+      assert.equal(first[0].providerId, '456');
+      assert.equal(first[0].competitionName, 'Premier League');
+      assert.equal(first[0].homeTeam.name, 'Liverpool');
+      assert.equal(first[0].awayTeam.name, 'Chelsea');
+      assert.equal(first[0].homeScore, 2);
+      assert.equal(first[0].awayScore, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('public visitors can browse fixtures, completed results and fixture details', async () => {
     const finishedId = await makeFixture({
-      status: 'FINISHED', kickoffMs: -86400000, homeScore: 2, awayScore: 1,
+      status: 'FINISHED', kickoffMs: -30 * 60 * 1000, homeScore: 2, awayScore: 1,
       homeShots: 8, awayShots: 4, statsAvailable: 1,
     });
     const comps = await api().get('/api/football/competitions');
@@ -109,6 +149,10 @@ describe('football: browsing', () => {
       counts: { FIRE: 0, SHOCK: 0, GOAL: 0 },
       mine: null,
     });
+    assert.equal(detail.body.fixture.headToHead.status, 'UNSUPPORTED');
+    assert.equal(detail.body.fixture.headToHead.source, 'SYNCED');
+    assert.ok(detail.body.fixture.headToHead.matches.some((meeting) => meeting.homeTeam === 'Arsenal' && meeting.awayTeam === 'Chelsea'));
+    assert.deepEqual(detail.body.fixture.headToHead.summary, { homeWins: 1, draws: 0, awayWins: 0 });
     const team = await api().get(`/api/football/teams/${homeId}`);
     assert.equal(team.status, 200);
     assert.equal(team.body.team.id, homeId);

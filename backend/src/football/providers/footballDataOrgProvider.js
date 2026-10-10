@@ -33,6 +33,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     super();
     this.apiKey = apiKey;
     this.baseUrl = baseUrl.replace(/\/+$/, '');
+    this.headToHeadCache = new Map();
   }
 
   get name() { return 'football-data'; }
@@ -91,5 +92,34 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     const data = await this.#get(`/matches/${providerFixtureId}`);
     if (!data?.id) return null;
     return this.#fixture(data);
+  }
+
+  async getHeadToHead(providerFixtureId) {
+    const key = String(providerFixtureId);
+    const cached = this.headToHeadCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.promise;
+    if (cached) this.headToHeadCache.delete(key);
+
+    const entry = {
+      expiresAt: Date.now() + 15 * 60 * 1000,
+      promise: null,
+    };
+    entry.promise = this.#get(`/matches/${encodeURIComponent(key)}/head2head?limit=10`)
+      .then((data) => {
+        if (!Array.isArray(data.matches)) throw new Error('football-data.org head2head response did not include a matches array.');
+        return data.matches.map((match) => ({
+          ...this.#fixture(match),
+          homeScore: match.score?.fullTime?.home ?? null,
+          awayScore: match.score?.fullTime?.away ?? null,
+          competitionName: match.competition?.name || match.competition?.code || null,
+        }));
+      })
+      .catch((err) => {
+        if (this.headToHeadCache.get(key) === entry) this.headToHeadCache.delete(key);
+        throw err;
+      });
+    this.headToHeadCache.set(key, entry);
+    if (this.headToHeadCache.size > 100) this.headToHeadCache.delete(this.headToHeadCache.keys().next().value);
+    return entry.promise;
   }
 }
