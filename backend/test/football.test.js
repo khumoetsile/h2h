@@ -127,6 +127,81 @@ describe('football: browsing', () => {
     }
   });
 
+  test('football-data provider finds past meetings from team histories when head-to-head is unavailable', async () => {
+    const provider = new FootballDataOrgProvider({ apiKey: '', baseUrl: 'https://football.example.test/v4' });
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    const meeting = {
+      id: 456,
+      status: 'FINISHED',
+      utcDate: '2025-02-01T15:00:00Z',
+      competition: { code: 'SA', name: 'Serie A' },
+      homeTeam: { id: 10, name: 'Como 1907', tla: 'COM' },
+      awayTeam: { id: 20, name: 'AS Roma', tla: 'ROM' },
+      score: { fullTime: { home: 2, away: 1 } },
+    };
+    globalThis.fetch = async (url) => {
+      calls += 1;
+      if (url.endsWith('/matches/123/head2head?limit=10')) {
+        return { ok: false, status: 403, text: async () => 'head2head unavailable on plan' };
+      }
+      if (url.endsWith('/teams/10/matches?status=FINISHED&limit=100')) {
+        return { ok: true, json: async () => ({ matches: [meeting] }) };
+      }
+      if (url.endsWith('/teams/20/matches?status=FINISHED&limit=100')) {
+        return { ok: true, json: async () => ({ matches: [meeting] }) };
+      }
+      throw new Error(`Unexpected football-data URL: ${url}`);
+    };
+    try {
+      const [first, second] = await Promise.all([
+        provider.getHeadToHead('123', '10', '20'),
+        provider.getHeadToHead('123', '10', '20'),
+      ]);
+      assert.equal(calls, 3, 'failed H2H request and both team histories are shared by concurrent calls');
+      assert.deepEqual(first, second);
+      assert.equal(first.length, 1);
+      assert.equal(first[0].providerId, '456');
+      assert.equal(first[0].homeTeam.name, 'Como 1907');
+      assert.equal(first[0].awayTeam.name, 'AS Roma');
+      assert.equal(first[0].homeScore, 2);
+      assert.equal(first[0].awayScore, 1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  test('football-data provider broadens an empty head-to-head result with team histories', async () => {
+    const provider = new FootballDataOrgProvider({ apiKey: '', baseUrl: 'https://football.example.test/v4' });
+    const originalFetch = globalThis.fetch;
+    const meeting = {
+      id: 789,
+      status: 'FINISHED',
+      utcDate: '2024-11-24T14:00:00Z',
+      competition: { code: 'SA', name: 'Serie A' },
+      homeTeam: { id: 10, name: 'Como 1907' },
+      awayTeam: { id: 20, name: 'AS Roma' },
+      score: { fullTime: { home: 1, away: 1 } },
+    };
+    globalThis.fetch = async (url) => {
+      if (url.endsWith('/matches/123/head2head?limit=10')) {
+        return { ok: true, json: async () => ({ matches: [] }) };
+      }
+      if (url.includes('/teams/10/matches?') || url.includes('/teams/20/matches?')) {
+        return { ok: true, json: async () => ({ matches: [meeting] }) };
+      }
+      throw new Error(`Unexpected football-data URL: ${url}`);
+    };
+    try {
+      const matches = await provider.getHeadToHead('123', '10', '20');
+      assert.equal(matches.length, 1);
+      assert.equal(matches[0].providerId, '789');
+      assert.equal(matches[0].competitionName, 'Serie A');
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('public visitors can browse fixtures, completed results and fixture details', async () => {
     const finishedId = await makeFixture({
       status: 'FINISHED', kickoffMs: -30 * 60 * 1000, homeScore: 2, awayScore: 1,

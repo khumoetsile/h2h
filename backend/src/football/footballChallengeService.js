@@ -127,13 +127,22 @@ function summarizeResults(results) {
 
 function mapTeamForm(rows, teamId) {
   const matches = rows.map((match) => {
-    const playedAtHome = match.home_team_id === teamId;
-    const teamScore = Number(playedAtHome ? match.home_score : match.away_score);
-    const opponentScore = Number(playedAtHome ? match.away_score : match.home_score);
+    const providerMatch = match.homeTeam !== undefined;
+    const playedAtHome = providerMatch
+      ? String(match.homeTeam?.providerId) === String(teamId)
+      : match.home_team_id === teamId;
+    const teamScore = Number(playedAtHome
+      ? (providerMatch ? match.homeScore : match.home_score)
+      : (providerMatch ? match.awayScore : match.away_score));
+    const opponentScore = Number(playedAtHome
+      ? (providerMatch ? match.awayScore : match.away_score)
+      : (providerMatch ? match.homeScore : match.home_score));
     return {
-      id: match.id,
-      kickoffAt: match.kickoff_at,
-      opponent: playedAtHome ? match.away_name : match.home_name,
+      id: providerMatch ? match.providerId : match.id,
+      kickoffAt: providerMatch ? match.kickoffAt : match.kickoff_at,
+      opponent: playedAtHome
+        ? (providerMatch ? match.awayTeam?.name : match.away_name)
+        : (providerMatch ? match.homeTeam?.name : match.home_name),
       venue: playedAtHome ? 'HOME' : 'AWAY',
       teamScore,
       opponentScore,
@@ -141,6 +150,32 @@ function mapTeamForm(rows, teamId) {
     };
   });
   return { matches, summary: summarizeResults(matches) };
+}
+
+async function getRecentTeamForm({ rows, teamId, providerTeamId, teamName, competitionCode, kickoffAt, provider }) {
+  if (rows.length) return { ...mapTeamForm(rows, teamId), status: 'AVAILABLE', source: 'SYNCED' };
+  if (!providerTeamId || typeof provider.getTeamMatches !== 'function') {
+    return { ...mapTeamForm([], teamId), status: 'UNSUPPORTED', source: null };
+  }
+  try {
+    const matches = await provider.getTeamMatches(providerTeamId);
+    const recentMatches = matches
+      .filter((match) => match.status === 'FINISHED'
+        && match.competitionProviderId === competitionCode
+        && new Date(match.kickoffAt) < new Date(kickoffAt)
+        && match.homeScore !== null && match.awayScore !== null
+        && [String(match.homeTeam?.providerId), String(match.awayTeam?.providerId)].includes(String(providerTeamId)))
+      .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
+      .slice(0, 5);
+    return {
+      ...mapTeamForm(recentMatches, providerTeamId),
+      status: 'AVAILABLE',
+      source: recentMatches.length ? 'PROVIDER' : null,
+    };
+  } catch (err) {
+    await logSystemError(`football-team-form:${teamName}:${providerTeamId}`, err);
+    return { ...mapTeamForm([], teamId), status: 'UNAVAILABLE', source: null };
+  }
 }
 
 export async function listFixtures({ competitionId, status, dateFrom, dateTo, teamId, page = 1, pageSize = 50 } = {}) {
@@ -189,6 +224,7 @@ export async function getFixtureDetail(fixtureId) {
   const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
   const row = (await query(`${FIXTURE_SELECT} WHERE fx.id = ? AND comp.is_enabled = 1${simulatedFilter}`, [fixtureId]))[0];
   if (!row) throw notFound('Fixture not found.');
+  const provider = getFootballProvider();
   const settings = await getSettings();
   const types = (await listChallengeTypes()).map((t) => ({ ...t, question: fillQuestion(t.question, row.home_short, row.away_short) }));
   const events = await query(
@@ -196,11 +232,23 @@ export async function getFixtureDetail(fixtureId) {
     [fixtureId],
   );
   const meetings = await query(
-    `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND comp.is_enabled = 1${simulatedFilter}
+    `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND fx.home_score IS NOT NULL AND fx.away_score IS NOT NULL
+       AND comp.is_enabled = 1${simulatedFilter}
        AND ((fx.home_team_id = ? AND fx.away_team_id = ?) OR (fx.home_team_id = ? AND fx.away_team_id = ?))
        AND fx.id <> ? AND fx.kickoff_at < ? ORDER BY fx.kickoff_at DESC LIMIT 10`,
     [row.home_team_id, row.away_team_id, row.away_team_id, row.home_team_id, fixtureId, row.kickoff_at],
   );
+  const providerHistoryPromise = typeof provider.getHeadToHead === 'function'
+    ? Promise.resolve().then(() => provider.getHeadToHead(
+      row.provider_fixture_id,
+      row.home_provider_team_id,
+      row.away_provider_team_id,
+    )).then((matches) => ({ status: 'AVAILABLE', matches }))
+      .catch(async (err) => {
+        await logSystemError(`football-head2head:${row.provider_fixture_id}`, err);
+        return { status: 'UNAVAILABLE', matches: [] };
+      })
+    : Promise.resolve({ status: 'UNSUPPORTED', matches: [] });
   const [homeFormRows, awayFormRows] = await Promise.all([row.home_team_id, row.away_team_id].map((teamId) => query(
     `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND comp.is_enabled = 1${simulatedFilter}
        AND fx.competition_id = ? AND (fx.home_team_id = ? OR fx.away_team_id = ?)
@@ -208,39 +256,52 @@ export async function getFixtureDetail(fixtureId) {
        ORDER BY fx.kickoff_at DESC LIMIT 5`,
     [row.competition_id, teamId, teamId, fixtureId, row.kickoff_at],
   )));
-  let headToHeadStatus = 'UNSUPPORTED';
+  const [homeForm, awayForm, providerHistory] = await Promise.all([
+    getRecentTeamForm({
+      rows: homeFormRows,
+      teamId: row.home_team_id,
+      providerTeamId: row.home_provider_team_id,
+      teamName: row.home_name,
+      competitionCode: row.competition_code,
+      kickoffAt: row.kickoff_at,
+      provider,
+    }),
+    getRecentTeamForm({
+      rows: awayFormRows,
+      teamId: row.away_team_id,
+      providerTeamId: row.away_provider_team_id,
+      teamName: row.away_name,
+      competitionCode: row.competition_code,
+      kickoffAt: row.kickoff_at,
+      provider,
+    }),
+    providerHistoryPromise,
+  ]);
+  let headToHeadStatus = providerHistory.status;
   let headToHeadSource = null;
   let headToHeadMatches = [];
-  const provider = getFootballProvider();
-  if (typeof provider.getHeadToHead === 'function') {
-    try {
-      const providerMeetings = await provider.getHeadToHead(row.provider_fixture_id);
-      headToHeadStatus = 'AVAILABLE';
-      headToHeadSource = 'PROVIDER';
-      headToHeadMatches = providerMeetings
-        .filter((meeting) => String(meeting.providerId) !== String(row.provider_fixture_id)
-          && new Date(meeting.kickoffAt) < new Date(row.kickoff_at)
-          && meeting.status === 'FINISHED'
-          && meeting.homeScore !== null && meeting.awayScore !== null
-          && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.home_provider_team_id))
-          && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.away_provider_team_id)))
-        .map((meeting) => ({
-          id: meeting.providerId,
-          competition: meeting.competitionName || meeting.competitionProviderId,
-          kickoffAt: meeting.kickoffAt,
-          homeTeam: meeting.homeTeam.name,
-          awayTeam: meeting.awayTeam.name,
-          homeTeamProviderId: meeting.homeTeam.providerId,
-          awayTeamProviderId: meeting.awayTeam.providerId,
-          homeScore: meeting.homeScore,
-          awayScore: meeting.awayScore,
-        }))
-        .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
-        .slice(0, 10);
-    } catch (err) {
-      headToHeadStatus = 'UNAVAILABLE';
-      await logSystemError(`football-head2head:${row.provider_fixture_id}`, err);
-    }
+  if (providerHistory.status === 'AVAILABLE') {
+    headToHeadSource = 'PROVIDER';
+    headToHeadMatches = providerHistory.matches
+      .filter((meeting) => String(meeting.providerId) !== String(row.provider_fixture_id)
+        && new Date(meeting.kickoffAt) < new Date(row.kickoff_at)
+        && meeting.status === 'FINISHED'
+        && meeting.homeScore !== null && meeting.awayScore !== null
+        && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.home_provider_team_id))
+        && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.away_provider_team_id)))
+      .map((meeting) => ({
+        id: meeting.providerId,
+        competition: meeting.competitionName || meeting.competitionProviderId,
+        kickoffAt: meeting.kickoffAt,
+        homeTeam: meeting.homeTeam.name,
+        awayTeam: meeting.awayTeam.name,
+        homeTeamProviderId: meeting.homeTeam.providerId,
+        awayTeamProviderId: meeting.awayTeam.providerId,
+        homeScore: meeting.homeScore,
+        awayScore: meeting.awayScore,
+      }))
+      .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
+      .slice(0, 10);
   }
   if (!headToHeadMatches.length && meetings.length) {
     headToHeadSource = 'SYNCED';
@@ -275,8 +336,8 @@ export async function getFixtureDetail(fixtureId) {
     opponentCleanSheets: headToHeadResults.filter((result) => Number(result.teamScore) === 0).length,
   };
   headToHead.recentForm = {
-    home: mapTeamForm(homeFormRows, row.home_team_id),
-    away: mapTeamForm(awayFormRows, row.away_team_id),
+    home: homeForm,
+    away: awayForm,
   };
   return {
     ...mapFixtureRow(row),

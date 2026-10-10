@@ -34,6 +34,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.headToHeadCache = new Map();
+    this.teamMatchesCache = new Map();
   }
 
   get name() { return 'football-data'; }
@@ -94,7 +95,37 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     return this.#fixture(data);
   }
 
-  async getHeadToHead(providerFixtureId) {
+  async #getTeamMatches(teamProviderId) {
+    const key = String(teamProviderId);
+    const cached = this.teamMatchesCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.promise;
+    if (cached) this.teamMatchesCache.delete(key);
+
+    const entry = { expiresAt: Date.now() + 15 * 60 * 1000, promise: null };
+    entry.promise = this.#get(`/teams/${encodeURIComponent(key)}/matches?status=FINISHED&limit=100`)
+      .then((data) => {
+        if (!Array.isArray(data.matches)) throw new Error(`football-data.org team history for ${key} did not include a matches array.`);
+        return data.matches.map((match) => ({
+          ...this.#fixture(match),
+          homeScore: match.score?.fullTime?.home ?? null,
+          awayScore: match.score?.fullTime?.away ?? null,
+          competitionName: match.competition?.name || match.competition?.code || null,
+        }));
+      })
+      .catch((err) => {
+        if (this.teamMatchesCache.get(key) === entry) this.teamMatchesCache.delete(key);
+        throw err;
+      });
+    this.teamMatchesCache.set(key, entry);
+    if (this.teamMatchesCache.size > 100) this.teamMatchesCache.delete(this.teamMatchesCache.keys().next().value);
+    return entry.promise;
+  }
+
+  async getTeamMatches(teamProviderId) {
+    return this.#getTeamMatches(teamProviderId);
+  }
+
+  async getHeadToHead(providerFixtureId, homeTeamProviderId, awayTeamProviderId) {
     const key = String(providerFixtureId);
     const cached = this.headToHeadCache.get(key);
     if (cached && cached.expiresAt > Date.now()) return cached.promise;
@@ -104,22 +135,55 @@ export class FootballDataOrgProvider extends FootballDataProvider {
       expiresAt: Date.now() + 15 * 60 * 1000,
       promise: null,
     };
-    entry.promise = this.#get(`/matches/${encodeURIComponent(key)}/head2head?limit=10`)
-      .then((data) => {
+    entry.promise = (async () => {
+      let headToHeadError = null;
+      let matches = [];
+      try {
+        const data = await this.#get(`/matches/${encodeURIComponent(key)}/head2head?limit=10`);
         if (!Array.isArray(data.matches)) throw new Error('football-data.org head2head response did not include a matches array.');
-        return data.matches.map((match) => ({
+        matches = data.matches.map((match) => ({
           ...this.#fixture(match),
           homeScore: match.score?.fullTime?.home ?? null,
           awayScore: match.score?.fullTime?.away ?? null,
           competitionName: match.competition?.name || match.competition?.code || null,
         }));
-      })
-      .catch((err) => {
-        if (this.headToHeadCache.get(key) === entry) this.headToHeadCache.delete(key);
-        throw err;
-      });
+      } catch (err) {
+        headToHeadError = err;
+      }
+      if (matches.length) return matches;
+      if (!homeTeamProviderId || !awayTeamProviderId) {
+        if (headToHeadError) throw headToHeadError;
+        return matches;
+      }
+      try {
+        return await this.#intersectTeamMatches(homeTeamProviderId, awayTeamProviderId);
+      } catch (fallbackError) {
+        if (!headToHeadError) throw fallbackError;
+        throw new Error(
+          `football-data.org head2head request failed (${headToHeadError.message}); team-history fallback failed (${fallbackError.message}).`,
+          { cause: fallbackError },
+        );
+      }
+    })().catch((err) => {
+      if (this.headToHeadCache.get(key) === entry) this.headToHeadCache.delete(key);
+      throw err;
+    });
     this.headToHeadCache.set(key, entry);
     if (this.headToHeadCache.size > 100) this.headToHeadCache.delete(this.headToHeadCache.keys().next().value);
     return entry.promise;
+  }
+
+  async #intersectTeamMatches(homeTeamProviderId, awayTeamProviderId) {
+    const [homeMatches, awayMatches] = await Promise.all([
+      this.#getTeamMatches(homeTeamProviderId),
+      this.#getTeamMatches(awayTeamProviderId),
+    ]);
+    const awayMatchIds = new Set(awayMatches.map((match) => match.providerId));
+    return homeMatches
+      .filter((match) => awayMatchIds.has(match.providerId)
+        && [String(match.homeTeam?.providerId), String(match.awayTeam?.providerId)].includes(String(homeTeamProviderId))
+        && [String(match.homeTeam?.providerId), String(match.awayTeam?.providerId)].includes(String(awayTeamProviderId)))
+      .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
+      .slice(0, 10);
   }
 }

@@ -342,6 +342,8 @@ export interface FootballFixture {
 }
 
 export interface FootballTeamForm {
+  status: 'AVAILABLE' | 'UNAVAILABLE' | 'UNSUPPORTED';
+  source: 'PROVIDER' | 'SYNCED' | null;
   matches: Array<{
     id: number;
     kickoffAt: string;

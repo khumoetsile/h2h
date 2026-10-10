@@ -62,7 +62,7 @@
                 <div><strong>{{ h2h.summary.over25Pct }}%</strong><span>Over 2.5 · {{ h2h.summary.over25 }}/{{ h2h.summary.played }}</span></div>
                 <div><strong>{{ h2h.summary.cleanSheets }}–{{ h2h.summary.opponentCleanSheets }}</strong><span>Clean sheets · home/away</span></div>
               </div>
-              @if (h2h.source === 'SYNCED') { <p class="muted tiny">Showing previously synced meetings. Provider history could not be refreshed just now.</p> }
+              @if (h2h.source === 'SYNCED') { <p class="muted tiny">Showing meetings already synced by Head2Head; the provider did not return these results in its current response.</p> }
               <ol class="h2h-list">
                 @for (meeting of h2h.matches; track meeting.id) {
                   <li class="h2h-row">
@@ -77,7 +77,10 @@
                 }
               </ol>
             } @else if (h2h.status === 'UNAVAILABLE') {
-              <p class="muted small">Past head-to-head results could not be loaded right now. Please try again later.</p>
+              <div class="data-unavailable">
+                <p class="muted small">The match-history service could not return these clubs’ past meetings. No results are being guessed.</p>
+                <button class="btn btn-ghost btn-sm" type="button" (click)="load()">Try again</button>
+              </div>
             } @else if (h2h.status === 'UNSUPPORTED') {
               <p class="muted small">Past head-to-head results are not available from this football data source yet.</p>
             } @else {
@@ -90,6 +93,9 @@
                   <div class="form-heading">
                     <strong>{{ entry.team.name }}</strong>
                     <span class="muted tiny">{{ entry.form.summary.played }} recent matches</span>
+                    @if (entry.form.matches.length) {
+                      <span class="muted tiny">{{ entry.form.source === 'PROVIDER' ? 'Provider history' : 'Head2Head synced results' }}</span>
+                    }
                   </div>
                   @if (entry.form.matches.length) {
                     <div class="form-list">
@@ -109,7 +115,13 @@
                       · O2.5 {{ entry.form.summary.over25 }}/{{ entry.form.summary.played }}
                     </p>
                   } @else {
-                    <p class="muted tiny">No earlier completed results for this team in this competition are synced.</p>
+                    @if (entry.form.status === 'UNAVAILABLE') {
+                      <p class="muted tiny">Recent results could not be loaded from the match-history service.</p>
+                    } @else if (entry.form.status === 'UNSUPPORTED') {
+                      <p class="muted tiny">Recent match history is not available from this football data source.</p>
+                    } @else {
+                      <p class="muted tiny">No earlier completed results for this team in this competition were found in the available match history.</p>
+                    }
                   }
                 </section>
               }
