@@ -93,6 +93,56 @@ const FIXTURE_SELECT = `
   JOIN football_teams ht ON ht.id = fx.home_team_id
   JOIN football_teams at ON at.id = fx.away_team_id`;
 
+function summarizeResults(results) {
+  const summary = results.reduce((totals, result) => {
+    const goalsFor = Number(result.teamScore);
+    const goalsAgainst = Number(result.opponentScore);
+    totals.played += 1;
+    totals.wins += goalsFor > goalsAgainst ? 1 : 0;
+    totals.draws += goalsFor === goalsAgainst ? 1 : 0;
+    totals.losses += goalsFor < goalsAgainst ? 1 : 0;
+    totals.goalsFor += goalsFor;
+    totals.goalsAgainst += goalsAgainst;
+    totals.bothTeamsScored += goalsFor > 0 && goalsAgainst > 0 ? 1 : 0;
+    totals.over25 += goalsFor + goalsAgainst > 2 ? 1 : 0;
+    totals.cleanSheets += goalsAgainst === 0 ? 1 : 0;
+    return totals;
+  }, {
+    played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0,
+    bothTeamsScored: 0, over25: 0, cleanSheets: 0,
+  });
+  const percentage = (count) => summary.played ? Math.round(count / summary.played * 100) : null;
+  return {
+    ...summary,
+    averageGoals: summary.played
+      ? Number(((summary.goalsFor + summary.goalsAgainst) / summary.played).toFixed(1))
+      : null,
+    goalsForPerMatch: summary.played ? Number((summary.goalsFor / summary.played).toFixed(1)) : null,
+    goalsAgainstPerMatch: summary.played ? Number((summary.goalsAgainst / summary.played).toFixed(1)) : null,
+    bothTeamsScoredPct: percentage(summary.bothTeamsScored),
+    over25Pct: percentage(summary.over25),
+    cleanSheetsPct: percentage(summary.cleanSheets),
+  };
+}
+
+function mapTeamForm(rows, teamId) {
+  const matches = rows.map((match) => {
+    const playedAtHome = match.home_team_id === teamId;
+    const teamScore = Number(playedAtHome ? match.home_score : match.away_score);
+    const opponentScore = Number(playedAtHome ? match.away_score : match.home_score);
+    return {
+      id: match.id,
+      kickoffAt: match.kickoff_at,
+      opponent: playedAtHome ? match.away_name : match.home_name,
+      venue: playedAtHome ? 'HOME' : 'AWAY',
+      teamScore,
+      opponentScore,
+      outcome: teamScore > opponentScore ? 'W' : teamScore === opponentScore ? 'D' : 'L',
+    };
+  });
+  return { matches, summary: summarizeResults(matches) };
+}
+
 export async function listFixtures({ competitionId, status, dateFrom, dateTo, teamId, page = 1, pageSize = 50 } = {}) {
   const where = ['comp.is_enabled = 1'];
   // Once a real data provider is connected, fixtures left over from the simulated one (seed data) must not be offered as real games.
@@ -151,6 +201,13 @@ export async function getFixtureDetail(fixtureId) {
        AND fx.id <> ? AND fx.kickoff_at < ? ORDER BY fx.kickoff_at DESC LIMIT 10`,
     [row.home_team_id, row.away_team_id, row.away_team_id, row.home_team_id, fixtureId, row.kickoff_at],
   );
+  const [homeFormRows, awayFormRows] = await Promise.all([row.home_team_id, row.away_team_id].map((teamId) => query(
+    `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND comp.is_enabled = 1${simulatedFilter}
+       AND fx.competition_id = ? AND (fx.home_team_id = ? OR fx.away_team_id = ?)
+       AND fx.id <> ? AND fx.kickoff_at < ? AND fx.home_score IS NOT NULL AND fx.away_score IS NOT NULL
+       ORDER BY fx.kickoff_at DESC LIMIT 5`,
+    [row.competition_id, teamId, teamId, fixtureId, row.kickoff_at],
+  )));
   let headToHeadStatus = 'UNSUPPORTED';
   let headToHeadSource = null;
   let headToHeadMatches = [];
@@ -177,7 +234,9 @@ export async function getFixtureDetail(fixtureId) {
           awayTeamProviderId: meeting.awayTeam.providerId,
           homeScore: meeting.homeScore,
           awayScore: meeting.awayScore,
-        }));
+        }))
+        .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
+        .slice(0, 10);
     } catch (err) {
       headToHeadStatus = 'UNAVAILABLE';
       await logSystemError(`football-head2head:${row.provider_fixture_id}`, err);
@@ -199,17 +258,26 @@ export async function getFixtureDetail(fixtureId) {
     if (headToHeadStatus === 'UNSUPPORTED') headToHeadStatus = 'AVAILABLE';
   }
   const headToHead = { status: headToHeadStatus, source: headToHeadSource, matches: headToHeadMatches };
-  headToHead.summary = headToHeadMatches.reduce((summary, meeting) => {
+  const headToHeadResults = headToHeadMatches.map((meeting) => {
     const homeIsFixtureHome = meeting.homeTeamProviderId
       ? meeting.homeTeamProviderId === String(row.home_provider_team_id)
       : meeting.homeTeam === row.home_name;
-    const homeScore = Number(meeting.homeScore);
-    const awayScore = Number(meeting.awayScore);
-    if (homeScore === awayScore) summary.draws += 1;
-    else if ((homeScore > awayScore) === homeIsFixtureHome) summary.homeWins += 1;
-    else summary.awayWins += 1;
-    return summary;
-  }, { homeWins: 0, draws: 0, awayWins: 0 });
+    return {
+      teamScore: homeIsFixtureHome ? meeting.homeScore : meeting.awayScore,
+      opponentScore: homeIsFixtureHome ? meeting.awayScore : meeting.homeScore,
+    };
+  });
+  const h2hRecord = summarizeResults(headToHeadResults);
+  headToHead.summary = {
+    ...h2hRecord,
+    homeWins: h2hRecord.wins,
+    awayWins: h2hRecord.losses,
+    opponentCleanSheets: headToHeadResults.filter((result) => Number(result.teamScore) === 0).length,
+  };
+  headToHead.recentForm = {
+    home: mapTeamForm(homeFormRows, row.home_team_id),
+    away: mapTeamForm(awayFormRows, row.away_team_id),
+  };
   return {
     ...mapFixtureRow(row),
     stats: {

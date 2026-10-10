@@ -55,6 +55,13 @@
                 <div><strong>{{ h2h.summary.draws }}</strong><span>Draws</span></div>
                 <div><strong>{{ h2h.summary.awayWins }}</strong><span>{{ f.awayTeam.shortName || f.awayTeam.name }} wins</span></div>
               </div>
+              <p class="muted tiny h2h-sample">Scoring patterns across these {{ h2h.summary.played }} recorded meetings</p>
+              <div class="h2h-insights" aria-label="Historical scoring patterns">
+                <div><strong>{{ h2h.summary.averageGoals }}</strong><span>Avg total goals</span></div>
+                <div><strong>{{ h2h.summary.bothTeamsScoredPct }}%</strong><span>Both scored · {{ h2h.summary.bothTeamsScored }}/{{ h2h.summary.played }}</span></div>
+                <div><strong>{{ h2h.summary.over25Pct }}%</strong><span>Over 2.5 · {{ h2h.summary.over25 }}/{{ h2h.summary.played }}</span></div>
+                <div><strong>{{ h2h.summary.cleanSheets }}–{{ h2h.summary.opponentCleanSheets }}</strong><span>Clean sheets · home/away</span></div>
+              </div>
               @if (h2h.source === 'SYNCED') { <p class="muted tiny">Showing previously synced meetings. Provider history could not be refreshed just now.</p> }
               <ol class="h2h-list">
                 @for (meeting of h2h.matches; track meeting.id) {
@@ -76,6 +83,38 @@
             } @else {
               <p class="muted small">No previous meetings between these teams were returned by the football data source.</p>
             }
+            <h4 class="form-title">Recent form in {{ f.competition.name }}</h4>
+            <div class="recent-form">
+              @for (entry of recentForm(); track entry.team.id) {
+                <section class="form-team" [attr.aria-label]="entry.team.name + ' recent form'">
+                  <div class="form-heading">
+                    <strong>{{ entry.team.name }}</strong>
+                    <span class="muted tiny">{{ entry.form.summary.played }} recent matches</span>
+                  </div>
+                  @if (entry.form.matches.length) {
+                    <div class="form-list">
+                      @for (match of entry.form.matches; track match.id) {
+                        <div class="form-row">
+                          <span class="muted tiny form-date">{{ match.kickoffAt | date: 'd MMM' }}</span>
+                          <span class="form-opponent">{{ match.venue === 'HOME' ? 'vs' : '@' }} {{ match.opponent }}</span>
+                          <strong>{{ match.teamScore }}–{{ match.opponentScore }}</strong>
+                          <span class="form-result" [class.form-win]="match.outcome === 'W'" [class.form-draw]="match.outcome === 'D'" [class.form-loss]="match.outcome === 'L'">{{ match.outcome }}</span>
+                        </div>
+                      }
+                    </div>
+                    <p class="muted tiny form-record">
+                      {{ entry.form.summary.wins }}W {{ entry.form.summary.draws }}D {{ entry.form.summary.losses }}L
+                      · {{ entry.form.summary.goalsFor }} scored / {{ entry.form.summary.goalsAgainst }} conceded
+                      · BTTS {{ entry.form.summary.bothTeamsScored }}/{{ entry.form.summary.played }}
+                      · O2.5 {{ entry.form.summary.over25 }}/{{ entry.form.summary.played }}
+                    </p>
+                  } @else {
+                    <p class="muted tiny">No earlier completed results for this team in this competition are synced.</p>
+                  }
+                </section>
+              }
+            </div>
+            <p class="muted tiny h2h-disclaimer">Historical results describe recorded samples only; they are not odds, predictions, or a guarantee of future results. Form uses up to five earlier completed matches in this competition that are synced here.</p>
           </section>
         }
 

@@ -313,9 +313,61 @@ export interface FootballFixture {
       homeScore: number;
       awayScore: number;
     }>;
-    summary: { homeWins: number; draws: number; awayWins: number };
+    summary: {
+      played: number;
+      wins: number;
+      homeWins: number;
+      draws: number;
+      losses: number;
+      awayWins: number;
+      goalsFor: number;
+      goalsAgainst: number;
+      averageGoals: number | null;
+      goalsForPerMatch: number | null;
+      goalsAgainstPerMatch: number | null;
+      bothTeamsScored: number;
+      bothTeamsScoredPct: number | null;
+      over25: number;
+      over25Pct: number | null;
+      cleanSheets: number;
+      cleanSheetsPct: number | null;
+      opponentCleanSheets: number;
+    };
+    recentForm: {
+      home: FootballTeamForm;
+      away: FootballTeamForm;
+    };
   };
   lastUpdatedAt?: string | null;
+}
+
+export interface FootballTeamForm {
+  matches: Array<{
+    id: number;
+    kickoffAt: string;
+    opponent: string;
+    venue: 'HOME' | 'AWAY';
+    teamScore: number;
+    opponentScore: number;
+    outcome: 'W' | 'D' | 'L';
+  }>;
+  summary: {
+    played: number;
+    wins: number;
+    draws: number;
+    losses: number;
+    goalsFor: number;
+    goalsAgainst: number;
+    averageGoals: number | null;
+    goalsForPerMatch: number | null;
+    goalsAgainstPerMatch: number | null;
+    bothTeamsScored: number;
+    bothTeamsScoredPct: number | null;
+    over25: number;
+    over25Pct: number | null;
+    cleanSheets: number;
+    cleanSheetsPct: number | null;
+  };
 }
 
 export type FootballReaction = 'FIRE' | 'SHOCK' | 'GOAL';

@@ -152,7 +152,16 @@ describe('football: browsing', () => {
     assert.equal(detail.body.fixture.headToHead.status, 'AVAILABLE');
     assert.equal(detail.body.fixture.headToHead.source, 'SYNCED');
     assert.ok(detail.body.fixture.headToHead.matches.some((meeting) => meeting.homeTeam === 'Arsenal' && meeting.awayTeam === 'Chelsea'));
-    assert.deepEqual(detail.body.fixture.headToHead.summary, { homeWins: 1, draws: 0, awayWins: 0 });
+    assert.deepEqual({
+      homeWins: detail.body.fixture.headToHead.summary.homeWins,
+      draws: detail.body.fixture.headToHead.summary.draws,
+      awayWins: detail.body.fixture.headToHead.summary.awayWins,
+    }, { homeWins: 1, draws: 0, awayWins: 0 });
+    assert.equal(detail.body.fixture.headToHead.summary.averageGoals, 3);
+    assert.equal(detail.body.fixture.headToHead.summary.bothTeamsScoredPct, 100);
+    assert.equal(detail.body.fixture.headToHead.summary.over25Pct, 100);
+    assert.ok(detail.body.fixture.headToHead.recentForm.home.matches.some((match) => match.outcome === 'W'));
+    assert.ok(detail.body.fixture.headToHead.recentForm.away.matches.some((match) => match.outcome === 'L'));
     const team = await api().get(`/api/football/teams/${homeId}`);
     assert.equal(team.status, 200);
     assert.equal(team.body.team.id, homeId);

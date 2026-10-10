@@ -399,8 +399,11 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
   automatically and display only supplied statistics and events; no player or ball positions are
   inferred without tracking data. The football-data provider also requests its match-specific
   Head2head subresource for up to 10 prior club meetings, caches the response for 15 minutes, and
-  displays final scores and the clubs' win/draw record when the configured plan supplies it.
-  Previously synced meetings are used if that request is unavailable; no results are invented.
+  displays final scores, the clubs' win/draw record, and historical goal-pattern counts when the
+  configured plan supplies it. Match centres also compare each club's last five synced completed
+  results in the same competition. Every comparison is labelled with its sample size; missing
+  history is not filled with guesses, and descriptive history is not presented as odds or a
+  prediction. Previously synced meetings are used if the provider request is unavailable.
   Public visitors can view match reactions, while changing one requires an account (one reaction
   per player per fixture). Challenge discovery that identifies players, plus all
   challenge creation/acceptance actions, still requires an authenticated player.

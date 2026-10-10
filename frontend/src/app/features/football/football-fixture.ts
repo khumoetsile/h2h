@@ -78,6 +78,15 @@ export class FootballFixturePage implements OnInit {
     return !!f && (f.status !== 'SCHEDULED' || this.clock.remainingMs(f.kickoffAt) === 0);
   });
   protected visibleOpen = computed(() => this.openChallenges().filter((c) => this.clock.remainingMs(c.acceptanceDeadline) > 0));
+  protected recentForm = computed(() => {
+    const fixture = this.fixture();
+    const headToHead = fixture?.headToHead;
+    if (!fixture || !headToHead) return [];
+    return [
+      { team: fixture.homeTeam, form: headToHead.recentForm.home },
+      { team: fixture.awayTeam, form: headToHead.recentForm.away },
+    ];
+  });
   protected pulseRows = computed(() => {
     const stats = this.fixture()?.stats;
     if (!stats) return [];
