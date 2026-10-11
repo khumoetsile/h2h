@@ -46,8 +46,8 @@
   .ch-actions { width: 100%; justify-content: flex-end; }
 }
 
-// Wider screens: the Play card and football sit side by side instead of stacking.
-@media (min-width: 900px) {
+// Keep the dashboard sections stacked until both columns have enough room.
+@media (min-width: 1200px) {
   .layout { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: 24px; align-items: start; }
   .layout .block { margin-top: 0; }
 }
