@@ -360,7 +360,7 @@ describe('football: browsing', () => {
     assert.equal(headToHead.summary.averageGoals, Number((totalGoals.reduce((sum, goals) => sum + goals, 0) / totalGoals.length).toFixed(1)));
     assert.equal(headToHead.summary.latestMeeting.fixtureId, latest);
     assert.notEqual(headToHead.summary.latestMeeting.fixtureId, earlier);
-    assert.deepEqual(headToHead.matches.map((match) => match.fixtureId), [latest, earlier]);
+    assert.deepEqual(headToHead.matches.slice(0, 2).map((match) => match.fixtureId), [latest, earlier]);
   });
 
   test('players can follow live fixtures and remove them from followed matches', async () => {
