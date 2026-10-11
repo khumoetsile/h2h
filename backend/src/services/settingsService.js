@@ -11,7 +11,7 @@ export const SETTING_DEFAULTS = {
   min_withdrawal: 10,
   // Challenge/match timers are NOT admin settings — they live in
   // config.timers (env vars), the single source of truth. See src/timers.js.
-  football_supported_competitions: ['PL', 'PD', 'SA', 'BL1', 'FL1', 'CL'],
+  football_supported_competitions: ['PL', 'PD', 'SA', 'BL1', 'FL1', 'CL', 'SM172', 'SM501'],
 };
 
 export const SETTING_DESCRIPTIONS = {
@@ -105,4 +105,3 @@ export async function getSettingRows() {
 export async function getSetting(key) {
   return (await getSettings())[key];
 }
-

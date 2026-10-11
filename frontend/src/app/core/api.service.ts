@@ -19,5 +19,6 @@ export class Api {
   get<T>(path: string, params?: Params) { return firstValueFrom(this.http.get<T>(this.base + path, { params: this.params(params) })); }
   post<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.post<T>(this.base + path, body)); }
   put<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.put<T>(this.base + path, body)); }
+  delete<T>(path: string) { return firstValueFrom(this.http.delete<T>(this.base + path)); }
   patch<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.patch<T>(this.base + path, body)); }
 }

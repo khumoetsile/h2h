@@ -40,6 +40,10 @@ router.get('/challenge-types', ah(async (_req, res) => {
   res.json({ challengeTypes: await svc.listChallengeTypes() });
 }));
 
+router.get('/followed-fixtures', requireAuth, requirePlayer, ah(async (req, res) => {
+  res.json({ fixtures: await svc.getFollowedFixtures(req.user.id) });
+}));
+
 router.get('/teams/:id', validate(fixtureIdParam, 'params'), ah(async (req, res) => {
   res.json(await svc.getTeamDetail(Number(req.params.id)));
 }));
@@ -50,13 +54,23 @@ router.get('/fixtures', validate(fixturesQuery, 'query'), ah(async (req, res) =>
 
 router.get('/fixtures/:id', optionalAuth, validate(fixtureIdParam, 'params'), ah(async (req, res) => {
   const id = Number(req.params.id);
-  const [fixture, openChallenges, reactions] = await Promise.all([
+  const [fixture, openChallenges, reactions, followed] = await Promise.all([
     svc.getFixtureDetail(id),
     req.user?.role === 'PLAYER' ? svc.listOpenChallenges(req.user.id, { fixtureId: id }) : [],
     svc.getFixtureReactions(id, req.user?.id),
+    req.user?.role === 'PLAYER' ? svc.isFixtureFollowed(req.user.id, id) : false,
   ]);
   fixture.reactions = reactions;
+  fixture.followed = followed;
   res.json({ fixture, openChallenges, serverNow: new Date() });
+}));
+
+router.put('/fixtures/:id/follow', requireAuth, requirePlayer, validate(fixtureIdParam, 'params'), ah(async (req, res) => {
+  res.json(await svc.followFixture(req.user.id, Number(req.params.id)));
+}));
+
+router.delete('/fixtures/:id/follow', requireAuth, requirePlayer, validate(fixtureIdParam, 'params'), ah(async (req, res) => {
+  res.json(await svc.unfollowFixture(req.user.id, Number(req.params.id)));
 }));
 
 router.put('/fixtures/:id/reaction', requireAuth, validate(fixtureIdParam, 'params'), validate(fixtureReactionSchema), ah(async (req, res) => {

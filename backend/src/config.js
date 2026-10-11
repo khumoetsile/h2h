@@ -84,6 +84,7 @@ export const config = {
     // 'mock' (default): a fully self-contained, clearly-labelled simulated
     // provider — deterministic, needs no API key, safe for local dev/testing.
     // 'football-data': a real implementation against api.football-data.org.
+    // 'sportmonks': Sportmonks API v3; configure a key and supported league list.
     // Swap providers with zero code changes elsewhere in the app.
     //
     // The test suite ALWAYS uses 'mock', regardless of FOOTBALL_PROVIDER in
@@ -92,13 +93,17 @@ export const config = {
     // provider key for local manual testing must never change what `npm
     // test` exercises or silently disable the stats-dependent test cases.
     provider: env === 'test' ? 'mock' : (
-      env === 'production' && process.env.FOOTBALL_ALLOW_SIMULATED !== 'true'
+      env === 'production'
+        && process.env.FOOTBALL_PROVIDER !== 'football-data'
+        && process.env.FOOTBALL_PROVIDER !== 'sportmonks'
+        && process.env.FOOTBALL_ALLOW_SIMULATED !== 'true'
         ? 'football-data'
         : (process.env.FOOTBALL_PROVIDER || 'mock')
     ),
     apiKey: process.env.FOOTBALL_API_KEY || '',
+    sportmonksApiKey: process.env.SPORTMONKS_API_KEY || '',
     apiBaseUrl: process.env.FOOTBALL_API_BASE_URL || 'https://api.football-data.org/v4',
-    syncIntervalSeconds: num('FOOTBALL_SYNC_INTERVAL_SECONDS', process.env.FOOTBALL_PROVIDER === 'football-data' || env === 'production' ? 60 : 20),
+    syncIntervalSeconds: num('FOOTBALL_SYNC_INTERVAL_SECONDS', ['football-data', 'sportmonks'].includes(process.env.FOOTBALL_PROVIDER) || env === 'production' ? 60 : 20),
     fixtureWindowDays: num('FOOTBALL_FIXTURE_WINDOW_DAYS', 21),
   },
 };

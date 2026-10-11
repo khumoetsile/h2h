@@ -301,6 +301,22 @@ describe('football: browsing', () => {
     assert.ok(Array.isArray(team.body.recentResults));
   });
 
+  test('players can follow live fixtures and remove them from followed matches', async () => {
+    const fixtureId = await makeFixture({ status: 'LIVE', kickoffMs: -10 * 60 * 1000 });
+    const path = `/api/football/fixtures/${fixtureId}/follow`;
+    assert.equal((await api().put(path).send({})).status, 401);
+    const player = await newPlayer('follow');
+    assert.equal((await api().put(path).set(auth(player.token)).send({})).status, 200);
+    const followed = await api().get('/api/football/followed-fixtures').set(auth(player.token));
+    assert.equal(followed.status, 200);
+    assert.ok(followed.body.fixtures.some((fixture) => fixture.id === fixtureId && fixture.followed));
+    const detail = await api().get(`/api/football/fixtures/${fixtureId}`).set(auth(player.token));
+    assert.equal(detail.body.fixture.followed, true);
+    assert.equal((await api().delete(path).set(auth(player.token))).status, 200);
+    const afterUnfollow = await api().get('/api/football/followed-fixtures').set(auth(player.token));
+    assert.equal(afterUnfollow.body.fixtures.some((fixture) => fixture.id === fixtureId), false);
+  });
+
   test('fixture reactions are public to read, authenticated to set, and unique per player', async () => {
     const fixtureId = await makeFixture({ status: 'LIVE', kickoffMs: -10 * 60 * 1000 });
     const path = `/api/football/fixtures/${fixtureId}/reaction`;

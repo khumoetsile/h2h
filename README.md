@@ -153,10 +153,11 @@ Open **http://localhost:4200** and log in with a [development account](#developm
 | `FOOTBALL_RESULT_TIMEOUT_MINUTES` | `240` | After kickoff: wait this long for a verifiable result, then void (full refunds) |
 | `TIMER_LATENCY_GRACE_MS` | `2000` | Allowance for a request sent just before a deadline |
 | `ABANDONMENT_FEE` | `0.50` | Fee charged to a player who leaves after BOTH players locked in |
-| `FOOTBALL_PROVIDER` | `mock` in development; `football-data` in production | `mock` (deterministic simulated fixtures, no API key needed) or `football-data` (real data from football-data.org) |
+| `FOOTBALL_PROVIDER` | `mock` in development; `football-data` in production | `mock` (deterministic simulated fixtures), `football-data`, or `sportmonks` (Sportmonks v3; two free-plan leagues only) |
 | `FOOTBALL_ALLOW_SIMULATED` | `false` | Explicit opt-in required to enable the mock provider in production |
 | `FOOTBALL_API_KEY` | — | Required when `FOOTBALL_PROVIDER=football-data`; never sent to the browser — the backend is the only thing that ever calls the provider |
 | `FOOTBALL_API_BASE_URL` | `https://api.football-data.org/v4` | Provider base URL |
+| `SPORTMONKS_API_KEY` | — | Required for `FOOTBALL_PROVIDER=sportmonks`; backend-only secret. Confirm public-display rights with Sportmonks before production use. |
 | `FOOTBALL_SYNC_INTERVAL_SECONDS` | `60` for real provider, otherwise `20` | How often the background job pulls competitions/fixtures and checks for results |
 | `FOOTBALL_FIXTURE_WINDOW_DAYS` | `21` | How far ahead upcoming fixtures are synced |
 | `PUBLIC_BASE_URL` | — | Public site origin; enables a sitemap of real, recently synced football pages |
@@ -393,6 +394,15 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
     `capabilities() = { statistics: false, events: false }`. Historical meeting, team history,
     and competition-standing requests are attempted where the configured account plan permits;
     provider errors are logged and the fixture page clearly reports unavailable data.
+  - `sportmonks` — an opt-in v3 integration using `SPORTMONKS_API_KEY` on the backend only.
+    The documented Free plan covers the Danish Superliga (league 172) and Scottish Premiership
+    (league 501), livescores, scores, events and fixture statistics, with a 3,000 Fixture-entity
+    requests/hour limit. The sync uses one aggregated in-play request plus one fixture-range call
+    per supported league each minute; responses are cached and provider failure leaves prior
+    synced data visible while logging the error. Configure `SM172` and/or `SM501` in the existing
+    football competition setting. Free-plan ball-coordinate availability is not confirmed by the
+    provider's public documentation; the integration requests coordinates opportunistically and
+    retries without them if the plan rejects that include. No positions are invented.
 - **Public browsing**: `GET /api/football/competitions`, `/fixtures`, `/fixtures/:id`, and
   `/teams/:id` do not
   require an account. Fixtures support status, competition, team, date-range and pagination
@@ -413,13 +423,17 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
   the full available head-to-head sample; list filters change the results and trend only. Missing
   history is not filled with guesses, and descriptive history is not presented as odds or a
   prediction. Previously synced meetings are used if provider history cannot be refreshed.
+  Authenticated players can save followed fixtures on their account; guests can follow locally in
+  their browser. Both can quickly reopen followed match centres from the Football landing page.
   Public visitors can view match reactions, while changing one requires an account (one reaction
   per player per fixture). Challenge discovery that identifies players, plus all
   challenge creation/acceptance actions, still requires an authenticated player.
-- **Production data safety**: production forces `football-data`, even if the development
-  `.env.example` sets `FOOTBALL_PROVIDER=mock`. Simulated fixtures can only be enabled in
-  production through the explicit `FOOTBALL_ALLOW_SIMULATED=true` opt-in, remain labelled, and
-  are excluded from the sitemap. The real provider requires `FOOTBALL_API_KEY`.
+- **Production data safety**: production defaults to `football-data`, even if the development
+  `.env.example` sets `FOOTBALL_PROVIDER=mock`; selecting `sportmonks` requires an explicit
+  provider setting and `SPORTMONKS_API_KEY`. Simulated fixtures can only be enabled in production
+  through the explicit `FOOTBALL_ALLOW_SIMULATED=true` opt-in, remain labelled, and are excluded
+  from the sitemap. Sportmonks documentation describes Free-plan API coverage but does not confirm
+  public redistribution rights; confirm those rights before displaying its data to public visitors.
 - **Search metadata**: public football routes publish page-specific titles/descriptions and
   canonical URLs in the browser. Set `PUBLIC_BASE_URL` to enable the sitemap for real upcoming,
   live and recently completed fixtures. The Angular app is client-rendered (not SSR), so this

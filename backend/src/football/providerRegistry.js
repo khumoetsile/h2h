@@ -1,6 +1,7 @@
 import { config } from '../config.js';
 import { MockFootballProvider } from './providers/mockProvider.js';
 import { FootballDataOrgProvider } from './providers/footballDataOrgProvider.js';
+import { SportmonksProvider } from './providers/sportmonksProvider.js';
 
 let instance = null;
 
@@ -10,6 +11,9 @@ export function getFootballProvider() {
   switch (config.football.provider) {
     case 'football-data':
       instance = new FootballDataOrgProvider({ apiKey: config.football.apiKey, baseUrl: config.football.apiBaseUrl });
+      break;
+    case 'sportmonks':
+      instance = new SportmonksProvider({ apiKey: config.football.sportmonksApiKey });
       break;
     case 'mock':
     default:

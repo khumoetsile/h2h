@@ -18,6 +18,7 @@ import { MoneyPipe } from '../../shared/pipes';
 import { formatMoney } from '../../core/format';
 import { EmptyState, LoadError } from '../../shared/ui';
 import { JoinSheet, OpenChallengeCard } from './open-challenge';
+import { readGuestFollowedFixtures, writeGuestFollowedFixtures } from './football-follow-storage';
 
 type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
 
@@ -59,6 +60,26 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
           <div class="grow"><strong>Challenging {{ r.username }}</strong><p class="muted small">Pick a fixture below to set up your challenge.</p></div>
           <button class="btn btn-ghost btn-sm" (click)="rematch.clear()">Clear</button>
         </div>
+      }
+
+      @if (followedFixtures().length) {
+        <section aria-labelledby="followed-title">
+          <div class="section-title">
+            <div><h2 id="followed-title">Followed matches</h2><p class="sub">Quick access to matches you’re keeping an eye on.</p></div>
+          </div>
+          <div class="followed-list">
+            @for (f of followedFixtures(); track f.id) {
+              <div class="card followed-row">
+                <a [routerLink]="['/football', f.id]" class="grow">
+                  <strong>{{ f.homeTeam.shortName || f.homeTeam.name }} <span class="muted">{{ f.status === 'LIVE' || f.status === 'FINISHED' ? f.homeScore + '–' + f.awayScore : 'vs' }}</span> {{ f.awayTeam.shortName || f.awayTeam.name }}</strong>
+                  <span class="muted tiny">{{ f.competition.name }} · {{ f.status === 'LIVE' && f.minute ? 'LIVE ' + f.minute + '′' : (f.kickoffAt | date: 'EEE d MMM, HH:mm') }}</span>
+                </a>
+                <button class="btn btn-ghost btn-sm" type="button" (click)="unfollow(f.id)" [attr.aria-label]="'Stop following ' + f.homeTeam.name + ' versus ' + f.awayTeam.name"><mat-icon>star</mat-icon><span class="unfollow-label">Following</span></button>
+              </div>
+            }
+          </div>
+          @if (followError()) { <p class="muted small" role="status">{{ followError() }}</p> }
+        </section>
       }
 
       @if (auth.isLoggedIn()) {
@@ -273,6 +294,11 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
     .end { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
     .link-area { color: inherit; text-decoration: none; }
     .rematch { padding: 0 10px; flex-shrink: 0; }
+    .followed-list { display: grid; gap: 8px; }
+    .followed-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px;
+      a { display: grid; gap: 4px; color: inherit; text-decoration: none; min-width: 0; }
+      strong { overflow-wrap: anywhere; } }
+    .unfollow-label { font-size: 11px; }
     .day-tabs { margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; }
     .day-tabs button { padding: 8px 4px; min-width: 0; font-size: 13px; gap: 3px; }
     @media (min-width: 640px) { .day-tabs { display: inline-grid; } .day-tabs button { padding: 8px 14px; font-size: 14px; } }
@@ -304,6 +330,9 @@ export class FootballListPage implements OnInit {
   protected rematch = inject(RematchService);
 
   protected fixtures = signal<FootballFixture[] | null>(null);
+  protected followedFixturesServer = signal<FootballFixture[]>([]);
+  protected guestFollowedIds = signal<number[]>(readGuestFollowedFixtures());
+  protected followError = signal('');
   protected results = signal<FootballFixture[] | null>(null);
   protected resultsTotal = signal(0);
   protected loadingMoreResults = signal(false);
@@ -334,6 +363,11 @@ export class FootballListPage implements OnInit {
   protected visibleOpen = computed(() => (this.open() ?? []).filter((c) => this.clock.remainingMs(c.acceptanceDeadline) > 0));
   protected shownOpen = computed(() => (this.showAllOpen() ? this.visibleOpen() : this.visibleOpen().slice(0, 3)));
   protected anySimulated = computed(() => (this.fixtures() ?? []).some((f) => f.isSimulated));
+  protected followedFixtures = computed(() => {
+    if (this.auth.isLoggedIn()) return this.followedFixturesServer();
+    const byId = new Map([...(this.fixtures() ?? []), ...(this.results() ?? [])].map((fixture) => [fixture.id, fixture]));
+    return this.guestFollowedIds().map((id) => byId.get(id)).filter((fixture): fixture is FootballFixture => !!fixture);
+  });
 
   /** Fixtures bucketed by the player's local calendar day, relative to server time. */
   protected byDay = computed(() => {
@@ -362,6 +396,7 @@ export class FootballListPage implements OnInit {
     if (this.auth.isLoggedIn()) {
       this.loadOpen();
       this.loadMine();
+      this.loadFollowed();
     }
     const refresh = () => { this.loadOpen(); this.loadMine(); };
     this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => { this.load(); refresh(); });
@@ -432,6 +467,8 @@ export class FootballListPage implements OnInit {
       this.results.set(results.fixtures);
       this.resultsTotal.set(results.total);
       this.lastUpdatedAt.set(upcoming.lastUpdatedAt);
+      this.guestFollowedIds.set(readGuestFollowedFixtures());
+      if (this.auth.isLoggedIn()) void this.loadFollowed();
       this.seo.publish(
         'Football fixtures, live scores and results',
         'Browse upcoming football fixtures, live scores and recent results. View match centres and find relevant Head2Head challenges.',
@@ -444,6 +481,7 @@ export class FootballListPage implements OnInit {
         this.day.set((['live', 'today', 'tomorrow', 'later'] as DayTab[]).find((k) => b[k].length) ?? 'today');
         this.dayChosen = true;
       }
+
     } catch (err) {
       if (queryVersion === this.resultsQueryVersion) {
         const message = apiError(err).message;
@@ -452,6 +490,35 @@ export class FootballListPage implements OnInit {
         this.results.set([]);
       }
     }
+  }
+
+  async loadFollowed() {
+    try {
+      const result = await this.api.get<{ fixtures: FootballFixture[] }>('/football/followed-fixtures');
+      this.followedFixturesServer.set(result.fixtures);
+      this.followError.set('');
+    } catch (err) {
+      this.followError.set(apiError(err).message);
+    }
+  }
+
+  async unfollow(fixtureId: number) {
+    this.followError.set('');
+    if (this.auth.isLoggedIn()) {
+      try {
+        await this.api.delete(`/football/fixtures/${fixtureId}/follow`);
+        this.followedFixturesServer.update((fixtures) => fixtures.filter((fixture) => fixture.id !== fixtureId));
+      } catch (err) {
+        this.followError.set(apiError(err).message);
+      }
+      return;
+    }
+    const remaining = this.guestFollowedIds().filter((id) => id !== fixtureId);
+    if (!writeGuestFollowedFixtures(remaining)) {
+      this.followError.set('Your browser could not update followed matches. Check local storage settings and try again.');
+      return;
+    }
+    this.guestFollowedIds.set(remaining);
   }
 
   async loadMoreResults() {

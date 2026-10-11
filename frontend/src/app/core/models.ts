@@ -283,8 +283,11 @@ export interface FootballFixture {
   kickoffAt: string;
   status: FixtureStatus;
   minute: number | null;
+  phase?: string | null;
   homeScore: number | null;
   awayScore: number | null;
+  ballCoordinates?: Array<{ providerEventId: string; timer: string; x: number; y: number }>;
+  followed?: boolean;
   isSimulated: boolean;
   openChallenges: number;
   challengeTypes?: FootballChallengeType[];
@@ -296,7 +299,7 @@ export interface FootballFixture {
     corners: { home: number | null; away: number | null };
     cards: { home: number | null; away: number | null };
   };
-  events?: Array<{ id: number; minute: number | null; type: string; team: 'HOME' | 'AWAY'; playerName: string | null; detail: string | null }>;
+  events?: Array<{ id: number; providerEventId: string | null; minute: number | null; sortOrder: number; type: string; team: 'HOME' | 'AWAY'; playerName: string | null; detail: string | null }>;
   reactions?: FootballFixtureReactions;
   recentMeetings?: FootballFixture[];
   headToHead?: {

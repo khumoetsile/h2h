@@ -5,7 +5,7 @@
 // underneath, just one whose outcome the system decides from a football
 // fixture instead of gameplay input.
 import { config } from '../config.js';
-import { query, withTransaction } from '../db.js';
+import { query, queryOne, withTransaction } from '../db.js';
 import { badRequest, conflict, forbidden, notFound } from '../utils/errors.js';
 import { formatMoney, toCents } from '../utils/money.js';
 import { getSettings } from '../services/settingsService.js';
@@ -31,6 +31,50 @@ async function footballGameId(runner = query) {
   if (!row) throw new Error('Football pseudo-game row is missing. Re-run the seed script.');
   footballGameIdCache = row.id;
   return footballGameIdCache;
+}
+
+export async function getFollowedFixtures(userId) {
+  const provider = getFootballProvider();
+  const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
+  const rows = await query(
+    `${FIXTURE_SELECT}
+     JOIN football_followed_fixtures ff ON ff.fixture_id = fx.id
+     WHERE ff.user_id = ? AND comp.is_enabled = 1 AND comp.provider = ?${simulatedFilter}
+     ORDER BY ff.created_at DESC LIMIT 100`,
+    [userId, provider.name],
+  );
+  return rows.map((row) => ({ ...mapFixtureRow(row), followed: true }));
+}
+
+export async function isFixtureFollowed(userId, fixtureId) {
+  if (!userId) return false;
+  const row = await queryOne(
+    'SELECT 1 AS followed FROM football_followed_fixtures WHERE user_id = ? AND fixture_id = ?',
+    [userId, fixtureId],
+  );
+  return !!row;
+}
+
+export async function followFixture(userId, fixtureId) {
+  const provider = getFootballProvider();
+  const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
+  const fixture = await query(
+    `SELECT fx.id FROM football_fixtures fx
+     JOIN football_competitions c ON c.id = fx.competition_id AND c.is_enabled = 1 AND c.provider = ?
+     WHERE fx.id = ?${simulatedFilter}`,
+    [provider.name, fixtureId],
+  );
+  if (!fixture.length) throw notFound('Fixture not found.');
+  await query(
+    'INSERT INTO football_followed_fixtures (user_id, fixture_id) VALUES (?, ?) ON DUPLICATE KEY UPDATE fixture_id = VALUES(fixture_id)',
+    [userId, fixtureId],
+  );
+  return { followed: true };
+}
+
+export async function unfollowFixture(userId, fixtureId) {
+  await query('DELETE FROM football_followed_fixtures WHERE user_id = ? AND fixture_id = ?', [userId, fixtureId]);
+  return { followed: false };
 }
 
 // ---------------------------------------------------------------------------
@@ -79,8 +123,12 @@ function mapFixtureRow(r) {
     kickoffAt: r.kickoff_at,
     status: r.status,
     minute: r.minute,
+    phase: r.match_phase || null,
     homeScore: r.home_score,
     awayScore: r.away_score,
+    ballCoordinates: Array.isArray(r.ball_coordinates)
+      ? r.ball_coordinates
+      : (typeof r.ball_coordinates === 'string' ? JSON.parse(r.ball_coordinates) : []),
     isSimulated: !!r.is_simulated,
     openChallenges: Number(r.open_count || 0),
   };
@@ -234,7 +282,7 @@ export async function getFixtureDetail(fixtureId) {
   const settings = await getSettings();
   const types = (await listChallengeTypes()).map((t) => ({ ...t, question: fillQuestion(t.question, row.home_short, row.away_short) }));
   const events = await query(
-    'SELECT id, minute, type, team, player_name AS playerName, detail FROM football_events WHERE fixture_id = ? ORDER BY minute, id',
+    'SELECT id, provider_event_id AS providerEventId, minute, sort_order AS sortOrder, type, team, player_name AS playerName, detail FROM football_events WHERE fixture_id = ? ORDER BY sort_order, minute, id',
     [fixtureId],
   );
   const meetings = await query(

@@ -98,7 +98,8 @@ export async function settleFootballMatch(matchId) {
     // reaching here (POSTPONED/CANCELLED/ABANDONED) is handled by
     // voidMatchesForFixture instead — this function leaves it untouched.
     if (fixture.status !== 'FINISHED') return false;
-    if (fc.requires_stats && !fixture.stats_available) return false; // wait for stats, or the sync loop will eventually give up and void it
+    if (fc.requires_stats && !fixture.stats_available
+      && !(fc.type_slug === 'first_to_score' && fixture.first_goal_team !== null)) return false; // wait for required data, or the sync loop will eventually void it
 
     const players = await tx.q(
       `SELECT mp.*, u.username, u.is_bot FROM match_players mp JOIN users u ON u.id = mp.user_id WHERE match_id = ? ORDER BY slot`,

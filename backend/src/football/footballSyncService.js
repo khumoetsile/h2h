@@ -38,7 +38,7 @@ async function upsertCompetitions(provider) {
       [provider.name, c.providerId, c.code, c.name, c.country, c.emblemUrl, i],
     );
   }
-  return query('SELECT * FROM football_competitions WHERE is_enabled = 1');
+  return query('SELECT * FROM football_competitions WHERE is_enabled = 1 AND provider = ?', [provider.name]);
 }
 
 async function upsertTeam(provider, team) {
@@ -56,13 +56,14 @@ async function upsertFixture(provider, competitionRow, fx) {
   const isSimulated = provider.name === 'mock' ? 1 : 0;
   await query(
     `INSERT INTO football_fixtures
-       (provider, provider_fixture_id, competition_id, season, home_team_id, away_team_id, kickoff_at, status, minute,
+       (provider, provider_fixture_id, competition_id, season, home_team_id, away_team_id, kickoff_at, status, minute, match_phase,
         home_score, away_score, home_shots, away_shots, home_shots_on_target, away_shots_on_target,
         home_possession, away_possession, home_corners, away_corners, home_cards, away_cards,
-        first_goal_team, stats_available, is_simulated, last_synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        first_goal_team, stats_available, ball_coordinates, is_simulated, last_synced_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE
        kickoff_at = VALUES(kickoff_at), status = VALUES(status), minute = VALUES(minute),
+       match_phase = COALESCE(VALUES(match_phase), match_phase),
        home_score = VALUES(home_score), away_score = VALUES(away_score),
        home_shots = VALUES(home_shots), away_shots = VALUES(away_shots),
        home_shots_on_target = VALUES(home_shots_on_target), away_shots_on_target = VALUES(away_shots_on_target),
@@ -70,14 +71,16 @@ async function upsertFixture(provider, competitionRow, fx) {
        home_corners = VALUES(home_corners), away_corners = VALUES(away_corners),
        home_cards = VALUES(home_cards), away_cards = VALUES(away_cards),
        first_goal_team = VALUES(first_goal_team), stats_available = VALUES(stats_available),
+       ball_coordinates = COALESCE(VALUES(ball_coordinates), ball_coordinates),
        last_synced_at = NOW()`,
     [
-      provider.name, fx.providerId, competitionRow.id, fx.season, homeId, awayId, new Date(fx.kickoffAt), fx.status, fx.minute,
+      provider.name, fx.providerId, competitionRow.id, fx.season, homeId, awayId, new Date(fx.kickoffAt), fx.status, fx.minute, fx.phase || null,
       fx.homeScore, fx.awayScore, fx.stats.homeShots ?? null, fx.stats.awayShots ?? null,
       fx.stats.homeShotsOnTarget ?? null, fx.stats.awayShotsOnTarget ?? null,
       fx.stats.homePossession ?? null, fx.stats.awayPossession ?? null,
       fx.stats.homeCorners ?? null, fx.stats.awayCorners ?? null,
-      fx.stats.homeCards ?? null, fx.stats.awayCards ?? null, fx.stats.firstGoalTeam ?? null, fx.statsAvailable ? 1 : 0, isSimulated,
+      fx.stats.homeCards ?? null, fx.stats.awayCards ?? null, fx.stats.firstGoalTeam ?? null, fx.statsAvailable ? 1 : 0,
+      Array.isArray(fx.ballCoordinates) ? JSON.stringify(fx.ballCoordinates) : null, isSimulated,
     ],
   );
   return queryOne('SELECT * FROM football_fixtures WHERE provider = ? AND provider_fixture_id = ?', [provider.name, fx.providerId]);
@@ -85,12 +88,15 @@ async function upsertFixture(provider, competitionRow, fx) {
 
 async function insertNewEvents(fixtureRow, events) {
   if (!events?.length) return;
-  const [{ maxMinute }] = await query('SELECT COALESCE(MAX(minute), -1) AS maxMinute FROM football_events WHERE fixture_id = ?', [fixtureRow.id]);
-  const fresh = events.filter((e) => (e.minute ?? 0) > maxMinute);
-  for (const e of fresh) {
-    await query('INSERT INTO football_events (fixture_id, minute, type, team, player_name, detail) VALUES (?, ?, ?, ?, ?, ?)', [
-      fixtureRow.id, e.minute, e.type, e.team, e.playerName || null, e.detail || null,
-    ]);
+  for (const [index, e] of events.entries()) {
+    const providerEventId = String(e.providerEventId
+      ?? `${e.minute ?? 'unknown'}:${e.type}:${e.team}:${e.playerName || ''}:${e.detail || ''}:${index}`);
+    await query(
+      `INSERT INTO football_events (fixture_id, provider_event_id, minute, sort_order, type, team, player_name, detail)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE provider_event_id = VALUES(provider_event_id)`,
+      [fixtureRow.id, providerEventId, e.minute, e.sortOrder ?? index, e.type, e.team, e.playerName || null, e.detail || null],
+    );
   }
 }
 
@@ -113,9 +119,20 @@ async function syncUpcomingFixtures(provider, competitions) {
 async function fixturesNeedingRefresh() {
   return query(
     `SELECT * FROM football_fixtures
-     WHERE status IN ('SCHEDULED','LIVE') AND kickoff_at <= NOW() + INTERVAL 2 HOUR
+     WHERE status = 'LIVE'
      ORDER BY kickoff_at ASC LIMIT 40`,
   );
+}
+
+async function processRefreshedFixture(updated, events) {
+  await insertNewEvents(updated, events);
+  if (['POSTPONED', 'CANCELLED'].includes(updated.status)) {
+    await voidMatchesForFixture(updated.id, updated.status === 'POSTPONED' ? 'the football match was postponed' : 'the football match was cancelled', { toStatus: 'CANCELLED' });
+  } else if (updated.status === 'ABANDONED') {
+    await voidMatchesForFixture(updated.id, 'the football match was abandoned before full time', { toStatus: 'VOID' });
+  } else if (updated.status === 'FINISHED') {
+    await settleMatchesForFixture(updated.id);
+  }
 }
 
 async function refreshFixture(provider, row) {
@@ -128,14 +145,26 @@ async function refreshFixture(provider, row) {
   }
   if (!fx) return;
   const updated = await upsertFixture(provider, { id: row.competition_id }, fx);
-  await insertNewEvents(updated, fx.events);
+  await processRefreshedFixture(updated, fx.events);
+}
 
-  if (['POSTPONED', 'CANCELLED'].includes(updated.status)) {
-    await voidMatchesForFixture(updated.id, updated.status === 'POSTPONED' ? 'the football match was postponed' : 'the football match was cancelled', { toStatus: 'CANCELLED' });
-  } else if (updated.status === 'ABANDONED') {
-    await voidMatchesForFixture(updated.id, 'the football match was abandoned before full time', { toStatus: 'VOID' });
-  } else if (updated.status === 'FINISHED') {
-    await settleMatchesForFixture(updated.id);
+async function refreshLiveSnapshot(provider, competitions) {
+  let liveFixtures;
+  try {
+    liveFixtures = await provider.getLiveFixtures();
+  } catch (err) {
+    await logSystemError('football-sync:live-snapshot', err);
+    return;
+  }
+  const byProviderCompetition = new Map(competitions.map((competition) => [
+    String(competition.provider_competition_id),
+    competition,
+  ]));
+  for (const fixture of liveFixtures) {
+    const competition = byProviderCompetition.get(String(fixture.competitionProviderId));
+    if (!competition) continue;
+    const updated = await upsertFixture(provider, competition, fixture);
+    await processRefreshedFixture(updated, fixture.events);
   }
 }
 
@@ -209,8 +238,12 @@ export async function runFootballSync() {
   const provider = getFootballProvider();
   const competitions = await upsertCompetitions(provider);
   if (competitions.length) await syncUpcomingFixtures(provider, competitions);
-  const toRefresh = await fixturesNeedingRefresh();
-  for (const row of toRefresh) await refreshFixture(provider, row);
+  if (typeof provider.getLiveFixtures === 'function') {
+    await refreshLiveSnapshot(provider, competitions);
+  } else {
+    const toRefresh = await fixturesNeedingRefresh();
+    for (const row of toRefresh) await refreshFixture(provider, row);
+  }
   await transitionAndExpireAtKickoff();
   await voidUnresolvedFixtures();
 }

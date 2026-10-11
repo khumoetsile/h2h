@@ -19,6 +19,7 @@ import { Countdown } from '../../shared/countdown';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, LoadError, Spinner } from '../../shared/ui';
 import { JoinSheet, OpenChallengeCard } from './open-challenge';
+import { readGuestFollowedFixtures, writeGuestFollowedFixtures } from './football-follow-storage';
 
 /**
  * Fixture + challenge builder: question -> your pick -> stake -> who you
@@ -52,6 +53,8 @@ export class FootballFixturePage implements OnInit {
   protected refreshError = signal('');
   protected activeEventId = signal<number | null>(null);
   protected reactionBusy = signal(false);
+  protected followed = signal(false);
+  protected followBusy = signal(false);
   protected target = signal<RematchIntent | null>(null);
   protected h2hCompetition = signal('');
   protected h2hVenue = signal<'ALL' | 'HOME' | 'AWAY'>('ALL');
@@ -259,6 +262,9 @@ export class FootballFixturePage implements OnInit {
       const previousEvents = new Set(this.fixture()?.events?.map((event) => event.id) ?? []);
       const newEvents = res.fixture.events?.filter((event) => !previousEvents.has(event.id)) ?? [];
       const latestNewEvent = newEvents[newEvents.length - 1];
+      this.followed.set(this.auth.isLoggedIn()
+        ? !!res.fixture.followed
+        : readGuestFollowedFixtures().includes(res.fixture.id));
       this.fixture.set(res.fixture);
       if (latestNewEvent) this.activeEventId.set(latestNewEvent.id);
       else if (first && res.fixture.events?.length) this.activeEventId.set(res.fixture.events[res.fixture.events.length - 1].id);
@@ -298,6 +304,38 @@ export class FootballFixturePage implements OnInit {
       this.reactionBusy.set(false);
     }
   }
+
+  async toggleFollow(): Promise<void> {
+    const fixture = this.fixture();
+    if (!fixture || this.followBusy()) return;
+    this.followBusy.set(true);
+    try {
+      const following = !this.followed();
+      if (this.auth.isLoggedIn()) {
+        await (following
+          ? this.api.put(`/football/fixtures/${fixture.id}/follow`, {})
+          : this.api.delete(`/football/fixtures/${fixture.id}/follow`));
+      } else {
+        const ids = readGuestFollowedFixtures().filter((id) => id !== fixture.id);
+        if (following) ids.unshift(fixture.id);
+        if (!writeGuestFollowedFixtures(ids)) {
+          this.toast.error('Your browser could not save followed matches. Check your local storage settings and try again.');
+          return;
+        }
+      }
+      this.followed.set(following);
+      this.fixture.update((current) => current?.id === fixture.id ? { ...current, followed: following } : current);
+    } catch (err) {
+      this.toast.error(err);
+    } finally {
+      this.followBusy.set(false);
+    }
+  }
+
+  protected latestBallCoordinate = computed(() => {
+    const points = this.fixture()?.ballCoordinates ?? [];
+    return points.length ? points[points.length - 1] : null;
+  });
 
   /** Default stake, plus the question/stake carried over from a rematch. */
   private applyDefaults(f: FootballFixture) {

@@ -17,6 +17,9 @@
 .h2h-more { margin-top: 10px; }
 .h2h-match a { color: inherit; text-decoration: none; }
 .h2h-match a:hover { color: var(--accent); text-decoration: underline; }
+.follow-match { margin-top: 10px; }
+.follow-match mat-icon { font-size: 19px; }
+.tracked-ball { fill: #fff; stroke: #111; stroke-width: 2px; filter: drop-shadow(0 0 3px #fff9); transition: cx 400ms ease-out, cy 400ms ease-out; }
 @media (max-width: 560px) {
   .h2h-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .h2h-venue-splits, .standing-pair { grid-template-columns: minmax(0, 1fr); }
@@ -24,3 +27,4 @@
 @media (min-width: 561px) and (max-width: 760px) {
   .h2h-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+@media (prefers-reduced-motion: reduce) { .tracked-ball { transition: none; } }

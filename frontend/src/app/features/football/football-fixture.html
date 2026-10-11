@@ -12,11 +12,15 @@
           <div class="fh-top">
             <span class="muted small">{{ f.competition.name }}</span>
             @if (f.status === 'LIVE') {
-              <span class="chip chip-win"><span class="live-dot"></span>LIVE @if (f.minute) { {{ f.minute }}' }</span>
+              <span class="chip chip-win"><span class="live-dot"></span>LIVE @if (f.minute) { {{ f.minute }}' } @if (f.phase) { · {{ f.phase }} }</span>
             } @else if (f.status !== 'SCHEDULED') {
               <span class="chip">{{ f.status }}</span>
             }
           </div>
+          <button class="btn btn-ghost btn-sm follow-match" type="button" [disabled]="followBusy()" [attr.aria-pressed]="followed()" (click)="toggleFollow()">
+            <mat-icon>{{ followed() ? 'star' : 'star_outline' }}</mat-icon>
+            {{ followed() ? 'Following match' : 'Follow match' }}
+          </button>
           <div class="fh-teams">
             <a class="team team-link" [routerLink]="['/football/teams', f.homeTeam.id]">{{ f.homeTeam.name }}</a>
             @if (f.status === 'LIVE' || f.status === 'FINISHED') {
@@ -242,16 +246,24 @@
               <p class="muted small">This match feed does not provide live statistics. The score and any recorded events still refresh automatically.</p>
             }
             <div class="pitch-placeholder">
-              <svg class="pitch-illustration" viewBox="0 0 320 150" role="img" aria-label="Football pitch illustration; live player and ball positions are not available">
+              <svg class="pitch-illustration" viewBox="0 0 320 150" role="img" [attr.aria-label]="latestBallCoordinate() ? 'Football pitch with provider-reported latest ball location' : 'Football pitch illustration; live player and ball positions are not available'">
                 <rect x="1" y="1" width="318" height="148" rx="8"></rect>
                 <line x1="160" y1="1" x2="160" y2="149"></line>
                 <circle cx="160" cy="75" r="23"></circle>
                 <rect x="1" y="40" width="36" height="70"></rect><rect x="283" y="40" width="36" height="70"></rect>
                 <circle cx="160" cy="75" r="2" class="pitch-dot"></circle>
+                @if (latestBallCoordinate(); as ball) {
+                  <circle class="tracked-ball" [attr.cx]="8 + ball.x * 304" [attr.cy]="8 + ball.y * 134" r="5"></circle>
+                }
               </svg>
               <div class="pitch-message">
-                <strong>Live pitch positions unavailable</strong>
-                <span>This provider does not send formations or ball-tracking coordinates. No live position is being guessed.</span>
+                @if (latestBallCoordinate(); as ball) {
+                  <strong>Provider ball tracking · {{ ball.timer }}</strong>
+                  <span>Latest reported ball location. Positions are provider supplied and may be delayed; players and formations are not tracked.</span>
+                } @else {
+                  <strong>Live pitch positions unavailable</strong>
+                  <span>This provider has not supplied ball-tracking coordinates for this match. No live position is being guessed.</span>
+                }
               </div>
             </div>
           </section>
