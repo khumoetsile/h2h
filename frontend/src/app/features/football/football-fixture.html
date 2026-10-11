@@ -51,12 +51,17 @@
           <section class="card how h2h-card" aria-labelledby="h2h-title">
             <div class="pulse-heading">
               <div><h3 id="h2h-title">Head-to-head history</h3><p class="muted small">This fixture: {{ f.homeTeam.name }} vs {{ f.awayTeam.name }}</p></div>
-              <span class="chip">{{ h2h.summary.played }} previous meetings</span>
+              @if (h2h.status === 'UNAVAILABLE') {
+                <span class="chip">History unavailable</span>
+              } @else if (h2h.status === 'UNSUPPORTED') {
+                <span class="chip">History not supported</span>
+              } @else {
+                <span class="chip">{{ h2h.summary.played }} previous meetings</span>
+              }
             </div>
             @if (h2h.matches.length) {
               <nav class="h2h-tabs" aria-label="History sections">
                 <a href="#h2h-record">Record</a>
-                <a href="#h2h-results">Meetings</a>
                 <a href="#h2h-stats">Stats</a>
                 <a href="#team-form">Team form</a>
               </nav>
@@ -67,18 +72,6 @@
                 <div><strong>{{ h2h.summary.draws }}</strong><span>Draws</span></div>
                 <div><strong>{{ h2h.summary.awayWins }}</strong><span>{{ f.awayTeam.shortName || f.awayTeam.name }} wins</span></div>
               </div>
-              @if (h2h.summary.latestMeeting; as latest) {
-                <div class="h2h-latest">
-                  <span class="muted tiny">Last meeting · {{ latest.kickoffAt | date: 'd MMM yyyy' }}</span>
-                  <div class="h2h-latest-score">
-                    <span>{{ latest.homeTeam }}</span><strong>{{ latest.homeScore }}–{{ latest.awayScore }}</strong><span>{{ latest.awayTeam }}</span>
-                  </div>
-                </div>
-              }
-              <p class="muted tiny h2h-meeting-count">
-                All {{ h2h.matches.length }} returned meetings · newest first
-                @if (h2h.summary.capped) { <span>· showing the 50 most recent; older meetings may exist</span> }
-              </p>
               <details class="h2h-more-details">
                 <summary id="h2h-stats">Stats</summary>
                 <div class="h2h-details-content">
@@ -106,46 +99,12 @@
                 <div><strong>{{ h2h.summary.cleanSheets }}/{{ h2h.summary.played }}</strong><span>{{ f.homeTeam.shortName || f.homeTeam.name }} clean sheets</span></div>
                 <div><strong>{{ h2h.summary.opponentCleanSheets }}/{{ h2h.summary.played }}</strong><span>{{ f.awayTeam.shortName || f.awayTeam.name }} clean sheets</span></div>
               </div>
-              @if (goalTrend().length) {
-                <h4 class="form-title">Goals in each meeting</h4>
-                <div class="goal-trend-wrap" role="img" [attr.aria-label]="'Total goals per meeting between ' + f.homeTeam.name + ' and ' + f.awayTeam.name + ', oldest to newest'">
-                  <div class="goal-trend">
-                    @for (meeting of goalTrend(); track meeting.id) {
-                      <div class="goal-trend-item" [title]="(meeting.kickoffAt | date: 'd MMM yyyy') + ': ' + meeting.homeScore + '–' + meeting.awayScore">
-                        <strong>{{ meeting.totalGoals }}</strong>
-                        <span class="goal-bar" [style.height.%]="meeting.barHeight"></span>
-                        <small>{{ meeting.kickoffAt | date: 'yy' }}</small>
-                      </div>
-                    }
-                  </div>
-                </div>
-              }
               @if (h2h.source === 'SYNCED') { <p class="muted tiny">Showing meetings already synced by Head2Head; the provider did not return these results in its current response.</p> }
                 </div>
               </details>
-              <div class="h2h-results" id="h2h-results" aria-label="All available past results between these fixture teams">
-                @for (meeting of h2h.matches; track meeting.id) {
-                  <article class="h2h-result-card">
-                    <span class="h2h-date">{{ meeting.kickoffAt | date: 'd MMM yyyy' }}</span>
-                    <div class="h2h-teams">
-                      <span>@if (meeting.homeCrestUrl) { <img [src]="meeting.homeCrestUrl" alt="" loading="lazy"> }{{ meeting.homeTeam }}</span>
-                      <strong class="h2h-score">{{ meeting.homeScore }}–{{ meeting.awayScore }}</strong>
-                      <span>@if (meeting.awayCrestUrl) { <img [src]="meeting.awayCrestUrl" alt="" loading="lazy"> }{{ meeting.awayTeam }}</span>
-                    </div>
-                    <span class="h2h-outcome" [class.form-win]="headToHeadResult(meeting) === 'W'" [class.form-draw]="headToHeadResult(meeting) === 'D'" [class.form-loss]="headToHeadResult(meeting) === 'L'" [attr.aria-label]="f.homeTeam.name + ' result: ' + headToHeadResult(meeting)">{{ headToHeadResult(meeting) }}</span>
-                    @if (meeting.competition || meeting.venue) {
-                      <span class="h2h-competition">{{ meeting.competition }}@if (meeting.competition && meeting.venue) { · }{{ meeting.venue }}</span>
-                    }
-                    @if (meeting.fixtureId) {
-                      <a class="h2h-open" [routerLink]="['/football', meeting.fixtureId]">Match details</a>
-                    }
-                  </article>
-                }
-              </div>
             } @else if (h2h.status === 'UNAVAILABLE') {
               <div class="data-unavailable">
-                <p class="muted small">The match-history service could not return these clubs’ past meetings. No results are being guessed.</p>
-                <button class="btn btn-ghost btn-sm" type="button" (click)="load()">Try again</button>
+                <p class="muted small">The football data provider could not supply this history. The record will appear when the provider makes it available.</p>
               </div>
             } @else if (h2h.status === 'UNSUPPORTED') {
               <p class="muted small">Past head-to-head results are not available from this football data source yet.</p>

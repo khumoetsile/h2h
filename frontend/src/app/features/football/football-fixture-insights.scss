@@ -3,49 +3,24 @@
 .h2h-tabs a { display: inline-flex; min-height: 40px; align-items: center; flex: 0 0 auto; border-bottom: 2px solid transparent; color: var(--text-2); font-size: 12px; font-weight: 600; text-decoration: none; }
 .h2h-tabs a:hover, .h2h-tabs a:focus-visible { border-bottom-color: var(--accent); color: var(--accent); }
 .h2h-tabs a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-.h2h-record, #h2h-results, #h2h-stats, #team-form { scroll-margin-top: calc(var(--header-h) + 12px); }
+.h2h-record, #h2h-stats, #team-form { scroll-margin-top: calc(var(--header-h) + 12px); }
 .h2h-record { margin: 0 0 8px; }
 .h2h-record > div { padding: 8px 4px; }
 .h2h-record strong { font-size: 22px; }
 .h2h-record span { max-width: 100%; overflow-wrap: anywhere; }
-.h2h-meeting-count { margin: 10px 0; }
 .h2h-more-details { margin: 8px 0 12px; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
 .h2h-more-details > summary { min-height: 42px; padding: 12px 0; color: var(--accent); font-size: 13px; font-weight: 600; cursor: pointer; }
 .h2h-details-content { padding-bottom: 8px; }
 .h2h-team-details { margin-top: 12px; }
 .h2h-team-goals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 10px 0; }
-.h2h-team-goals > div, .h2h-latest { display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.h2h-team-goals > div { display: flex; min-width: 0; flex-direction: column; gap: 5px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
 .h2h-team-goals span { color: var(--text-2); overflow-wrap: anywhere; font-size: 11px; }
-.h2h-team-goals strong, .h2h-latest-score strong { font-family: var(--font-display); font-size: 20px; }
-.h2h-latest { margin: 10px 0; }
-.h2h-latest { flex-direction: row; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 10px; }
-.h2h-latest-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 8px; }
-.h2h-latest-score span { min-width: 0; overflow-wrap: anywhere; font-weight: 600; }
-.h2h-latest-score span:last-child { text-align: right; }
-.h2h-latest-score strong { white-space: nowrap; }
-.h2h-results { display: grid; gap: 8px; }
-.h2h-result-card { display: grid; min-width: 0; grid-template-columns: minmax(0, 1fr) auto minmax(100px, 1fr) minmax(100px, 1fr) auto; grid-template-areas: "date teams result competition venue" "date teams result competition open"; align-items: center; gap: 5px 12px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
-.h2h-date, .h2h-competition, .h2h-venue { min-width: 0; color: var(--text-2); font-size: 11px; overflow-wrap: anywhere; }
-.h2h-date { grid-area: date; }
-.h2h-teams { display: grid; grid-area: teams; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 7px; min-width: 0; }
-.h2h-teams span { display: flex; min-width: 0; align-items: center; gap: 5px; overflow-wrap: anywhere; font-size: 12px; }
-.h2h-teams span:last-child { justify-content: flex-end; text-align: right; }
-.h2h-teams img { width: 18px; height: 18px; flex: 0 0 18px; object-fit: contain; }
-.h2h-score { font-weight: 800; text-align: center; white-space: nowrap; }
-.h2h-outcome { grid-area: result; justify-self: center; display: inline-grid; min-width: 28px; min-height: 28px; padding: 0 6px; place-items: center; border-radius: 4px; background: var(--surface-3); font-weight: 800; }
-.h2h-competition { grid-area: competition; }
-.h2h-venue { grid-area: venue; }
-.h2h-open { grid-area: open; justify-self: end; min-height: 32px; color: var(--accent); font-size: 12px; }
+.h2h-team-goals strong { font-family: var(--font-display); font-size: 20px; }
 .h2h-venue-splits, .standing-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0 14px; }
 .h2h-venue-splits > div, .standing-card { display: flex; min-width: 0; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
 .h2h-venue-splits strong, .standing-card strong { overflow-wrap: anywhere; font-size: 12px; }
 .h2h-venue-splits span, .standing-card span { color: var(--text-2); font-size: 11px; }
 .standing-card sup { font-size: 9px; }
-.goal-trend-wrap { overflow-x: auto; padding: 8px 4px 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
-.goal-trend { display: flex; align-items: end; gap: 8px; min-width: max-content; height: 104px; }
-.goal-trend-item { display: flex; width: 32px; height: 100%; flex-direction: column; align-items: center; justify-content: end; gap: 3px; font-size: 10px; }
-.goal-bar { width: 14px; min-height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); }
-.goal-trend-item small { color: var(--text-2); }
 .h2h-more { margin-top: 10px; }
 .h2h-match a { color: inherit; text-decoration: none; }
 .h2h-match a:hover { color: var(--accent); text-decoration: underline; }
@@ -54,22 +29,10 @@
 .tracked-ball { fill: #fff; stroke: #111; stroke-width: 2px; filter: drop-shadow(0 0 3px #fff9); transition: cx 400ms ease-out, cy 400ms ease-out; }
 @media (max-width: 560px) {
   .h2h-venue-splits, .standing-pair { grid-template-columns: minmax(0, 1fr); }
-  .h2h-result-card { grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: "date result" "teams teams" "competition open"; gap: 8px; }
-  .h2h-teams { gap: 5px; }
-  .h2h-teams span { font-size: 11px; }
-  .h2h-teams img { width: 16px; height: 16px; flex-basis: 16px; }
-  .h2h-date, .h2h-competition, .h2h-venue { font-size: 12px; }
-  .h2h-open { min-height: 40px; display: inline-flex; align-items: center; }
-  .h2h-latest { align-items: flex-start; flex-direction: column; gap: 5px; }
-  .h2h-latest-score { width: 100%; gap: 5px; font-size: 12px; }
-  .h2h-latest-score strong { font-size: 18px; }
   .h2h-summary span { font-size: 10px; line-height: 1.2; }
   .h2h-tabs { gap: 10px; }
   .h2h-tabs a { min-height: 44px; font-size: 11px; }
   .h2h-card .pulse-heading { flex-wrap: wrap; }
-}
-@media (min-width: 561px) and (max-width: 760px) {
-  .h2h-result-card { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-areas: "date teams teams" "result competition venue"; }
 }
 @media (max-width: 360px) {
   .h2h-team-goals { grid-template-columns: minmax(0, 1fr); }

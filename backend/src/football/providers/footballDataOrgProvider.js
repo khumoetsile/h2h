@@ -176,9 +176,9 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     };
     entry.promise = (async () => {
       let headToHeadError = null;
-      let matches = [];
+      let matches = null;
       try {
-        const data = await this.#get(`/matches/${encodeURIComponent(key)}/head2head?limit=50`);
+        const data = await this.#get(`/matches/${encodeURIComponent(key)}/head2head?limit=10`);
         if (!Array.isArray(data.matches)) throw new Error('football-data.org head2head response did not include a matches array.');
         matches = data.matches.map((match) => ({
           ...this.#fixture(match),
@@ -190,14 +190,15 @@ export class FootballDataOrgProvider extends FootballDataProvider {
       } catch (err) {
         headToHeadError = err;
       }
-      if (matches.length) return matches;
       if (!homeTeamProviderId || !awayTeamProviderId) {
         if (headToHeadError) throw headToHeadError;
-        return matches;
+        return matches || [];
       }
       try {
-        return await this.#intersectTeamMatches(homeTeamProviderId, awayTeamProviderId);
+        const teamHistory = await this.#intersectTeamMatches(homeTeamProviderId, awayTeamProviderId);
+        return matches?.length && matches.length >= teamHistory.length ? matches : teamHistory;
       } catch (fallbackError) {
+        if (matches?.length) return matches;
         if (!headToHeadError) throw fallbackError;
         throw new Error(
           `football-data.org head2head request failed (${headToHeadError.message}); team-history fallback failed (${fallbackError.message}).`,
