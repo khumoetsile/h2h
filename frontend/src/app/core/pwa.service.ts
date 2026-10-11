@@ -23,6 +23,7 @@ const toKey = (b64: string) => {
 export class PwaService {
   private api = inject(Api);
   private deferred: InstallPromptEvent | null = null;
+  private updateRegistration: ServiceWorkerRegistration | null = null;
 
   private ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
   readonly isIos = /iPhone|iPad|iPod/.test(this.ua) || (/Macintosh/.test(this.ua) && typeof navigator !== 'undefined' && navigator.maxTouchPoints > 1);
@@ -33,6 +34,7 @@ export class PwaService {
   readonly needsIosSteps = computed(() => !this.installed() && this.isIos);
 
   readonly pushState = signal<PushState>('unsupported');
+  readonly updateAvailable = signal(false);
   private publicKey: string | null = null;
 
   /** Call once at startup. */
@@ -46,9 +48,43 @@ export class PwaService {
     window.addEventListener('appinstalled', () => { this.installed.set(true); this.promptReady.set(false); });
     if ('serviceWorker' in navigator) {
       // Register once the page has settled, so it never competes with the first screen.
-      const go = () => navigator.serviceWorker.register('/sw.js').catch(() => { /* private mode etc. */ });
+      const go = () => {
+        void navigator.serviceWorker.register('/sw.js')
+          .then((registration) => this.watchForUpdate(registration))
+          .catch((error: unknown) => console.warn('Service worker registration failed.', error));
+      };
       if (document.readyState === 'complete') go(); else window.addEventListener('load', go, { once: true });
     }
+  }
+
+  private watchForUpdate(registration: ServiceWorkerRegistration) {
+    this.updateRegistration = registration;
+    this.updateAvailable.set(!!registration.waiting);
+    registration.addEventListener('updatefound', () => {
+      const installing = registration.installing;
+      if (!installing) return;
+      installing.addEventListener('statechange', () => {
+        if (installing.state === 'installed' && navigator.serviceWorker.controller) {
+          this.updateAvailable.set(true);
+        }
+      });
+    });
+
+    const checkForUpdate = () => {
+      void registration.update().catch((error: unknown) => console.warn('Service worker update check failed.', error));
+    };
+    window.addEventListener('focus', checkForUpdate);
+    window.setInterval(checkForUpdate, 60 * 60 * 1000);
+  }
+
+  applyUpdate() {
+    const waiting = this.updateRegistration?.waiting;
+    if (!waiting) {
+      window.location.reload();
+      return;
+    }
+    navigator.serviceWorker.addEventListener('controllerchange', () => window.location.reload(), { once: true });
+    waiting.postMessage({ type: 'SKIP_WAITING' });
   }
 
   private isStandalone() {

@@ -56,13 +56,6 @@ export class FootballFixturePage implements OnInit {
   protected followed = signal(false);
   protected followBusy = signal(false);
   protected target = signal<RematchIntent | null>(null);
-  protected h2hCompetition = signal('');
-  protected h2hVenue = signal<'ALL' | 'HOME' | 'AWAY'>('ALL');
-  protected h2hDateFrom = signal('');
-  protected h2hDateTo = signal('');
-  protected h2hSort = signal<'NEWEST' | 'OLDEST'>('NEWEST');
-  protected h2hLimit = signal<5 | 10 | 20>(10);
-
   protected type = signal<FootballChallengeType | null>(null);
   protected pick = signal<FootballPickValue | null>(null);
   protected stake = signal<number | null>(null);
@@ -96,37 +89,8 @@ export class FootballFixturePage implements OnInit {
       { team: fixture.awayTeam, form: headToHead.recentForm.away },
     ];
   });
-  protected headToHeadCompetitions = computed(() => [...new Set(
-    (this.fixture()?.headToHead?.matches ?? [])
-      .map((meeting) => meeting.competition)
-      .filter((competition): competition is string => !!competition),
-  )].sort((a, b) => a.localeCompare(b)));
-  protected filteredHeadToHead = computed(() => {
-    const h2h = this.fixture()?.headToHead;
-    if (!h2h) return [];
-    const competition = this.h2hCompetition();
-    const venue = this.h2hVenue();
-    const dateFrom = this.h2hDateFrom();
-    const dateTo = this.h2hDateTo();
-    const sort = this.h2hSort();
-    return h2h.matches
-      .filter((meeting) => !competition || meeting.competition === competition)
-      .filter((meeting) => {
-        if (venue === 'ALL') return true;
-        const fixtureHomeWasHome = meeting.homeTeamProviderId
-          ? meeting.homeTeamProviderId === this.fixture()?.homeTeam.providerId
-          : meeting.homeTeam === this.fixture()?.homeTeam.name;
-        return (venue === 'HOME') === fixtureHomeWasHome;
-      })
-      .filter((meeting) => !dateFrom || meeting.kickoffAt.slice(0, 10) >= dateFrom)
-      .filter((meeting) => !dateTo || meeting.kickoffAt.slice(0, 10) <= dateTo)
-      .sort((a, b) => sort === 'NEWEST'
-        ? new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime()
-        : new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
-  });
-  protected visibleHeadToHead = computed(() => this.filteredHeadToHead().slice(0, this.h2hLimit()));
   protected goalTrend = computed(() => {
-    const matches = [...this.filteredHeadToHead()].reverse();
+    const matches = [...(this.fixture()?.headToHead?.matches ?? [])].reverse();
     const maxGoals = Math.max(1, ...matches.map((meeting) => meeting.homeScore + meeting.awayScore));
     return matches.map((meeting) => ({
       ...meeting,
@@ -143,28 +107,6 @@ export class FootballFixturePage implements OnInit {
     const fixtureHomeScore = homeIsFixtureHome ? meeting.homeScore : meeting.awayScore;
     const fixtureAwayScore = homeIsFixtureHome ? meeting.awayScore : meeting.homeScore;
     return fixtureHomeScore > fixtureAwayScore ? 'W' : fixtureHomeScore < fixtureAwayScore ? 'L' : 'D';
-  }
-  protected resetHeadToHeadFilters(): void {
-    this.h2hCompetition.set('');
-    this.h2hVenue.set('ALL');
-    this.h2hDateFrom.set('');
-    this.h2hDateTo.set('');
-    this.h2hSort.set('NEWEST');
-    this.h2hLimit.set(10);
-  }
-  protected setHeadToHeadCompetition(value: string): void {
-    this.h2hCompetition.set(value);
-  }
-  protected setHeadToHeadVenue(value: 'ALL' | 'HOME' | 'AWAY'): void {
-    this.h2hVenue.set(value);
-  }
-  protected setHeadToHeadDates(from: string, to: string): void {
-    this.h2hDateFrom.set(from);
-    this.h2hDateTo.set(to);
-  }
-  protected setHeadToHeadLimit(value: string | number): void {
-    const limit = Number(value);
-    if (limit === 5 || limit === 10 || limit === 20) this.h2hLimit.set(limit);
   }
   protected pulseRows = computed(() => {
     const stats = this.fixture()?.stats;

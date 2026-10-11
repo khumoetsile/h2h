@@ -1,8 +1,11 @@
 // Head2Head service worker. It does two small jobs: show a notification when the server pushes one, and
 // open the right page when it is tapped. It does not cache anything, so a new deploy is always what people get.
 
-self.addEventListener('install', () => self.skipWaiting());
+self.addEventListener('install', () => {});
 self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()));
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+});
 
 self.addEventListener('push', (event) => {
   let data = {};

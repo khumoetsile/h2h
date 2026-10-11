@@ -86,6 +86,13 @@
 @if (auth.isLoggedIn()) { <app-active-match-bar /> }
 <app-ads-consent />
 
+@if (pwa.updateAvailable()) {
+  <aside class="app-update" role="status" aria-live="polite">
+    <span>A new version is ready.</span>
+    <button type="button" class="btn btn-primary btn-sm" (click)="pwa.applyUpdate()">Reload to update</button>
+  </aside>
+}
+
 <main class="content">
   <router-outlet />
 </main>

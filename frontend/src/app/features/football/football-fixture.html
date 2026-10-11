@@ -54,6 +54,34 @@
               <span class="chip">{{ h2h.summary.played }} previous meetings</span>
             </div>
             @if (h2h.matches.length) {
+              <nav class="h2h-tabs" aria-label="History sections">
+                <a href="#h2h-record">Record</a>
+                <a href="#h2h-results">Meetings</a>
+                <a href="#h2h-stats">Stats</a>
+                <a href="#team-form">Team form</a>
+              </nav>
+            }
+            @if (h2h.matches.length) {
+              <div class="h2h-summary h2h-record" id="h2h-record" [attr.aria-label]="f.homeTeam.name + ' versus ' + f.awayTeam.name + ' record'">
+                <div><strong>{{ h2h.summary.homeWins }}</strong><span>{{ f.homeTeam.shortName || f.homeTeam.name }} wins</span></div>
+                <div><strong>{{ h2h.summary.draws }}</strong><span>Draws</span></div>
+                <div><strong>{{ h2h.summary.awayWins }}</strong><span>{{ f.awayTeam.shortName || f.awayTeam.name }} wins</span></div>
+              </div>
+              @if (h2h.summary.latestMeeting; as latest) {
+                <div class="h2h-latest">
+                  <span class="muted tiny">Last meeting · {{ latest.kickoffAt | date: 'd MMM yyyy' }}</span>
+                  <div class="h2h-latest-score">
+                    <span>{{ latest.homeTeam }}</span><strong>{{ latest.homeScore }}–{{ latest.awayScore }}</strong><span>{{ latest.awayTeam }}</span>
+                  </div>
+                </div>
+              }
+              <p class="muted tiny h2h-meeting-count">
+                All {{ h2h.matches.length }} returned meetings · newest first
+                @if (h2h.summary.capped) { <span>· showing the 50 most recent; older meetings may exist</span> }
+              </p>
+              <details class="h2h-more-details">
+                <summary id="h2h-stats">Stats</summary>
+                <div class="h2h-details-content">
               <div class="h2h-coverage">
                 <span>{{ h2h.source === 'PROVIDER' ? 'Football data provider' : 'Head2Head synced history' }}</span>
                 @if (h2h.summary.firstMeetingAt && h2h.summary.latestMeetingAt) {
@@ -61,63 +89,10 @@
                 }
                 @if (h2h.summary.capped) { <span>Showing up to 50 most recent available meetings; older results may exist.</span> }
               </div>
-              <div class="h2h-filters" aria-label="Filter head-to-head results">
-                @if (headToHeadCompetitions().length) {
-                  <label>Competition
-                    <select [ngModel]="h2hCompetition()" (ngModelChange)="setHeadToHeadCompetition($event)">
-                      <option value="">All competitions</option>
-                      @for (competition of headToHeadCompetitions(); track competition) { <option [value]="competition">{{ competition }}</option> }
-                    </select>
-                  </label>
-                }
-                <label>Venue
-                  <select [ngModel]="h2hVenue()" (ngModelChange)="setHeadToHeadVenue($event)">
-                    <option value="ALL">All venues</option>
-                    <option value="HOME">{{ f.homeTeam.shortName || f.homeTeam.name }} at home</option>
-                    <option value="AWAY">{{ f.awayTeam.shortName || f.awayTeam.name }} at home</option>
-                  </select>
-                </label>
-                <label>From
-                  <input type="date" [ngModel]="h2hDateFrom()" (ngModelChange)="setHeadToHeadDates($event, h2hDateTo())">
-                </label>
-                <label>To
-                  <input type="date" [ngModel]="h2hDateTo()" (ngModelChange)="setHeadToHeadDates(h2hDateFrom(), $event)">
-                </label>
-                <label>Sort
-                  <select [ngModel]="h2hSort()" (ngModelChange)="h2hSort.set($event)">
-                    <option value="NEWEST">Newest first</option>
-                    <option value="OLDEST">Oldest first</option>
-                  </select>
-                </label>
-                <label>Meetings
-                  <select [ngModel]="h2hLimit()" (ngModelChange)="setHeadToHeadLimit($event)">
-                    <option [ngValue]="5">Last 5</option>
-                    <option [ngValue]="10">Last 10</option>
-                    <option [ngValue]="20">Last 20</option>
-                  </select>
-                </label>
-                <button class="btn btn-ghost btn-sm h2h-reset" type="button" (click)="resetHeadToHeadFilters()">Reset</button>
-              </div>
-              <p class="muted tiny h2h-filter-count">Showing {{ visibleHeadToHead().length }} of {{ filteredHeadToHead().length }} filtered meetings ({{ h2h.summary.played }} total recorded)</p>
-              <div class="h2h-summary" [attr.aria-label]="f.homeTeam.name + ' versus ' + f.awayTeam.name + ' record'">
-                <div><strong>{{ h2h.summary.homeWins }}</strong><span>Games won by {{ f.homeTeam.shortName || f.homeTeam.name }}</span></div>
-                <div><strong>{{ h2h.summary.draws }}</strong><span>Drawn</span></div>
-                <div><strong>{{ h2h.summary.awayWins }}</strong><span>Games won by {{ f.awayTeam.shortName || f.awayTeam.name }}</span></div>
-              </div>
               <div class="h2h-team-goals" aria-label="Total goals scored in the recorded meetings">
-                <div><span>{{ f.homeTeam.name }} goals</span><strong>{{ h2h.summary.goalsFor }}</strong></div>
-                <div><span>{{ f.awayTeam.name }} goals</span><strong>{{ h2h.summary.goalsAgainst }}</strong></div>
+                <div><span>{{ f.homeTeam.shortName || f.homeTeam.name }} goals</span><strong>{{ h2h.summary.goalsFor }}</strong></div>
+                <div><span>{{ f.awayTeam.shortName || f.awayTeam.name }} goals</span><strong>{{ h2h.summary.goalsAgainst }}</strong></div>
               </div>
-              @if (h2h.summary.latestMeeting; as latest) {
-                <div class="h2h-latest">
-                  <span class="muted tiny">Most recent meeting · {{ latest.kickoffAt | date: 'd MMM yyyy' }}</span>
-                  <div class="h2h-latest-score">
-                    <span>{{ latest.homeTeam }}</span><strong>{{ latest.homeScore }}–{{ latest.awayScore }}</strong><span>{{ latest.awayTeam }}</span>
-                  </div>
-                  <span class="muted tiny">{{ latest.competition || 'Competition not supplied' }}@if (latest.venue) { · {{ latest.venue }} }</span>
-                </div>
-              }
-              <p class="muted tiny h2h-sample">The overall record and scoring summary use all recorded meetings; the filters below apply to the results list and goal trend.</p>
               <div class="h2h-venue-splits" aria-label="Head-to-head record by venue">
                 <div><strong>{{ f.homeTeam.shortName || f.homeTeam.name }} hosted</strong><span>{{ h2h.summary.homeAtHome.wins }}W {{ h2h.summary.homeAtHome.draws }}D {{ h2h.summary.homeAtHome.losses }}L · {{ h2h.summary.homeAtHome.played }} matches</span></div>
                 <div><strong>{{ f.awayTeam.shortName || f.awayTeam.name }} hosted</strong><span>{{ h2h.summary.awayAtHome.losses }}W {{ h2h.summary.awayAtHome.draws }}D {{ h2h.summary.awayAtHome.wins }}L · {{ h2h.summary.awayAtHome.played }} matches</span></div>
@@ -146,8 +121,10 @@
                 </div>
               }
               @if (h2h.source === 'SYNCED') { <p class="muted tiny">Showing meetings already synced by Head2Head; the provider did not return these results in its current response.</p> }
-              <div class="h2h-results" aria-label="Past results between these fixture teams">
-                @for (meeting of visibleHeadToHead(); track meeting.id) {
+                </div>
+              </details>
+              <div class="h2h-results" id="h2h-results" aria-label="All available past results between these fixture teams">
+                @for (meeting of h2h.matches; track meeting.id) {
                   <article class="h2h-result-card">
                     <span class="h2h-date">{{ meeting.kickoffAt | date: 'd MMM yyyy' }}</span>
                     <div class="h2h-teams">
@@ -156,8 +133,9 @@
                       <span>@if (meeting.awayCrestUrl) { <img [src]="meeting.awayCrestUrl" alt="" loading="lazy"> }{{ meeting.awayTeam }}</span>
                     </div>
                     <span class="h2h-outcome" [class.form-win]="headToHeadResult(meeting) === 'W'" [class.form-draw]="headToHeadResult(meeting) === 'D'" [class.form-loss]="headToHeadResult(meeting) === 'L'" [attr.aria-label]="f.homeTeam.name + ' result: ' + headToHeadResult(meeting)">{{ headToHeadResult(meeting) }}</span>
-                    <span class="h2h-competition">{{ meeting.competition || 'Competition not supplied' }}</span>
-                    <span class="h2h-venue">{{ meeting.venue || 'Venue not supplied' }}</span>
+                    @if (meeting.competition || meeting.venue) {
+                      <span class="h2h-competition">{{ meeting.competition }}@if (meeting.competition && meeting.venue) { · }{{ meeting.venue }}</span>
+                    }
                     @if (meeting.fixtureId) {
                       <a class="h2h-open" [routerLink]="['/football', meeting.fixtureId]">Match details</a>
                     }
@@ -174,7 +152,9 @@
             } @else {
               <p class="muted small">No previous meetings between these teams were returned by the football data source.</p>
             }
-            <h4 class="form-title">Recent form in {{ f.competition.name }}</h4>
+            <details class="h2h-more-details h2h-team-details">
+              <summary id="team-form">Team form & standings</summary>
+              <h4 class="form-title">Recent form</h4>
             <div class="recent-form">
               @for (entry of recentForm(); track entry.team.id) {
                 <section class="form-team" [attr.aria-label]="entry.team.name + ' recent form'">
@@ -191,18 +171,18 @@
                         <div class="form-row">
                           <span class="muted tiny form-date">{{ match.kickoffAt | date: 'd MMM yyyy' }}</span>
                           <span class="form-opponent">@if (match.opponentCrestUrl) { <img [src]="match.opponentCrestUrl" alt="" loading="lazy"> }{{ match.venue === 'HOME' ? 'vs' : '@' }} {{ match.opponent }}</span>
-                          <strong>{{ match.teamScore }}–{{ match.opponentScore }}</strong>
+                          <strong class="form-score">{{ match.teamScore }}–{{ match.opponentScore }}</strong>
                           <span class="form-result" [class.form-win]="match.outcome === 'W'" [class.form-draw]="match.outcome === 'D'" [class.form-loss]="match.outcome === 'L'">{{ match.outcome }}</span>
-                          <small class="form-competition">{{ match.competition || 'Competition not supplied' }}</small>
+                          @if (match.competition) { <small class="form-competition">{{ match.competition }}</small> }
                         </div>
                       }
                     </div>
-                    <p class="muted tiny form-record">
-                      {{ entry.form.summary.wins }}W {{ entry.form.summary.draws }}D {{ entry.form.summary.losses }}L
-                      · {{ entry.form.summary.goalsFor }} scored / {{ entry.form.summary.goalsAgainst }} conceded
-                      · BTTS {{ entry.form.summary.bothTeamsScored }}/{{ entry.form.summary.played }}
-                      · O2.5 {{ entry.form.summary.over25 }}/{{ entry.form.summary.played }}
-                    </p>
+                    <div class="muted tiny form-record">
+                      <span>{{ entry.form.summary.wins }}W · {{ entry.form.summary.draws }}D · {{ entry.form.summary.losses }}L</span>
+                      <span>{{ entry.form.summary.goalsFor }} scored · {{ entry.form.summary.goalsAgainst }} conceded</span>
+                      <span>BTTS {{ entry.form.summary.bothTeamsScored }}/{{ entry.form.summary.played }}</span>
+                      <span>O2.5 {{ entry.form.summary.over25 }}/{{ entry.form.summary.played }}</span>
+                    </div>
                   } @else {
                     @if (entry.form.status === 'UNAVAILABLE') {
                       <p class="muted tiny">Recent results could not be loaded from the match-history service.</p>
@@ -233,7 +213,8 @@
             } @else {
               <p class="muted tiny">Standings are not supported by this football data source.</p>
             }
-            <p class="muted tiny h2h-disclaimer">History is tied to the two teams in this fixture. Results describe the available recorded sample; they are not odds, predictions, or a guarantee of future results. Form uses up to five earlier completed matches across available competitions.</p>
+              <p class="muted tiny h2h-disclaimer">Historical results are not a prediction. Form uses up to five earlier completed matches.</p>
+            </details>
           </section>
         }
 

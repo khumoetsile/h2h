@@ -6,6 +6,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '../core/auth.service';
 import { Api } from '../core/api.service';
 import { BRAND } from '../core/brand';
+import { PwaService } from '../core/pwa.service';
 import { AppNotification } from '../core/models';
 import { RealtimeService } from '../core/realtime.service';
 import { Avatar } from '../shared/ui';
@@ -50,6 +51,7 @@ const PUBLIC_NAV: NavItem[] = [{ label: 'Football', icon: 'sports_soccer', link:
 export class Shell {
   protected auth = inject(AuthService);
   protected realtime = inject(RealtimeService);
+  protected pwa = inject(PwaService);
   private api = inject(Api);
   private router = inject(Router);
   protected brand = BRAND;
