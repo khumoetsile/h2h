@@ -158,12 +158,13 @@ function summarizeResults(results) {
     totals.goalsFor += goalsFor;
     totals.goalsAgainst += goalsAgainst;
     totals.bothTeamsScored += goalsFor > 0 && goalsAgainst > 0 ? 1 : 0;
+    totals.over15 += goalsFor + goalsAgainst > 1 ? 1 : 0;
     totals.over25 += goalsFor + goalsAgainst > 2 ? 1 : 0;
     totals.cleanSheets += goalsAgainst === 0 ? 1 : 0;
     return totals;
   }, {
     played: 0, wins: 0, draws: 0, losses: 0, goalsFor: 0, goalsAgainst: 0,
-    bothTeamsScored: 0, over25: 0, cleanSheets: 0,
+    bothTeamsScored: 0, over15: 0, over25: 0, cleanSheets: 0,
   });
   const percentage = (count) => summary.played ? Math.round(count / summary.played * 100) : null;
   return {
@@ -174,17 +175,18 @@ function summarizeResults(results) {
     goalsForPerMatch: summary.played ? Number((summary.goalsFor / summary.played).toFixed(1)) : null,
     goalsAgainstPerMatch: summary.played ? Number((summary.goalsAgainst / summary.played).toFixed(1)) : null,
     bothTeamsScoredPct: percentage(summary.bothTeamsScored),
+    over15Pct: percentage(summary.over15),
     over25Pct: percentage(summary.over25),
     cleanSheetsPct: percentage(summary.cleanSheets),
   };
 }
 
-function mapTeamForm(rows, teamId) {
+function mapTeamForm(rows, teamId, providerTeamId = teamId) {
   const matches = rows.map((match) => {
     const providerMatch = match.homeTeam !== undefined;
     const playedAtHome = providerMatch
-      ? String(match.homeTeam?.providerId) === String(teamId)
-      : match.home_team_id === teamId;
+      ? String(match.homeTeam?.providerId) === String(providerTeamId)
+      : String(match.home_team_id) === String(teamId);
     const teamScore = Number(playedAtHome
       ? (providerMatch ? match.homeScore : match.home_score)
       : (providerMatch ? match.awayScore : match.away_score));
@@ -194,41 +196,62 @@ function mapTeamForm(rows, teamId) {
     return {
       id: providerMatch ? match.providerId : match.id,
       kickoffAt: providerMatch ? match.kickoffAt : match.kickoff_at,
+      competition: providerMatch ? match.competitionName || null : match.competition_name || null,
       opponent: playedAtHome
         ? (providerMatch ? match.awayTeam?.name : match.away_name)
         : (providerMatch ? match.homeTeam?.name : match.home_name),
+      opponentCrestUrl: playedAtHome
+        ? (providerMatch ? match.awayTeam?.crestUrl : match.away_crest)
+        : (providerMatch ? match.homeTeam?.crestUrl : match.home_crest),
       venue: playedAtHome ? 'HOME' : 'AWAY',
       teamScore,
       opponentScore,
       outcome: teamScore > opponentScore ? 'W' : teamScore === opponentScore ? 'D' : 'L',
     };
   });
+  matches.sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt));
   return { matches, summary: summarizeResults(matches) };
 }
 
-async function getRecentTeamForm({ rows, teamId, providerTeamId, teamName, competitionCode, kickoffAt, provider }) {
-  if (rows.length) return { ...mapTeamForm(rows, teamId), status: 'AVAILABLE', source: 'SYNCED' };
+async function getRecentTeamForm({ rows, teamId, providerTeamId, teamName, kickoffAt, provider }) {
+  const syncedMatches = [...rows];
   if (!providerTeamId || typeof provider.getTeamMatches !== 'function') {
-    return { ...mapTeamForm([], teamId), status: 'UNSUPPORTED', source: null };
+    return {
+      ...mapTeamForm(syncedMatches.slice(0, 5), teamId),
+      status: syncedMatches.length ? 'AVAILABLE' : 'UNSUPPORTED',
+      source: syncedMatches.length ? 'SYNCED' : null,
+    };
   }
   try {
     const matches = await provider.getTeamMatches(providerTeamId);
-    const recentMatches = matches
+    const syncedProviderIds = new Set(syncedMatches.map((match) => String(match.provider_fixture_id)));
+    const providerMatches = matches
       .filter((match) => match.status === 'FINISHED'
-        && match.competitionProviderId === competitionCode
         && new Date(match.kickoffAt) < new Date(kickoffAt)
-        && match.homeScore !== null && match.awayScore !== null
+        && Number.isSafeInteger(match.homeScore) && match.homeScore >= 0
+        && Number.isSafeInteger(match.awayScore) && match.awayScore >= 0
         && [String(match.homeTeam?.providerId), String(match.awayTeam?.providerId)].includes(String(providerTeamId)))
-      .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
+      .filter((match) => !syncedProviderIds.has(String(match.providerId)));
+    const recentMatches = [...syncedMatches, ...providerMatches]
+      .sort((a, b) => new Date(b.kickoffAt || b.kickoff_at) - new Date(a.kickoffAt || a.kickoff_at))
       .slice(0, 5);
+    const hasProviderMatches = recentMatches.some((match) => match.homeTeam !== undefined);
+    const hasSyncedMatches = recentMatches.some((match) => match.homeTeam === undefined);
+    const source = hasProviderMatches && hasSyncedMatches
+      ? 'COMBINED'
+      : hasProviderMatches ? 'PROVIDER' : 'SYNCED';
     return {
-      ...mapTeamForm(recentMatches, providerTeamId),
+      ...mapTeamForm(recentMatches, teamId, providerTeamId),
       status: 'AVAILABLE',
-      source: recentMatches.length ? 'PROVIDER' : null,
+      source: recentMatches.length ? source : null,
     };
   } catch (err) {
     await logSystemError(`football-team-form:${teamName}:${providerTeamId}`, err);
-    return { ...mapTeamForm([], teamId), status: 'UNAVAILABLE', source: null };
+    return {
+      ...mapTeamForm(syncedMatches.slice(0, 5), teamId),
+      status: syncedMatches.length ? 'AVAILABLE' : 'UNAVAILABLE',
+      source: syncedMatches.length ? 'SYNCED' : null,
+    };
   }
 }
 
@@ -287,10 +310,10 @@ export async function getFixtureDetail(fixtureId) {
   );
   const meetings = await query(
     `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND fx.home_score IS NOT NULL AND fx.away_score IS NOT NULL
-       AND comp.is_enabled = 1${simulatedFilter}
+       AND comp.is_enabled = 1 AND comp.provider = ?${simulatedFilter}
        AND ((fx.home_team_id = ? AND fx.away_team_id = ?) OR (fx.home_team_id = ? AND fx.away_team_id = ?))
        AND fx.id <> ? AND fx.kickoff_at < ? ORDER BY fx.kickoff_at DESC LIMIT 50`,
-    [row.home_team_id, row.away_team_id, row.away_team_id, row.home_team_id, fixtureId, row.kickoff_at],
+    [provider.name, row.home_team_id, row.away_team_id, row.away_team_id, row.home_team_id, fixtureId, row.kickoff_at],
   );
   const providerHistoryPromise = typeof provider.getHeadToHead === 'function'
     ? Promise.resolve().then(() => provider.getHeadToHead(
@@ -317,11 +340,11 @@ export async function getFixtureDetail(fixtureId) {
       })
     : Promise.resolve({ status: 'UNSUPPORTED', source: null, home: null, away: null });
   const [homeFormRows, awayFormRows] = await Promise.all([row.home_team_id, row.away_team_id].map((teamId) => query(
-    `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND comp.is_enabled = 1${simulatedFilter}
-       AND fx.competition_id = ? AND (fx.home_team_id = ? OR fx.away_team_id = ?)
+    `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND comp.is_enabled = 1 AND comp.provider = ?${simulatedFilter}
+       AND (fx.home_team_id = ? OR fx.away_team_id = ?)
        AND fx.id <> ? AND fx.kickoff_at < ? AND fx.home_score IS NOT NULL AND fx.away_score IS NOT NULL
        ORDER BY fx.kickoff_at DESC LIMIT 5`,
-    [row.competition_id, teamId, teamId, fixtureId, row.kickoff_at],
+    [provider.name, teamId, teamId, fixtureId, row.kickoff_at],
   )));
   const [homeForm, awayForm, providerHistory, standings] = await Promise.all([
     getRecentTeamForm({
@@ -329,7 +352,6 @@ export async function getFixtureDetail(fixtureId) {
       teamId: row.home_team_id,
       providerTeamId: row.home_provider_team_id,
       teamName: row.home_name,
-      competitionCode: row.competition_code,
       kickoffAt: row.kickoff_at,
       provider,
     }),
@@ -338,7 +360,6 @@ export async function getFixtureDetail(fixtureId) {
       teamId: row.away_team_id,
       providerTeamId: row.away_provider_team_id,
       teamName: row.away_name,
-      competitionCode: row.competition_code,
       kickoffAt: row.kickoff_at,
       provider,
     }),
@@ -354,7 +375,8 @@ export async function getFixtureDetail(fixtureId) {
       .filter((meeting) => String(meeting.providerId) !== String(row.provider_fixture_id)
         && new Date(meeting.kickoffAt) < new Date(row.kickoff_at)
         && meeting.status === 'FINISHED'
-        && meeting.homeScore !== null && meeting.awayScore !== null
+        && Number.isSafeInteger(meeting.homeScore) && meeting.homeScore >= 0
+        && Number.isSafeInteger(meeting.awayScore) && meeting.awayScore >= 0
         && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.home_provider_team_id))
         && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.away_provider_team_id)))
       .map((meeting) => ({
@@ -366,8 +388,11 @@ export async function getFixtureDetail(fixtureId) {
         awayTeam: meeting.awayTeam.name,
         homeTeamProviderId: meeting.homeTeam.providerId,
         awayTeamProviderId: meeting.awayTeam.providerId,
+        homeCrestUrl: meeting.homeTeam.crestUrl,
+        awayCrestUrl: meeting.awayTeam.crestUrl,
         homeScore: meeting.homeScore,
         awayScore: meeting.awayScore,
+        venue: meeting.venue || null,
       }))
       .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
       .slice(0, 50);
@@ -382,9 +407,12 @@ export async function getFixtureDetail(fixtureId) {
       awayTeam: meeting.away_name,
       homeTeamProviderId: null,
       awayTeamProviderId: null,
+      homeCrestUrl: meeting.home_crest,
+      awayCrestUrl: meeting.away_crest,
       fixtureId: meeting.id,
       homeScore: meeting.home_score,
       awayScore: meeting.away_score,
+      venue: null,
     }));
     if (headToHeadStatus === 'UNSUPPORTED') headToHeadStatus = 'AVAILABLE';
   }
@@ -408,10 +436,12 @@ export async function getFixtureDetail(fixtureId) {
     homeWins: h2hRecord.wins,
     awayWins: h2hRecord.losses,
     opponentCleanSheets: headToHeadResults.filter((result) => Number(result.teamScore) === 0).length,
+    over15: h2hRecord.over15,
     homeAtHome,
     awayAtHome,
     firstMeetingAt: sortedMeetings[0]?.kickoffAt || null,
     latestMeetingAt: sortedMeetings.at(-1)?.kickoffAt || null,
+    latestMeeting: sortedMeetings.at(-1) || null,
     capped: headToHeadMatches.length >= 50,
   };
   headToHead.standings = standings;

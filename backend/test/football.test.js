@@ -104,6 +104,7 @@ describe('football: browsing', () => {
             competition: { code: 'PL', name: 'Premier League' },
             homeTeam: { id: 10, name: 'Liverpool', tla: 'LIV' },
             awayTeam: { id: 20, name: 'Chelsea', tla: 'CHE' },
+            venue: 'Anfield',
             score: { fullTime: { home: 2, away: 1 }, halfTime: { home: 1, away: 1 } },
           }],
         }),
@@ -122,6 +123,7 @@ describe('football: browsing', () => {
       assert.equal(first[0].awayTeam.name, 'Chelsea');
       assert.equal(first[0].homeScore, 2);
       assert.equal(first[0].awayScore, 1);
+      assert.equal(first[0].venue, 'Anfield');
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -180,6 +182,33 @@ describe('football: browsing', () => {
     }
   });
 
+  test('football-data historical results require a full-time score', async () => {
+    const provider = new FootballDataOrgProvider({ apiKey: '', baseUrl: 'https://football.example.test/v4' });
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({
+        matches: [{
+          id: 456,
+          status: 'FINISHED',
+          utcDate: '2025-02-01T15:00:00Z',
+          competition: { code: 'PL', name: 'Premier League' },
+          homeTeam: { id: 10, name: 'Liverpool' },
+          awayTeam: { id: 20, name: 'Chelsea' },
+          score: { halfTime: { home: 1, away: 0 }, fullTime: { home: null, away: null } },
+        }],
+      }),
+    });
+    try {
+      const [match] = await provider.getHeadToHead('123', '10', '20');
+      assert.equal(match.status, 'FINISHED');
+      assert.equal(match.homeScore, null);
+      assert.equal(match.awayScore, null);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('football-data provider finds past meetings from team histories when head-to-head is unavailable', async () => {
     const provider = new FootballDataOrgProvider({ apiKey: '', baseUrl: 'https://football.example.test/v4' });
     const originalFetch = globalThis.fetch;
@@ -191,6 +220,7 @@ describe('football: browsing', () => {
       competition: { code: 'SA', name: 'Serie A' },
       homeTeam: { id: 10, name: 'Como 1907', tla: 'COM' },
       awayTeam: { id: 20, name: 'AS Roma', tla: 'ROM' },
+      venue: 'Stadio Olimpico',
       score: { fullTime: { home: 2, away: 1 } },
     };
     globalThis.fetch = async (url) => {
@@ -219,6 +249,7 @@ describe('football: browsing', () => {
       assert.equal(first[0].awayTeam.name, 'AS Roma');
       assert.equal(first[0].homeScore, 2);
       assert.equal(first[0].awayScore, 1);
+      assert.equal(first[0].venue, 'Stadio Olimpico');
     } finally {
       globalThis.fetch = originalFetch;
     }
@@ -286,19 +317,50 @@ describe('football: browsing', () => {
       awayWins: detail.body.fixture.headToHead.summary.awayWins,
     }, { homeWins: 1, draws: 0, awayWins: 0 });
     assert.equal(detail.body.fixture.headToHead.summary.averageGoals, 3);
+    assert.equal(detail.body.fixture.headToHead.summary.goalsFor, 2);
+    assert.equal(detail.body.fixture.headToHead.summary.goalsAgainst, 1);
     assert.equal(detail.body.fixture.headToHead.summary.bothTeamsScoredPct, 100);
+    assert.equal(detail.body.fixture.headToHead.summary.over15, 1);
+    assert.equal(detail.body.fixture.headToHead.summary.over15Pct, 100);
     assert.equal(detail.body.fixture.headToHead.summary.over25Pct, 100);
     assert.equal(detail.body.fixture.headToHead.summary.homeAtHome.played, 1);
     assert.ok(detail.body.fixture.headToHead.matches.every((meeting) => meeting.fixtureId));
     assert.equal(detail.body.fixture.headToHead.standings.status, 'UNSUPPORTED');
     assert.ok(detail.body.fixture.headToHead.summary.firstMeetingAt);
     assert.ok(detail.body.fixture.headToHead.summary.latestMeetingAt);
+    assert.equal(detail.body.fixture.headToHead.summary.latestMeeting.homeScore, 2);
+    assert.equal(detail.body.fixture.headToHead.summary.latestMeeting.awayScore, 1);
     assert.ok(detail.body.fixture.headToHead.recentForm.home.matches.some((match) => match.outcome === 'W'));
     assert.ok(detail.body.fixture.headToHead.recentForm.away.matches.some((match) => match.outcome === 'L'));
+    assert.ok(detail.body.fixture.headToHead.recentForm.home.matches.every((match) => match.competition));
     const team = await api().get(`/api/football/teams/${homeId}`);
     assert.equal(team.status, 200);
     assert.equal(team.body.team.id, homeId);
     assert.ok(Array.isArray(team.body.recentResults));
+  });
+
+  test('head-to-head summaries include goal thresholds, team totals and latest meeting', async () => {
+    const earlier = await makeFixture({
+      status: 'FINISHED', kickoffMs: 86400000, homeScore: 0, awayScore: 0,
+    });
+    const latest = await makeFixture({
+      status: 'FINISHED', kickoffMs: 2 * 86400000, homeScore: 1, awayScore: 1,
+    });
+    const upcoming = await makeFixture({ status: 'SCHEDULED', kickoffMs: 3 * 86400000 });
+    const detail = await api().get(`/api/football/fixtures/${upcoming}`);
+    assert.equal(detail.status, 200);
+    const { headToHead } = detail.body.fixture;
+    const totalGoals = headToHead.matches.map((match) => match.homeScore + match.awayScore);
+    assert.equal(headToHead.summary.played, headToHead.matches.length);
+    assert.equal(headToHead.summary.over15, totalGoals.filter((goals) => goals > 1).length);
+    assert.equal(headToHead.summary.over25, totalGoals.filter((goals) => goals > 2).length);
+    assert.equal(headToHead.summary.bothTeamsScored, headToHead.matches.filter((match) => match.homeScore > 0 && match.awayScore > 0).length);
+    assert.equal(headToHead.summary.cleanSheets, headToHead.matches.filter((match) => match.homeTeam === 'Arsenal' ? match.awayScore === 0 : match.homeScore === 0).length);
+    assert.equal(headToHead.summary.opponentCleanSheets, headToHead.matches.filter((match) => match.homeTeam === 'Arsenal' ? match.homeScore === 0 : match.awayScore === 0).length);
+    assert.equal(headToHead.summary.averageGoals, Number((totalGoals.reduce((sum, goals) => sum + goals, 0) / totalGoals.length).toFixed(1)));
+    assert.equal(headToHead.summary.latestMeeting.fixtureId, latest);
+    assert.notEqual(headToHead.summary.latestMeeting.fixtureId, earlier);
+    assert.deepEqual(headToHead.matches.map((match) => match.fixtureId), [latest, earlier]);
   });
 
   test('players can follow live fixtures and remove them from followed matches', async () => {

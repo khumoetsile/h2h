@@ -150,24 +150,16 @@
 .form-heading { display: flex; flex-direction: column; gap: 3px; margin-bottom: 8px; }
 .form-heading strong { overflow-wrap: anywhere; }
 .form-list { display: grid; gap: 4px; }
-.form-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto 22px; gap: 6px; align-items: center; min-height: 26px; font-size: 12px; }
+.form-row { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto 22px; gap: 6px; align-items: center; min-height: 34px; font-size: 12px; }
 .form-date { white-space: nowrap; }
-.form-opponent { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.form-opponent { display: flex; min-width: 0; align-items: center; gap: 5px; overflow-wrap: anywhere; }
+.form-opponent img { width: 16px; height: 16px; flex: 0 0 16px; object-fit: contain; }
+.form-competition { grid-column: 2 / 3; color: var(--text-2); overflow-wrap: anywhere; }
 .form-result { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; font-size: 10px; font-weight: 700; background: var(--surface-3); }
 .form-win { color: var(--success, #36b37e); }
 .form-draw { color: var(--text-2); }
 .form-loss { color: var(--danger, #e05252); }
 .form-record { margin: 8px 0 0; line-height: 1.45; }
-.h2h-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-sm); }
-.h2h-table-wrap:focus-visible { outline: 2px solid var(--accent); }
-.h2h-table { min-width: 620px; border-collapse: collapse; font-size: 12px; }
-.h2h-table th { padding: 9px 10px; background: var(--accent); color: var(--text); text-align: left; font-weight: 700; white-space: nowrap; }
-.h2h-table td { padding: 8px 10px; border-top: 1px solid var(--border); }
-.h2h-table tbody tr:nth-child(even) { background: var(--surface-2); }
-.h2h-date, .h2h-score { white-space: nowrap; }
-.h2h-match { min-width: 190px; }
-.h2h-score { font-weight: 700; text-align: center; }
-.h2h-outcome { display: inline-grid; min-width: 24px; height: 24px; padding: 0 5px; place-items: center; border-radius: 4px; background: var(--surface-3); font-weight: 800; }
 @media (max-width: 560px) {
   .fixture-head, .how, .pulse-card { padding: 14px; }
   .h2h-insights { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -176,5 +168,9 @@
 @media (min-width: 561px) and (max-width: 760px) {
   .h2h-insights { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .recent-form { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 360px) {
+  .form-row { grid-template-columns: 40px minmax(0, 1fr) auto 22px; gap: 4px; }
+  .form-opponent { font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) { .pulse-bar span { transition: none; } }

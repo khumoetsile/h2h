@@ -65,6 +65,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
       season: m.season?.startDate ? m.season.startDate.slice(0, 4) : null,
       homeTeam: this.#team(m.homeTeam),
       awayTeam: this.#team(m.awayTeam),
+      venue: m.venue || null,
       kickoffAt: m.utcDate,
       status: STATUS_MAP[m.status] || 'SCHEDULED',
       minute: m.minute ?? null,
@@ -147,6 +148,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
           homeScore: match.score?.fullTime?.home ?? null,
           awayScore: match.score?.fullTime?.away ?? null,
           competitionName: match.competition?.name || match.competition?.code || null,
+          venue: match.venue || null,
         }));
       })
       .catch((err) => {
@@ -183,6 +185,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
           homeScore: match.score?.fullTime?.home ?? null,
           awayScore: match.score?.fullTime?.away ?? null,
           competitionName: match.competition?.name || match.competition?.code || null,
+          venue: match.venue || null,
         }));
       } catch (err) {
         headToHeadError = err;

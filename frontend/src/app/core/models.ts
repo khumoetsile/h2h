@@ -320,6 +320,8 @@ export interface FootballFixture {
       goalsAgainstPerMatch: number | null;
       bothTeamsScored: number;
       bothTeamsScoredPct: number | null;
+      over15: number;
+      over15Pct: number | null;
       over25: number;
       over25Pct: number | null;
       cleanSheets: number;
@@ -329,6 +331,7 @@ export interface FootballFixture {
       awayAtHome: FootballMatchRecord;
       firstMeetingAt: string | null;
       latestMeetingAt: string | null;
+      latestMeeting: FootballHeadToHeadMeeting | null;
       capped: boolean;
     };
     standings: {
@@ -354,8 +357,11 @@ export interface FootballHeadToHeadMeeting {
   awayTeam: string;
   homeTeamProviderId: string | null;
   awayTeamProviderId: string | null;
+  homeCrestUrl?: string | null;
+  awayCrestUrl?: string | null;
   homeScore: number;
   awayScore: number;
+  venue?: string | null;
 }
 
 export interface FootballMatchRecord {
@@ -366,12 +372,14 @@ export interface FootballMatchRecord {
   goalsFor: number;
   goalsAgainst: number;
   bothTeamsScored: number;
+  over15: number;
   over25: number;
   cleanSheets: number;
   averageGoals: number | null;
   goalsForPerMatch: number | null;
   goalsAgainstPerMatch: number | null;
   bothTeamsScoredPct: number | null;
+  over15Pct: number | null;
   over25Pct: number | null;
   cleanSheetsPct: number | null;
 }
@@ -392,11 +400,13 @@ export interface FootballCompetitionStanding {
 
 export interface FootballTeamForm {
   status: 'AVAILABLE' | 'UNAVAILABLE' | 'UNSUPPORTED';
-  source: 'PROVIDER' | 'SYNCED' | null;
+  source: 'PROVIDER' | 'SYNCED' | 'COMBINED' | null;
   matches: Array<{
-    id: number;
+    id: number | string;
     kickoffAt: string;
     opponent: string;
+    opponentCrestUrl?: string | null;
+    competition: string | null;
     venue: 'HOME' | 'AWAY';
     teamScore: number;
     opponentScore: number;
@@ -460,7 +470,7 @@ export interface LeaderboardEntry {
 }
 
 export interface AppNotification {
-  id: number;
+  id: number | string;
   type: string;
   title: string;
   message: string;

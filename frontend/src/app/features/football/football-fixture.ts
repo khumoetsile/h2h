@@ -61,7 +61,7 @@ export class FootballFixturePage implements OnInit {
   protected h2hDateFrom = signal('');
   protected h2hDateTo = signal('');
   protected h2hSort = signal<'NEWEST' | 'OLDEST'>('NEWEST');
-  protected h2hShowAll = signal(false);
+  protected h2hLimit = signal<5 | 10 | 20>(10);
 
   protected type = signal<FootballChallengeType | null>(null);
   protected pick = signal<FootballPickValue | null>(null);
@@ -124,9 +124,7 @@ export class FootballFixturePage implements OnInit {
         ? new Date(b.kickoffAt).getTime() - new Date(a.kickoffAt).getTime()
         : new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime());
   });
-  protected visibleHeadToHead = computed(() => this.h2hShowAll()
-    ? this.filteredHeadToHead()
-    : this.filteredHeadToHead().slice(0, 10));
+  protected visibleHeadToHead = computed(() => this.filteredHeadToHead().slice(0, this.h2hLimit()));
   protected goalTrend = computed(() => {
     const matches = [...this.filteredHeadToHead()].reverse();
     const maxGoals = Math.max(1, ...matches.map((meeting) => meeting.homeScore + meeting.awayScore));
@@ -152,20 +150,21 @@ export class FootballFixturePage implements OnInit {
     this.h2hDateFrom.set('');
     this.h2hDateTo.set('');
     this.h2hSort.set('NEWEST');
-    this.h2hShowAll.set(false);
+    this.h2hLimit.set(10);
   }
   protected setHeadToHeadCompetition(value: string): void {
     this.h2hCompetition.set(value);
-    this.h2hShowAll.set(false);
   }
   protected setHeadToHeadVenue(value: 'ALL' | 'HOME' | 'AWAY'): void {
     this.h2hVenue.set(value);
-    this.h2hShowAll.set(false);
   }
   protected setHeadToHeadDates(from: string, to: string): void {
     this.h2hDateFrom.set(from);
     this.h2hDateTo.set(to);
-    this.h2hShowAll.set(false);
+  }
+  protected setHeadToHeadLimit(value: string | number): void {
+    const limit = Number(value);
+    if (limit === 5 || limit === 10 || limit === 20) this.h2hLimit.set(limit);
   }
   protected pulseRows = computed(() => {
     const stats = this.fixture()?.stats;
