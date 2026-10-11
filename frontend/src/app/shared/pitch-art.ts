@@ -24,9 +24,18 @@ import { Component } from '@angular/core';
         <rect x="-12" y="-52" width="24" height="34" rx="7" fill="#f5701f"/>
         <circle cx="0" cy="-62" r="9.5" fill="#e8c9a6"/>
         <rect x="-5" y="-17" width="10" height="26" rx="4" fill="#14100c"/>
-        <rect x="-26" y="-92" width="7" height="42" rx="3.5" fill="#f5701f" transform="rotate(-12 -22 -50)"/>
-        <circle cx="-30" cy="-95" r="5.5" fill="#fff"/>
-        <rect x="14" y="-62" width="7" height="30" rx="3.5" fill="#f5701f" transform="rotate(40 17 -62)"/>
+        <path d="M-8 -48Q-16 -61 -27 -79" fill="none" stroke="#f5701f" stroke-width="8" stroke-linecap="round"/>
+        <g transform="translate(-29 -82) rotate(-28)">
+          <path d="M-4 4Q-7 1 -6 -2L-4 -7Q-3 -9 -1 -7L0 -4L1 -9Q2 -11 4 -9L4 -4L6 -7Q8 -8 8 -5L7 -1Q10 -2 10 1L7 6Q6 8 3 8H-1Q-4 8 -4 4Z" fill="#fff" stroke="#d9ddd8" stroke-width="1"/>
+          <path d="M-4 3L-7 2Q-9 1 -8 -1Q-7 -3 -5 -2L-2 0" fill="#fff" stroke="#d9ddd8" stroke-width="1"/>
+          <path d="M-3 7H5L4 11H-2Z" fill="#f5701f"/>
+        </g>
+        <path d="M8 -47Q17 -56 20 -68" fill="none" stroke="#f5701f" stroke-width="8" stroke-linecap="round"/>
+        <g transform="translate(20 -71) rotate(18)">
+          <path d="M-4 4Q-7 1 -6 -2L-4 -7Q-3 -9 -1 -7L0 -4L1 -9Q2 -11 4 -9L4 -4L6 -7Q8 -8 8 -5L7 -1Q10 -2 10 1L7 6Q6 8 3 8H-1Q-4 8 -4 4Z" fill="#fff" stroke="#d9ddd8" stroke-width="1"/>
+          <path d="M-4 3L-7 2Q-9 1 -8 -1Q-7 -3 -5 -2L-2 0" fill="#fff" stroke="#d9ddd8" stroke-width="1"/>
+          <path d="M-3 7H5L4 11H-2Z" fill="#f5701f"/>
+        </g>
       </g>
     </svg>
   `,

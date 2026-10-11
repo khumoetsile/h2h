@@ -89,8 +89,16 @@ const reducedMotion = () => typeof matchMedia === 'function' && matchMedia('(pre
               <rect x="2" y="-17" width="6.5" height="17" rx="2" [attr.fill]="keeperKit().sock"/>
               <rect x="-9.5" y="-3.2" width="8" height="3.4" rx="1.6" fill="#14100c"/><rect x="1.5" y="-3.2" width="8" height="3.4" rx="1.6" fill="#14100c"/>
               <rect x="-10.5" y="-27" width="21" height="11" rx="3" fill="#14100c"/>
-              <g #armL class="arm"><rect x="-18" y="-45" width="6.5" height="20" rx="3.2" [attr.fill]="keeperKit().jersey"/><circle cx="-14.7" cy="-24" r="4.4" fill="#fff"/></g>
-              <g #armR class="arm"><rect x="11.5" y="-45" width="6.5" height="20" rx="3.2" [attr.fill]="keeperKit().jersey"/><circle cx="14.7" cy="-24" r="4.4" fill="#fff"/></g>
+              <g #armL class="arm">
+                <path d="M-14.7 -44Q-17 -35 -14.7 -27" fill="none" [attr.stroke]="keeperKit().jersey" stroke-width="6.5" stroke-linecap="round"/>
+                <path d="M-18 -26L-19 -29Q-19.5 -31 -18 -32Q-16.5 -33 -15.5 -31L-14.8 -29L-14.5 -33Q-13 -35 -11.5 -33L-11.5 -29L-10 -31Q-8 -32 -7.5 -30L-8 -27L-6 -28Q-4 -27 -5 -25L-8 -20Q-9 -18 -12 -19L-15 -20Q-18 -21 -18 -24Z" fill="#fff" stroke="#d9ddd8" stroke-width="1"/>
+                <path d="M-17 -21L-21 -23Q-23 -24 -22 -26Q-21 -28 -19 -26L-16 -24" fill="#fff" stroke="#d9ddd8" stroke-width="1"/>
+              </g>
+              <g #armR class="arm">
+                <path d="M14.7 -44Q17 -35 14.7 -27" fill="none" [attr.stroke]="keeperKit().jersey" stroke-width="6.5" stroke-linecap="round"/>
+                <path d="M18 -26L19 -29Q19.5 -31 18 -32Q16.5 -33 15.5 -31L14.8 -29L14.5 -33Q13 -35 11.5 -33L11.5 -29L10 -31Q8 -32 7.5 -30L8 -27L6 -28Q4 -27 5 -25L8 -20Q9 -18 12 -19L15 -20Q18 -21 18 -24Z" fill="#fff" stroke="#d9ddd8" stroke-width="1"/>
+                <path d="M17 -21L21 -23Q23 -24 22 -26Q21 -28 19 -26L16 -24" fill="#fff" stroke="#d9ddd8" stroke-width="1"/>
+              </g>
               <rect x="-11.5" y="-47" width="23" height="22" rx="6" [attr.fill]="keeperKit().jersey"/>
               <circle cx="0" cy="-54.5" r="6.6" fill="#c9a27a"/>
               <path d="M-6.8 -55.5a6.8 6.8 0 0 1 13.6 0z" fill="#2a2018"/>
