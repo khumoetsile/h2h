@@ -255,6 +255,19 @@ export async function getFixtureDetail(fixtureId) {
         return { status: 'UNAVAILABLE', matches: [] };
       })
     : Promise.resolve({ status: 'UNSUPPORTED', matches: [] });
+  const standingsPromise = typeof provider.getCompetitionStandings === 'function'
+    ? Promise.resolve().then(() => provider.getCompetitionStandings(row.competition_code))
+      .then((table) => ({
+        status: 'AVAILABLE',
+        source: 'PROVIDER',
+        home: table.find((team) => team.teamProviderId === String(row.home_provider_team_id)) || null,
+        away: table.find((team) => team.teamProviderId === String(row.away_provider_team_id)) || null,
+      }))
+      .catch(async (err) => {
+        await logSystemError(`football-standings:${row.competition_code}`, err);
+        return { status: 'UNAVAILABLE', source: null, home: null, away: null };
+      })
+    : Promise.resolve({ status: 'UNSUPPORTED', source: null, home: null, away: null });
   const [homeFormRows, awayFormRows] = await Promise.all([row.home_team_id, row.away_team_id].map((teamId) => query(
     `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND comp.is_enabled = 1${simulatedFilter}
        AND fx.competition_id = ? AND (fx.home_team_id = ? OR fx.away_team_id = ?)
@@ -262,7 +275,7 @@ export async function getFixtureDetail(fixtureId) {
        ORDER BY fx.kickoff_at DESC LIMIT 5`,
     [row.competition_id, teamId, teamId, fixtureId, row.kickoff_at],
   )));
-  const [homeForm, awayForm, providerHistory] = await Promise.all([
+  const [homeForm, awayForm, providerHistory, standings] = await Promise.all([
     getRecentTeamForm({
       rows: homeFormRows,
       teamId: row.home_team_id,
@@ -282,6 +295,7 @@ export async function getFixtureDetail(fixtureId) {
       provider,
     }),
     providerHistoryPromise,
+    standingsPromise,
   ]);
   let headToHeadStatus = providerHistory.status;
   let headToHeadSource = null;
@@ -297,6 +311,7 @@ export async function getFixtureDetail(fixtureId) {
         && [String(meeting.homeTeam?.providerId), String(meeting.awayTeam?.providerId)].includes(String(row.away_provider_team_id)))
       .map((meeting) => ({
         id: meeting.providerId,
+        fixtureId: meetings.find((synced) => String(synced.provider_fixture_id) === String(meeting.providerId))?.id ?? null,
         competition: meeting.competitionName || meeting.competitionProviderId,
         kickoffAt: meeting.kickoffAt,
         homeTeam: meeting.homeTeam.name,
@@ -319,6 +334,7 @@ export async function getFixtureDetail(fixtureId) {
       awayTeam: meeting.away_name,
       homeTeamProviderId: null,
       awayTeamProviderId: null,
+      fixtureId: meeting.id,
       homeScore: meeting.home_score,
       awayScore: meeting.away_score,
     }));
@@ -332,15 +348,25 @@ export async function getFixtureDetail(fixtureId) {
     return {
       teamScore: homeIsFixtureHome ? meeting.homeScore : meeting.awayScore,
       opponentScore: homeIsFixtureHome ? meeting.awayScore : meeting.homeScore,
+      fixtureHomeWasHome: homeIsFixtureHome,
     };
   });
   const h2hRecord = summarizeResults(headToHeadResults);
+  const homeAtHome = summarizeResults(headToHeadResults.filter((result) => result.fixtureHomeWasHome));
+  const awayAtHome = summarizeResults(headToHeadResults.filter((result) => !result.fixtureHomeWasHome));
+  const sortedMeetings = [...headToHeadMatches].sort((a, b) => new Date(a.kickoffAt) - new Date(b.kickoffAt));
   headToHead.summary = {
     ...h2hRecord,
     homeWins: h2hRecord.wins,
     awayWins: h2hRecord.losses,
     opponentCleanSheets: headToHeadResults.filter((result) => Number(result.teamScore) === 0).length,
+    homeAtHome,
+    awayAtHome,
+    firstMeetingAt: sortedMeetings[0]?.kickoffAt || null,
+    latestMeetingAt: sortedMeetings.at(-1)?.kickoffAt || null,
+    capped: headToHeadMatches.length >= 50,
   };
+  headToHead.standings = standings;
   headToHead.recentForm = {
     home: homeForm,
     away: awayForm,

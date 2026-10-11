@@ -322,6 +322,17 @@ export interface FootballFixture {
       cleanSheets: number;
       cleanSheetsPct: number | null;
       opponentCleanSheets: number;
+      homeAtHome: FootballMatchRecord;
+      awayAtHome: FootballMatchRecord;
+      firstMeetingAt: string | null;
+      latestMeetingAt: string | null;
+      capped: boolean;
+    };
+    standings: {
+      status: 'AVAILABLE' | 'UNAVAILABLE' | 'UNSUPPORTED';
+      source: 'PROVIDER' | null;
+      home: FootballCompetitionStanding | null;
+      away: FootballCompetitionStanding | null;
     };
     recentForm: {
       home: FootballTeamForm;
@@ -333,6 +344,7 @@ export interface FootballFixture {
 
 export interface FootballHeadToHeadMeeting {
   id: string;
+  fixtureId: number | null;
   competition: string | null;
   kickoffAt: string;
   homeTeam: string;
@@ -341,6 +353,38 @@ export interface FootballHeadToHeadMeeting {
   awayTeamProviderId: string | null;
   homeScore: number;
   awayScore: number;
+}
+
+export interface FootballMatchRecord {
+  played: number;
+  wins: number;
+  draws: number;
+  losses: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  bothTeamsScored: number;
+  over25: number;
+  cleanSheets: number;
+  averageGoals: number | null;
+  goalsForPerMatch: number | null;
+  goalsAgainstPerMatch: number | null;
+  bothTeamsScoredPct: number | null;
+  over25Pct: number | null;
+  cleanSheetsPct: number | null;
+}
+
+export interface FootballCompetitionStanding {
+  teamProviderId: string;
+  teamName: string;
+  position: number;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goalsFor: number;
+  goalsAgainst: number;
+  goalDifference: number;
+  points: number;
 }
 
 export interface FootballTeamForm {

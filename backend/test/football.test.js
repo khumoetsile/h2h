@@ -127,6 +127,59 @@ describe('football: browsing', () => {
     }
   });
 
+  test('football-data provider maps and caches competition standings', async () => {
+    const provider = new FootballDataOrgProvider({ apiKey: '', baseUrl: 'https://football.example.test/v4' });
+    const originalFetch = globalThis.fetch;
+    let calls = 0;
+    globalThis.fetch = async (url) => {
+      calls += 1;
+      assert.equal(url, 'https://football.example.test/v4/competitions/PL/standings');
+      return {
+        ok: true,
+        json: async () => ({
+          standings: [{
+            type: 'TOTAL',
+            table: [{
+              position: 1,
+              playedGames: 30,
+              won: 22,
+              draw: 5,
+              lost: 3,
+              goalsFor: 70,
+              goalsAgainst: 25,
+              goalDifference: 45,
+              points: 71,
+              team: { id: 64, name: 'Liverpool FC', shortName: 'Liverpool' },
+            }],
+          }],
+        }),
+      };
+    };
+    try {
+      const [first, second] = await Promise.all([
+        provider.getCompetitionStandings('PL'),
+        provider.getCompetitionStandings('PL'),
+      ]);
+      assert.equal(calls, 1, 'simultaneous match-centre loads share the standings request');
+      assert.deepEqual(first, second);
+      assert.deepEqual(first[0], {
+        teamProviderId: '64',
+        teamName: 'Liverpool',
+        position: 1,
+        played: 30,
+        won: 22,
+        drawn: 5,
+        lost: 3,
+        goalsFor: 70,
+        goalsAgainst: 25,
+        goalDifference: 45,
+        points: 71,
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
   test('football-data provider finds past meetings from team histories when head-to-head is unavailable', async () => {
     const provider = new FootballDataOrgProvider({ apiKey: '', baseUrl: 'https://football.example.test/v4' });
     const originalFetch = globalThis.fetch;
@@ -235,6 +288,11 @@ describe('football: browsing', () => {
     assert.equal(detail.body.fixture.headToHead.summary.averageGoals, 3);
     assert.equal(detail.body.fixture.headToHead.summary.bothTeamsScoredPct, 100);
     assert.equal(detail.body.fixture.headToHead.summary.over25Pct, 100);
+    assert.equal(detail.body.fixture.headToHead.summary.homeAtHome.played, 1);
+    assert.ok(detail.body.fixture.headToHead.matches.every((meeting) => meeting.fixtureId));
+    assert.equal(detail.body.fixture.headToHead.standings.status, 'UNSUPPORTED');
+    assert.ok(detail.body.fixture.headToHead.summary.firstMeetingAt);
+    assert.ok(detail.body.fixture.headToHead.summary.latestMeetingAt);
     assert.ok(detail.body.fixture.headToHead.recentForm.home.matches.some((match) => match.outcome === 'W'));
     assert.ok(detail.body.fixture.headToHead.recentForm.away.matches.some((match) => match.outcome === 'L'));
     const team = await api().get(`/api/football/teams/${homeId}`);

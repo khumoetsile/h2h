@@ -172,10 +172,6 @@
   .fixture-head, .how, .pulse-card { padding: 14px; }
   .h2h-insights { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .recent-form { grid-template-columns: minmax(0, 1fr); }
-  .h2h-row { grid-template-columns: 1fr auto; }
-  .h2h-date { grid-column: 1; }
-  .h2h-scoreline { grid-column: 1 / -1; grid-row: 2; }
-  .h2h-competition { grid-column: 2; grid-row: 1; text-align: right; }
 }
 @media (min-width: 561px) and (max-width: 760px) {
   .h2h-insights { grid-template-columns: repeat(2, minmax(0, 1fr)); }

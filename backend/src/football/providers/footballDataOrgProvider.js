@@ -35,6 +35,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     this.baseUrl = baseUrl.replace(/\/+$/, '');
     this.headToHeadCache = new Map();
     this.teamMatchesCache = new Map();
+    this.standingsCache = new Map();
   }
 
   get name() { return 'football-data'; }
@@ -93,6 +94,42 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     const data = await this.#get(`/matches/${providerFixtureId}`);
     if (!data?.id) return null;
     return this.#fixture(data);
+  }
+
+  async getCompetitionStandings(competitionCode) {
+    const key = String(competitionCode);
+    const cached = this.standingsCache.get(key);
+    if (cached && cached.expiresAt > Date.now()) return cached.promise;
+    if (cached) this.standingsCache.delete(key);
+
+    const entry = { expiresAt: Date.now() + 15 * 60 * 1000, promise: null };
+    entry.promise = this.#get(`/competitions/${encodeURIComponent(key)}/standings`)
+      .then((data) => {
+        const total = (data.standings || []).find((standing) => standing.type === 'TOTAL');
+        if (!total || !Array.isArray(total.table)) {
+          throw new Error(`football-data.org standings for ${key} did not include a total table.`);
+        }
+        return total.table.map((row) => ({
+          teamProviderId: String(row.team.id),
+          teamName: row.team.shortName || row.team.name,
+          position: row.position,
+          played: row.playedGames,
+          won: row.won,
+          drawn: row.draw,
+          lost: row.lost,
+          goalsFor: row.goalsFor,
+          goalsAgainst: row.goalsAgainst,
+          goalDifference: row.goalDifference,
+          points: row.points,
+        }));
+      })
+      .catch((err) => {
+        if (this.standingsCache.get(key) === entry) this.standingsCache.delete(key);
+        throw err;
+      });
+    this.standingsCache.set(key, entry);
+    if (this.standingsCache.size > 100) this.standingsCache.delete(this.standingsCache.keys().next().value);
+    return entry.promise;
   }
 
   async #getTeamMatches(teamProviderId) {
@@ -184,6 +221,6 @@ export class FootballDataOrgProvider extends FootballDataProvider {
         && [String(match.homeTeam?.providerId), String(match.awayTeam?.providerId)].includes(String(homeTeamProviderId))
         && [String(match.homeTeam?.providerId), String(match.awayTeam?.providerId)].includes(String(awayTeamProviderId)))
       .sort((a, b) => new Date(b.kickoffAt) - new Date(a.kickoffAt))
-      .slice(0, 10);
+      .slice(0, 50);
   }
 }

@@ -381,16 +381,18 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
 
 - **Providers** (`backend/src/football/providers/`) implement one small interface —
   `capabilities()`, `listCompetitions()`, `listUpcomingFixtures()`, `getFixture()` — selected at
-  runtime via `FOOTBALL_PROVIDER`. Providers may also implement `getHeadToHead()` when they have
-  fixture-specific historical meetings:
+  runtime via `FOOTBALL_PROVIDER`. Providers may also implement `getHeadToHead()` for
+  fixture-specific historical meetings, `getTeamMatches()` for recent form, and
+  `getCompetitionStandings()` for league positions:
   - `mock` (development default) — a fully-featured, deterministic simulated provider. Fixtures, scores,
     shots, corners, cards and goal events are derived from a seeded hash, not stored mutable
     state, so the same fixture always "plays out" the same way and no timers are needed. Every
     mock fixture is flagged `isSimulated: true` in the API and UI.
-  - `football-data` — a real implementation against api.football-data.org. Its free tier does
-    not provide historical competition-wide archives, standings, shot/corner/card statistics,
-    or event timelines, so it honestly reports
-    `capabilities() = { statistics: false, events: false }`.
+  - `football-data` — a real implementation against api.football-data.org. It does not provide
+    shot/corner/card statistics or event timelines, so it honestly reports
+    `capabilities() = { statistics: false, events: false }`. Historical meeting, team history,
+    and competition-standing requests are attempted where the configured account plan permits;
+    provider errors are logged and the fixture page clearly reports unavailable data.
 - **Public browsing**: `GET /api/football/competitions`, `/fixtures`, `/fixtures/:id`, and
   `/teams/:id` do not
   require an account. Fixtures support status, competition, team, date-range and pagination
@@ -405,8 +407,12 @@ Football data provider ──▶ Head2Head backend ──▶ Head2Head database 
   club's last five completed results in the same competition, using synced records first and the
   provider's team history (up to 500 completed team matches are considered) when local sync has
   none. Every comparison is labelled with its sample
-  size; missing history is not filled with guesses, and descriptive history is not presented as
-  odds or a prediction. Previously synced meetings are used if provider history cannot be refreshed.
+  size. The fixture-specific history includes venue splits, coverage dates, a goals-per-meeting
+  trend, competition/venue/date filters, sorting, and links to matching fixtures already stored
+  locally. Competition standings are shown when returned by the provider. Summary statistics use
+  the full available head-to-head sample; list filters change the results and trend only. Missing
+  history is not filled with guesses, and descriptive history is not presented as odds or a
+  prediction. Previously synced meetings are used if provider history cannot be refreshed.
   Public visitors can view match reactions, while changing one requires an account (one reaction
   per player per fixture). Challenge discovery that identifies players, plus all
   challenge creation/acceptance actions, still requires an authenticated player.

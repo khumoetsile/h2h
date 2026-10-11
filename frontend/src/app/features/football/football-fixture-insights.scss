@@ -1,0 +1,26 @@
+.h2h-coverage { display: flex; flex-wrap: wrap; gap: 5px 14px; margin-bottom: 12px; color: var(--text-2); font-size: 11px; }
+.h2h-filters { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: end; margin: 12px 0 6px; }
+.h2h-filters label { display: grid; gap: 4px; color: var(--text-2); font-size: 11px; }
+.h2h-filters select, .h2h-filters input { min-width: 0; width: 100%; height: 38px; padding: 0 8px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--surface-2); color: var(--text); font: inherit; font-size: 12px; }
+.h2h-reset { min-height: 38px; }
+.h2h-filter-count { margin: 0 0 8px; }
+.h2h-venue-splits, .standing-pair { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; margin: 8px 0 14px; }
+.h2h-venue-splits > div, .standing-card { display: flex; min-width: 0; flex-direction: column; gap: 4px; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.h2h-venue-splits strong, .standing-card strong { overflow-wrap: anywhere; font-size: 12px; }
+.h2h-venue-splits span, .standing-card span { color: var(--text-2); font-size: 11px; }
+.standing-card sup { font-size: 9px; }
+.goal-trend-wrap { overflow-x: auto; padding: 8px 4px 2px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); }
+.goal-trend { display: flex; align-items: end; gap: 8px; min-width: max-content; height: 104px; }
+.goal-trend-item { display: flex; width: 32px; height: 100%; flex-direction: column; align-items: center; justify-content: end; gap: 3px; font-size: 10px; }
+.goal-bar { width: 14px; min-height: 3px; border-radius: 3px 3px 0 0; background: var(--accent); }
+.goal-trend-item small { color: var(--text-2); }
+.h2h-more { margin-top: 10px; }
+.h2h-match a { color: inherit; text-decoration: none; }
+.h2h-match a:hover { color: var(--accent); text-decoration: underline; }
+@media (max-width: 560px) {
+  .h2h-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .h2h-venue-splits, .standing-pair { grid-template-columns: minmax(0, 1fr); }
+}
+@media (min-width: 561px) and (max-width: 760px) {
+  .h2h-filters { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
