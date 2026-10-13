@@ -53,4 +53,25 @@ Featured games retain permanent Chess plus two random enabled live games, swipe/
 
 The football list now uses one search field and compact match rows. Competition/date dropdowns and day filter controls are removed from this page. Past results retain their own section. Opening a fixture automatically loads the stored head-to-head history on that same page, defaulting to past meetings. Recent form and goal trends are available beside it without navigating to a separate research page. The comparison tool remains available for arbitrary pairs of teams.
 
-Fixture history uses all available meetings and the last ten team results. Missing historical coverage is stated explicitly. The new user-supplied token was rejected as invalid by football-data.org and was not saved to source control or installed over the working server configuration; provider confirmation is required before connecting it.
+Fixture history uses all available meetings and the last ten team results. Missing historical coverage is stated explicitly. The supplied key belongs to API-Football, which is connected separately for historical research as described below.
+
+
+### API-Football supplementary history
+
+`API_FOOTBALL_KEY` is stored only in the server environment. It uses the direct API-Sports host and `x-apisports-key` header, never frontend code or public query parameters. `FOOTBALL_PROVIDER` continues to select the operational fixture/settlement provider; this addition does not replace it. The account status was verified as active Free, 100 requests per day.
+
+Migration `020_api_football_history.sql` adds provider team links and persistent daily request accounting. No operational fixtures are created by this importer. Club links require reviewed exact name/country matching, or an unambiguous exact name. Women's/youth/other-country identities cannot match approximately. Unresolved identities remain pending review rather than receiving invented histories.
+
+Commands on the configured server:
+
+```
+npm run migrate
+npm run history:api-football -- --fixture=31
+npm run history:api-football -- --limit=8
+```
+
+A fixture pair is checked at most once per 24 hours; `--force` is available for a deliberate correction check. The daily history workflow rotates through up to eight uncached/oldest upcoming pairs in the next 21 days. A persistent budget defaults to 40 outbound requests/day (`API_FOOTBALL_HISTORY_DAILY_REQUESTS`, maximum 80), with 6.5-second spacing and a further ten-request provider reserve when quota headers are supplied. Every attempted call is reserved before sending, including failed calls. No vendor HTTP requests are made by public research page requests.
+
+Completed regulation-time (FT) matches are imported with original provider fixture IDs, actual competition and season, real final/half-time scores. Future, awarded, AET/PEN and unfinished matches are excluded from this analysis. Up to two newest completed meetings are enriched with statistics when supplied; missing values stay unavailable. Corrections are audited. An empty or restricted response never removes previously stored scores, and outages keep existing results with a stale-data notice. A returned match that is no longer FT stops contributing until verified again.
+
+API-Football is a commercial API source, not CC0; source attribution says “API-Football terms”. Its terms allow application development but do not grant third-party competition publication rights and prohibit direct data resale: https://www.api-football.com/terms . Plan coverage and any applicable publication rights remain the operator's responsibility. No paid subscription or additional commercial rights were purchased.

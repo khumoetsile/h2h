@@ -121,6 +121,8 @@ export const config = {
         : (process.env.FOOTBALL_PROVIDER || 'mock')
     ),
     apiKey: process.env.FOOTBALL_API_KEY || '',
+    historyApiKey: process.env.API_FOOTBALL_KEY || '',
+    historyDailyRequests: num('API_FOOTBALL_HISTORY_DAILY_REQUESTS', 40),
     sportmonksApiKey: process.env.SPORTMONKS_API_KEY || '',
     apiBaseUrl: process.env.FOOTBALL_API_BASE_URL || 'https://api.football-data.org/v4',
     syncIntervalSeconds: num('FOOTBALL_SYNC_INTERVAL_SECONDS', ['football-data', 'sportmonks'].includes(process.env.FOOTBALL_PROVIDER) || env === 'production' ? 60 : 20),

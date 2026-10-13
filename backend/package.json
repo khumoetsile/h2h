@@ -2,7 +2,7 @@
   "name": "rivalis-backend",
   "version": "1.0.0",
   "private": true,
-  "description": "Rivalis P2P competitive gaming platform API (DEMO MODE — simulated funds only)",
+  "description": "Rivalis P2P competitive gaming platform API (DEMO MODE \u00e2\u20ac\u201d simulated funds only)",
   "type": "module",
   "main": "src/server.js",
   "scripts": {
@@ -13,7 +13,8 @@
     "history:import": "node scripts/import-football-history.js",
     "seed": "node scripts/seed.js",
     "db:reset": "node scripts/migrate.js --fresh && node scripts/seed.js",
-    "test": "node --test --test-concurrency=1 --test-reporter=spec test/*.test.js"
+    "test": "node --test --test-concurrency=1 --test-reporter=spec test/*.test.js",
+    "history:api-football": "node scripts/import-api-football-history.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

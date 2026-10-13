@@ -47,3 +47,13 @@ jobs:
           if [[ -n "$SEASONS" ]]; then ARGS="$ARGS --seasons=$SEASONS"; fi
           if [[ "$FORCE" == true ]]; then ARGS="$ARGS --force"; fi
           ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o BatchMode=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "set -e; source $ACTIVATE; cd $APP_DIR; npm run history:import -- $ARGS"
+
+      - name: Update supplementary API-Football match history
+        env:
+          SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
+          SSH_USER: ${{ secrets.CPANEL_SSH_USER }}
+          SSH_PORT: ${{ secrets.CPANEL_SSH_PORT || '22' }}
+          APP_DIR: ${{ vars.CPANEL_APP_DIR }}
+          ACTIVATE: ${{ vars.CPANEL_NODE_ACTIVATE }}
+        run: |
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o BatchMode=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "set -e; source $ACTIVATE; cd $APP_DIR; npm run history:api-football -- --limit=8"
