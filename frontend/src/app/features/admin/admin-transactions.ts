@@ -16,7 +16,7 @@ import { TX_LABEL, TxTable } from '../wallet/tx-table';
     <div class="page">
       <div class="page-head"><div><h1>Transactions</h1><p class="sub">{{ data()?.total ?? 0 }} ledger entries @if (userId) { for user #{{ userId }} }</p></div><app-demo-badge label="Demo ledger" size="lg" /></div>
       <div class="filters">
-        <div class="search"><mat-icon>search</mat-icon><input [(ngModel)]="search" (ngModelChange)="search$.next($event)" placeholder="Reference, description or username" /></div>
+        <div class="search"><mat-icon>search</mat-icon><input [(ngModel)]="search" (ngModelChange)="search$.next($event)" placeholder="Reference, description or username" aria-label="Search transactions" /></div>
         <div class="segmented">
           <button [class.active]="!type()" (click)="setType(null)">All</button>
           @for (t of types; track t) { <button [class.active]="type() === t" (click)="setType(t)">{{ label(t) }}</button> }

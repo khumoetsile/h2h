@@ -58,15 +58,15 @@ const ACTOR_LABEL: Record<string, string> = { PLAYER: 'Player', ADMIN: 'Admin', 
       <div class="page-head"><div><h1>Audit trail</h1><p class="sub">{{ data()?.total ?? 0 }} events · complete history of what happened, to whom, and why</p></div></div>
 
       <div class="filters audit-filters">
-        <div class="search"><mat-icon>search</mat-icon><input [(ngModel)]="q" (ngModelChange)="q$.next($event)" placeholder="Search action, username, match code, reason…" /></div>
+        <div class="search"><mat-icon>search</mat-icon><input [(ngModel)]="q" (ngModelChange)="q$.next($event)" placeholder="Search action, username, match code, reason…" aria-label="Search audit events" /></div>
         <div class="segmented">
           @for (a of actorTypes; track a.key) { <button [class.active]="actorType() === a.key" (click)="setActorType(a.key)">{{ a.label }}</button> }
         </div>
       </div>
       <div class="filters audit-filters-2">
-        <input class="num-filter" type="number" [(ngModel)]="matchIdFilter" (ngModelChange)="go(1)" placeholder="Match ID" />
-        <input class="num-filter" type="number" [(ngModel)]="challengeIdFilter" (ngModelChange)="go(1)" placeholder="Challenge ID" />
-        <input class="num-filter" type="number" [(ngModel)]="userIdFilter" (ngModelChange)="go(1)" placeholder="User ID" />
+        <input class="num-filter" type="number" [(ngModel)]="matchIdFilter" (ngModelChange)="go(1)" placeholder="Match ID" aria-label="Filter by match ID" />
+        <input class="num-filter" type="number" [(ngModel)]="challengeIdFilter" (ngModelChange)="go(1)" placeholder="Challenge ID" aria-label="Filter by challenge ID" />
+        <input class="num-filter" type="number" [(ngModel)]="userIdFilter" (ngModelChange)="go(1)" placeholder="User ID" aria-label="Filter by user ID" />
       </div>
 
       <div class="card card-flush">

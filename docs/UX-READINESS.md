@@ -12,6 +12,7 @@
 - Live connections start with polling and try the alternate transport when needed, following [Socket.IO client guidance](https://socket.io/docs/v4/client-options). Reconnection notices show elapsed time rather than implying a local countdown is a server match deadline, and avoid guaranteeing a match cannot be lost during an outage.
 - Football section links stay on the current fixture. Confirmation sheets contain keyboard focus, restore it when closed and support Escape.
 - Admin search/settings/notification fields have clearer accessible labels; user and match destinations expose keyboard controls. Profile, notification and ranking selections expose state.
+- Admin settings use shrinking form columns and single-column phone limits; numeric inputs no longer force horizontal page overflow.
 - Production hides the shared demo-account shortcuts unless explicitly enabled with `SHOW_DEMO_ACCOUNTS=true`.
 
 ## Account recovery

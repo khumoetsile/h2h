@@ -92,17 +92,19 @@ const LABELS: Record<string, string> = {
     </div>
   `,
   styles: [`
-    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-    .card { display: flex; flex-direction: column; gap: 12px; }
-    .fee-row { display: flex; align-items: center; gap: 14px; input[type=range] { flex: 1; accent-color: var(--accent); } }
+    .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+    .card { display: flex; flex-direction: column; gap: 12px; min-width:0; }
+    .fee-row { display: flex; align-items: center; gap: 14px; input[type=range] { flex: 1; min-width:0; accent-color: var(--accent); } }
     .num-in { display: flex; align-items: center; gap: 4px; input { width: 80px; } }
     input[type=number], .text-in { height: 38px; background: var(--bg-elev); border: 1px solid var(--border-strong); border-radius: 6px; color: var(--text); padding: 0 10px; font: inherit; }
     .preview { background: var(--bg-elev); border: 1px solid var(--border); border-radius: 8px; padding: 12px; display: flex; flex-direction: column; gap: 4px; font-size: 14px; }
     .chips { display: flex; gap: 6px; flex-wrap: wrap; }
     .stake-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 6px 4px 10px; border-radius: 6px; background: var(--surface-2); border: 1px solid var(--border-strong); font-weight: 600;
       button { background: transparent; border: 0; color: var(--muted); cursor: pointer; font-size: 16px; line-height: 1; &:hover { color: var(--loss); } } }
-    .add { display: flex; gap: 8px; input { flex: 1; } }
-    .limits { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; label { display: flex; flex-direction: column; gap: 4px; } }
+    .add { display: flex; gap: 8px; input { flex: 1; min-width:0; } }
+    .text-in {width:100%;min-width:0;}
+    .limits { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; label { display: flex; flex-direction: column; min-width:0; gap: 4px; } input {width:100%;min-width:0;} }
+    @media (max-width:480px) { .limits {grid-template-columns:minmax(0,1fr);} input[type=number],.text-in {min-height:48px;font-size:16px;} }
     .det { white-space: normal; max-width: 360px; }
   `],
 })
