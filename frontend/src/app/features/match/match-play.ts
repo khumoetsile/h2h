@@ -57,7 +57,7 @@ const MAX_AUTO_RETRIES = 3;
             @if (submitting() && !submitError()) {
               <mat-spinner diameter="32" />
               <h2>{{ retryAttempt() > 0 ? "Reconnecting…" : "Sending your result…" }}</h2>
-              <p class="muted">{{ retryAttempt() > 0 ? "We're trying again. This won't cost you the match." : "Just a moment." }}</p>
+              <p class="muted">{{ retryAttempt() > 0 ? "Your result stays on this page while we try again. Keep it open; match timers still apply." : "Just a moment." }}</p>
             }
             @if (submitError()) {
               <mat-icon class="loss big-icon">wifi_off</mat-icon>

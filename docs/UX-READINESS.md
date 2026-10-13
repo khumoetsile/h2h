@@ -9,6 +9,7 @@
 - Help explains the first match, football, refunds, practice, connection interruptions and account saving.
 - Player search in both skill and football challenges guards against out-of-order responses, distinguishes failures from empty results and offers retry. Game selection and shared invitations offer recovery after loading failures.
 - HTTP requests have bounded waiting and timeout guidance warns players to check activity before retrying a committed action.
+- Live connections start with polling and try the alternate transport when needed, following [Socket.IO client guidance](https://socket.io/docs/v4/client-options). Reconnection notices show elapsed time rather than implying a local countdown is a server match deadline, and avoid guaranteeing a match cannot be lost during an outage.
 - Football section links stay on the current fixture. Confirmation sheets contain keyboard focus, restore it when closed and support Escape.
 - Admin search/settings/notification fields have clearer accessible labels; user and match destinations expose keyboard controls. Profile, notification and ranking selections expose state.
 - Production hides the shared demo-account shortcuts unless explicitly enabled with `SHOW_DEMO_ACCOUNTS=true`.

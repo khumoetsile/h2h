@@ -85,7 +85,7 @@ export class RealtimeService {
       if ((this.socket.auth as { token?: string }).token === token) return;
       this.disconnect();
     }
-    const s = io({ path: '/socket.io', auth: { token }, transports: ['websocket', 'polling'], reconnectionDelay: 1200, reconnectionDelayMax: 6000 });
+    const s = io({ path: '/socket.io', auth: { token }, transports: ['polling', 'websocket'], tryAllTransports: true, reconnectionDelay: 1200, reconnectionDelayMax: 6000 });
     this.socket = s;
     s.on('connect', () => {
       const wasDown = this.disconnectedAt() !== null;
