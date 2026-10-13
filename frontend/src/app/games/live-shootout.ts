@@ -54,7 +54,7 @@ function readActs() {
               </div>
             }
           </div>
-          <button class="snd" type="button" (pointerdown)="toggleSound($event)" [attr.aria-label]="muted() ? 'Turn sound on' : 'Turn sound off'">
+          <button class="snd" type="button" (click)="toggleSound($event)" [attr.aria-label]="muted() ? 'Turn sound on' : 'Turn sound off'">
             <mat-icon>{{ muted() ? 'volume_off' : 'volume_up' }}</mat-icon>
           </button>
         </section>
@@ -104,6 +104,7 @@ function readActs() {
   styles: [`
     :host { display: block; }
     .so { display: flex; flex-direction: column; gap: 10px; user-select: none; -webkit-user-select: none; touch-action: manipulation; max-width: 560px; margin: 0 auto; }
+    .board{order:0}.status{order:1}.hint{order:2}.stage{order:3}.gauge{order:4}.act{order:5}
     .center { text-align: center; padding: 40px 0; }
     .err { text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; padding: 40px 0; }
 
@@ -361,6 +362,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.audio.dispose();
     cancelAnimationFrame(this.raf);
     if (this.endTimer) clearTimeout(this.endTimer);
   }
@@ -380,6 +382,7 @@ export class LiveShootoutGame implements OnInit, OnDestroy {
   @HostListener('window:keydown', ['$event'])
   protected onKey(ev: KeyboardEvent) {
     if (!this.canAct() || ev.repeat || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if((ev.key==='Enter'||ev.key===' ') && (ev.target as HTMLElement)?.closest('.snd'))return;
     const role = this.role();
     const key = ev.key;
     if (role === 'KEEPER') {

@@ -65,7 +65,7 @@ test('research compares completed results without requiring an upcoming fixture'
   assert.equal(res.body.teamA.id, teamA.id);
   assert.equal(res.body.headToHead.summary.played, 3);
   assert.deepEqual([res.body.headToHead.summary.wins, res.body.headToHead.summary.draws, res.body.headToHead.summary.losses], [1, 1, 1]);
-  assert.equal(res.body.metadata.providerStatus, 'UNSUPPORTED');
+  assert.equal(res.body.metadata.providerStatus, 'STORED');
   assert.equal(res.body.metadata.source, 'SYNCED');
   assert.equal(res.body.metadata.isSimulated, true);
   assert.match(res.body.metadata.notice, /not a complete all-time record/);
@@ -79,11 +79,11 @@ test('team orientation, venues and metric denominators exclude missing goals and
   const summary = res.headToHead.summary;
   assert.equal(summary.goalsFor, 4);
   assert.equal(summary.goalsAgainst, 4);
-  assert.equal(summary.averageGoals, 2.7);
+  assert.equal(summary.averageGoals, 2.67);
   assert.equal(summary.bothTeamsScoredPct, 67);
   assert.equal(summary.over25Pct, 33);
   assert.equal(summary.cleanSheetsPct, 33);
-  assert.equal(res.headToHead.excludedUnverified, 1);
+  assert.equal(res.headToHead.excludedUnverified, 2);
   assert.equal(res.headToHead.byVenue.home.played, 2);
   assert.equal(res.headToHead.byVenue.away.losses, 1);
   assert.equal(res.headToHead.matches.find(m => m.homeTeam.id === teamB.id).outcome, 'L');
@@ -105,7 +105,7 @@ test('venue, competition and inclusive date filters scope every sample before ag
   const recent = (await compare({ dateFrom: cutoff })).body;
   assert.equal(recent.headToHead.summary.played, 1);
   assert.equal(recent.headToHead.summary.draws, 1);
-  assert.equal(recent.headToHead.excludedUnverified, 1);
+  assert.equal(recent.headToHead.excludedUnverified, 2);
 });
 
 test('invalid team pairs, filters and calendar dates get actionable 400 responses', async () => {
@@ -145,47 +145,23 @@ test('team and fixture searches use literal wildcard characters and stable pagin
   assert.equal(calls, 0);
 });
 
-function providerMatch(id, homeScore = 2, awayScore = 1, extra = {}) {
-  return { providerId: id, competitionProviderId: 'PL', kickoffAt: new Date(originalNow() - 30 * 86400000).toISOString(), status: 'FINISHED', homeTeam: { providerId: teamA.providerId, name: teamA.name }, awayTeam: { providerId: teamB.providerId, name: teamB.name }, homeScore, awayScore, ...extra };
-}
-
-test('concurrent and reversed comparisons coalesce provider history, filters do not fetch again and IDs deduplicate', async () => {
+test('concurrent and reversed research reads only stored scores despite an available network provider', async () => {
   let calls = 0;
-  provider.getTeamMatches = async () => {
-    calls++;
-    await new Promise(resolve => setTimeout(resolve, 20));
-    return [providerMatch('extra-history'), providerMatch('missing-provider-score', null, 1), providerMatch('awarded-provider', 3, 0, { researchEligible: false })];
-  };
-  const responses = await Promise.all([compare(), compare(), compare({ teamA: teamB.id, teamB: teamA.id }), compare({ venue: 'home' })]);
-  assert.ok(responses.every(r => r.status === 200));
-  assert.equal(calls, 2);
-  assert.equal(responses[0].body.headToHead.summary.played, 4);
-  assert.equal(responses[0].body.headToHead.matches.filter(m => m.id === 'extra-history').length, 1);
-  assert.equal(responses[0].body.headToHead.excludedUnverified, 2);
-  assert.equal(responses[0].body.metadata.source, 'COMBINED');
-  await compare({ dateTo: new Date().toISOString().slice(0, 10) });
-  assert.equal(calls, 2);
+  provider.getTeamMatches = async () => { calls++; throw new Error('Page requests must not fetch external history'); };
+  const responses = await Promise.all([compare(), compare(), compare({teamA:teamB.id,teamB:teamA.id}),compare({venue:'home'})]);
+  assert.ok(responses.every(r=>r.status===200)); assert.equal(calls,0);
+  assert.equal(responses[0].body.headToHead.summary.played,3);
+  assert.deepEqual(responses[0].body.headToHead.matches.map(m=>m.id),responses[1].body.headToHead.matches.map(m=>m.id));
 });
 
-test('provider outages preserve an honest saved sample, mark stale and use a failure cooldown', async () => {
-  let calls = 0, fail = false;
-  provider.getTeamMatches = async () => { calls++; if (fail) throw new Error('Test provider unavailable'); return [providerMatch('stale-history')]; };
-  const first = await compare();
-  assert.equal(first.body.metadata.stale, false);
-  assert.equal(calls, 2);
-  fail = true;
-  Date.now = () => originalNow() + 16 * 60 * 1000;
-  const outage = await compare();
-  assert.equal(outage.status, 200);
-  assert.equal(outage.body.metadata.stale, true);
-  assert.equal(outage.body.metadata.providerStatus, 'UNAVAILABLE');
-  assert.equal(outage.body.headToHead.status, 'PARTIAL');
-  assert.ok(outage.body.headToHead.matches.some(m => m.id === 'stale-history'));
-  assert.match(outage.body.metadata.notice, /marked stale/);
-  await compare();
-  assert.equal(calls, 4);
+test('network outages cannot change stored research and sample controls are validated', async () => {
+  provider.getTeamMatches=async()=>{throw new Error('Source unavailable');};
+  globalThis.fetch=async()=>{throw new Error('No network allowed');};
+  const result=await compare({form:5,meetings:'5'});assert.equal(result.status,200);
+  assert.equal(result.body.filters.form,5);assert.equal(result.body.metadata.providerStatus,'STORED');
+  assert.equal(result.body.headToHead.summary.played,3);
+  for(const q of [{form:7},{meetings:'100'},{page:0},{season:'bad'}])assert.equal((await compare(q)).status,400);
 });
-
 test('a lite fixture reads scores and challenge rules without triggering any history or standings calls', async () => {
   let calls = 0;
   const never = async () => { calls++; throw new Error('Should not load insights'); };

@@ -1,4 +1,5 @@
 :host { display: block; }
+button:focus-visible { outline:3px solid #fff;outline-offset:3px; }
 .hud { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }
 .hud-item { display: flex; flex-direction: column; min-width: 70px;
   span { color: var(--muted); font-size: 11px; font-weight: 700; }
@@ -59,3 +60,4 @@
 @keyframes gx-bump { 0% { transform: scale(1); } 40% { transform: scale(1.18); } 100% { transform: scale(1); } }
 @media (prefers-reduced-motion: reduce) { .gx-count, .gx-big, .gx-streak, .gx-score strong.bump { animation: none; } }
 @media (orientation: landscape) and (max-height: 540px) { .gx-arena { height: calc(100vh - 150px); min-height: 220px; } .gx-score strong { font-size: 32px; } }
+@media(max-width:400px){.gx-score strong{font-size:36px}.gx-round strong{font-size:24px}.gx-streak{font-size:14px;padding:4px 7px}.gx-hint{font-size:16px}.gx-arena{min-height:300px;height:min(62svh,520px)}}

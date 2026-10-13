@@ -10,6 +10,7 @@
     "dev": "node --watch src/server.js",
     "vapid": "node -e \"const k=require('web-push').generateVAPIDKeys();console.log('VAPID_PUBLIC_KEY='+k.publicKey);console.log('VAPID_PRIVATE_KEY='+k.privateKey)\"",
     "migrate": "node scripts/migrate.js",
+    "history:import": "node scripts/import-football-history.js",
     "seed": "node scripts/seed.js",
     "db:reset": "node scripts/migrate.js --fresh && node scripts/seed.js",
     "test": "node --test --test-concurrency=1 --test-reporter=spec test/*.test.js"

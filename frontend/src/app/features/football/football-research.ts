@@ -19,11 +19,14 @@ export class FootballResearchPage {
   protected data=signal<FootballResearch|null>(null);protected loading=signal(false);protected error=signal('');protected formError=signal('');
   protected competitions=signal<FootballCompetition[]>([]);
   protected venue=signal<'all'|'home'|'away'>('all');protected competitionId=signal<number|null>(null);protected dateFrom=signal('');protected dateTo=signal('');
+  protected seasons=signal<string[]>([]);protected season=signal('');
   constructor(){this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroy)).subscribe(()=>void this.load());}
   async load(force=false){
     const version=++this.version;const query=this.route.snapshot.queryParamMap;const filters=researchFilters(query);
     this.venue.set(filters?.venue??'all');this.competitionId.set(filters?.competitionId??null);this.dateFrom.set(filters?.dateFrom??query.get('dateFrom')??'');this.dateTo.set(filters?.dateTo??query.get('dateTo')??'');
-    this.error.set('');this.data.set(null);
+    this.error.set('');this.season.set(filters?.season??'');
+    const previous=this.data();
+    if(!previous||previous.teamA.id!==filters?.teamA||previous.teamB.id!==filters?.teamB||previous.filters.venue!==filters?.venue||previous.filters.competitionId!==filters?.competitionId||previous.filters.dateFrom!==filters?.dateFrom||previous.filters.dateTo!==filters?.dateTo||previous.filters.season!==filters?.season)this.data.set(null);
     const a=Number(query.get('teamA')),b=Number(query.get('teamB'));
     if(this.teamA()?.id!==a)this.teamA.set(null);if(this.teamB()?.id!==b)this.teamB.set(null);
     this.loading.set(!!filters);
@@ -34,7 +37,7 @@ export class FootballResearchPage {
       }
       if(filters.dateFrom&&filters.dateTo&&filters.dateFrom>filters.dateTo){this.formError.set('Choose an end date after the start date.');return;}
       const data=await this.store.research(filters,force);
-      if(version!==this.version)return;this.data.set(data);this.competitions.set(data.competitions);this.teamA.set(data.teamA);this.teamB.set(data.teamB);this.formError.set('');
+      if(version!==this.version)return;this.data.set(data);this.competitions.set(data.competitions);this.seasons.set(data.seasons??[]);this.teamA.set(data.teamA);this.teamB.set(data.teamB);this.formError.set('');
       this.seo.publish(`${data.teamA.name} vs ${data.teamB.name} history`,`Head-to-head scores and recent form from available football history.`,'/football/research',!data.metadata.isSimulated);
     }catch(err){if(version===this.version)this.error.set(apiError(err).message);}finally{if(version===this.version)this.loading.set(false);}
   }
@@ -42,10 +45,12 @@ export class FootballResearchPage {
   protected swap(){const a=this.teamA();this.teamA.set(this.teamB());this.teamB.set(a);this.persist();}
   protected changeVenue(venue:'all'|'home'|'away'){this.venue.set(venue);this.persist();}
   protected filterCompetition(value:string){this.competitionId.set(value?Number(value):null);this.persist();}
+  protected filterSeason(value:string){this.season.set(value);this.persist();}
+  protected changeSample(sample:{meetings?:'5'|'10'|'all';form?:5|10}){void this.router.navigate([],{relativeTo:this.route,queryParams:sample,queryParamsHandling:'merge'});}
   protected filterDates(){if(this.dateFrom()&&this.dateTo()&&this.dateFrom()>this.dateTo()){this.formError.set('Choose an end date after the start date.');return;}this.formError.set('');this.persist();}
-  protected clearFilters(){this.venue.set('all');this.competitionId.set(null);this.dateFrom.set('');this.dateTo.set('');this.formError.set('');this.persist();}
+  protected clearFilters(){this.venue.set('all');this.competitionId.set(null);this.dateFrom.set('');this.dateTo.set('');this.season.set('');this.formError.set('');this.persist();}
   private persist(){
     const version=++this.version;this.data.set(null);this.error.set('');
-    void this.router.navigate([],{relativeTo:this.route,queryParams:{teamA:this.teamA()?.id??null,teamB:this.teamB()?.id??null,venue:this.venue()==='all'?null:this.venue(),competitionId:this.competitionId(),dateFrom:this.dateFrom()||null,dateTo:this.dateTo()||null},queryParamsHandling:'merge'}).then(()=>{if(version===this.version)void this.load();});
+    void this.router.navigate([],{relativeTo:this.route,queryParams:{teamA:this.teamA()?.id??null,teamB:this.teamB()?.id??null,venue:this.venue()==='all'?null:this.venue(),competitionId:this.competitionId(),dateFrom:this.dateFrom()||null,dateTo:this.dateTo()||null,season:this.season()||null},queryParamsHandling:'merge'}).then(()=>{if(version===this.version)void this.load();});
   }
 }

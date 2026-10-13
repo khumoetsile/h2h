@@ -1,4 +1,4 @@
-import { Component, inject, input, OnInit, signal } from '@angular/core';
+import { Component, inject, input, OnDestroy, OnInit, signal } from '@angular/core';
 import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -63,7 +63,7 @@ const MAX_AUTO_RETRIES = 3;
               <mat-icon class="loss big-icon">wifi_off</mat-icon>
               <h2>Connection interrupted</h2>
               <p class="text-2">{{ submitError() }}</p>
-              <button class="btn btn-primary" (click)="retrySubmit()">Try again</button>
+              <button class="btn btn-primary" [disabled]="submitting()" (click)="retrySubmit()">{{submitting()?'Retrying…':'Try again'}}</button>
             }
           </div>
         } @else {
@@ -74,6 +74,7 @@ const MAX_AUTO_RETRIES = 3;
             @case ('memory-battle') { @defer (on immediate) { <app-memory-battle [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
             @case ('word-battle') { @defer (on immediate) { <app-word-battle [spec]="start()!.spec" (finished)="submit($event)" /> } @placeholder { <app-spinner /> } }
             @case ('penalty-shootout') { @defer (on immediate) { <app-live-shootout [code]="code()" (finished)="goToResult()" /> } @placeholder { <app-spinner /> } }
+            @default { <div class="state"><h2>This game is unavailable</h2><p>Return to the match for its current status.</p><button class="btn" (click)="exit()">Back to match</button></div> }
           }
         }
       }
@@ -91,7 +92,7 @@ const MAX_AUTO_RETRIES = 3;
     .big-icon { font-size: 40px; width: 40px; height: 40px; }
   `],
 })
-export class MatchPlayPage implements OnInit {
+export class MatchPlayPage implements OnInit,OnDestroy {
   readonly code = input.required<string>();
   private api = inject(Api);
   private router = inject(Router);
@@ -105,6 +106,10 @@ export class MatchPlayPage implements OnInit {
   protected submitError = signal('');
   protected retryAttempt = signal(0);
   private pending: GameFinish | null = null;
+  private destroyed=false;private retryTimer:ReturnType<typeof setTimeout>|undefined;
+  private pendingKey(){return `h2h.result:${this.match()?.viewerId}:${this.code()}`;}
+  private forgetPending(){try{sessionStorage.removeItem(this.pendingKey());}catch{}}
+  ngOnDestroy(){this.destroyed=true;clearTimeout(this.retryTimer);}
 
   /** Live games (the penalty shootout) are played through the live endpoints, not start/submit. */
   protected isLive = () => this.start()?.game === 'penalty-shootout';
@@ -119,15 +124,20 @@ export class MatchPlayPage implements OnInit {
       const view = await this.api.get<{ match: MatchView }>(`/matches/${this.code()}`);
       if (view.match.category === 'CHESS') { await this.router.navigate(['/chess', view.match.chess?.code ?? view.match.code], {replaceUrl:true}); return; }
       this.match.set(view.match);
+      if(this.destroyed)return;
       if (view.match.game.slug === 'penalty-shootout') {
         // Live game: nothing to start here; the shootout screen joins the pitch itself.
         this.start.set({ matchId: view.match.id, code: view.match.code, game: 'penalty-shootout', spec: null, startedAt: '', deadline: '', resumed: false });
       } else {
         this.start.set(await this.api.post<StartResponse>(`/matches/${this.code()}/start`));
+        if(this.destroyed)return;
+        try{const saved=JSON.parse(sessionStorage.getItem(this.pendingKey())||'null');if(saved && saved.clientElapsedMs>=0 && saved.actions && typeof saved.actions==='object'){this.pending=saved;void this.submit(saved);}}catch{}
       }
     } catch (err) {
+      if(this.destroyed)return;
       const e = apiError(err);
       if (e.code === 'ALREADY_SUBMITTED' || e.code === 'MATCH_COMPLETED') {
+        this.forgetPending();
         this.exit();
         return;
       }
@@ -147,7 +157,9 @@ export class MatchPlayPage implements OnInit {
   }
 
   async submit(result: GameFinish, isRetry = false) {
+    if(this.destroyed || (this.submitting() && !isRetry))return;
     this.pending = result;
+    try{sessionStorage.setItem(this.pendingKey(),JSON.stringify(result));}catch{}
     this.submitting.set(true);
     this.submitError.set('');
     try {
@@ -155,13 +167,16 @@ export class MatchPlayPage implements OnInit {
         `/matches/${this.code()}/result`, result,
       );
       this.submitted.set(true);
+      this.forgetPending();if(this.destroyed)return;
       const target = r.match.status === 'COMPLETED' || r.match.status === 'CANCELLED'
         ? ['/match', this.code(), 'result']
         : ['/match', this.code()];
       await this.router.navigate(target, { replaceUrl: true });
     } catch (err) {
+      if(this.destroyed)return;
       const e = apiError(err);
       if (e.code === 'ALREADY_SUBMITTED' || e.code === 'MATCH_COMPLETED') {
+        this.forgetPending();if(this.destroyed)return;
         this.exit();
         return;
       }
@@ -169,12 +184,12 @@ export class MatchPlayPage implements OnInit {
       // few times in the background before ever bothering them.
       if (e.code === 'NETWORK' && this.retryAttempt() < MAX_AUTO_RETRIES) {
         this.retryAttempt.update((n) => n + 1);
-        setTimeout(() => this.submit(result, true), 1500 * this.retryAttempt());
+        this.retryTimer=setTimeout(() => this.submit(result, true), 1500 * this.retryAttempt());
         return;
       }
       this.submitError.set(
         e.code === 'NETWORK'
-          ? "We couldn't reach the game server. Check your connection and try again. Your result is safe on your device."
+          ? "We couldn't reach the server. Keep this tab open and retry. Match deadlines still apply."
           : e.message,
       );
       this.submitting.set(false);

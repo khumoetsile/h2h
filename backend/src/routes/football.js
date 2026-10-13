@@ -41,6 +41,8 @@ const researchQuery = z.object({
   venue: z.enum(['all', 'home', 'away']).default('all'), competitionId: z.coerce.number().int().positive().optional(),
   dateFrom: z.string().refine(validIsoDate, 'Choose a valid start date.').optional(),
   dateTo: z.string().refine(validIsoDate, 'Choose a valid end date.').optional(),
+  season: z.string().regex(/^\d{4}(?:-\d{2})?$/).optional(),
+  meetings: z.enum(['5', '10', 'all']).default('all'), form: z.coerce.number().pipe(z.union([z.literal(5), z.literal(10)])).default(10), page: z.coerce.number().int().min(1).max(500).default(1),
 }).refine(q => q.teamA !== q.teamB, { message: 'Choose two different teams.', path: ['teamB'] })
   .refine(q => !q.dateFrom || !q.dateTo || q.dateFrom <= q.dateTo, { message: 'The end date must be on or after the start date.', path: ['dateTo'] })
   .refine(q => !q.dateFrom || !q.dateTo || (Date.parse(q.dateTo) - Date.parse(q.dateFrom)) / 86400000 <= 3660, { message: 'Choose a date range of no more than ten years.', path: ['dateTo'] });
@@ -64,6 +66,8 @@ router.get('/teams/:id', validate(fixtureIdParam, 'params'), ah(async (req, res)
 }));
 
 router.get('/teams', validate(teamSearchQuery, 'query'), ah(async (req, res) => res.json(await research.searchTeams(req.validatedQuery))));
+
+router.get('/research/teams/:id', validate(fixtureIdParam, 'params'), ah(async (req, res) => res.json(await research.researchTeam(Number(req.params.id)))));
 
 router.get('/research', researchLimit, validate(researchQuery, 'query'), ah(async (req, res) => res.json(await research.researchTeams(req.validatedQuery))));
 

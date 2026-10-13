@@ -36,7 +36,7 @@ const DEFAULT_STAKE = 10;
         <app-spinner />
       } @else {
         @let g = game()!;
-        <div class="head">
+        <div class="head" [style.--game-accent]="g.accentColor">
           <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="56" />
           <div>
             <h1>{{ g.name }}</h1>
@@ -64,7 +64,7 @@ const DEFAULT_STAKE = 10;
           @if (stake(); as s) {
             <p class="prize">Win <strong class="money accent">{{ s.prize | money }}</strong><span class="muted"> for a {{ s.stake | money }} entry</span></p>
             <p class="muted small">The prize includes your entry. Platform fee: {{ s.fee | money }} from the combined pool.</p>
-            @if (waitingFor(s.stake) > 0) { <p class="win small instant"><mat-icon inline>bolt</mat-icon> Someone is ready to play now. You will be matched straight away.</p> }
+            @if (waitingFor(s.stake) > 0) { <p class="win small instant"><mat-icon inline>bolt</mat-icon> Players are waiting for this entry. Availability can change before you join.</p> }
           }
 
           @if (stake() && stake()!.stake > available()) {
@@ -75,7 +75,7 @@ const DEFAULT_STAKE = 10;
           <p class="muted small">Practice also uses the selected demo entry. It is against a bot, with no waiting.</p>
           <div class="actions">
             @if (available() < (g.stakes?.[0]?.stake ?? 0)) {
-              <a class="btn btn-primary btn-play btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add money to play</a>
+              <a class="btn btn-primary btn-play btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add demo funds to play</a>
             } @else {
               <button class="btn btn-primary btn-play btn-block" [disabled]="!stake() || busy() || !g.isEnabled || stake()!.stake > available()" (click)="find()">
                 @if (busy() === 'find') { <mat-spinner diameter="22" /> Finding an opponent } @else { Find opponent {{ stake() ? '· ' + (stake()!.stake | money) + ' demo' : '' }} }
@@ -108,9 +108,9 @@ const DEFAULT_STAKE = 10;
   styles: [`
     .back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 14px; min-height: 36px; mat-icon { font-size: 18px; width: 18px; height: 18px; } &:hover { color: var(--text); } }
     .help-link {display:inline-block;padding:16px 0;}
-    .head { display: flex; gap: 14px; align-items: center; h1 { font-size: 34px; } }
+    .head { display:flex;gap:14px;align-items:center;padding:22px 18px;border:1px solid color-mix(in srgb,var(--game-accent) 40%,var(--border));border-radius:18px;background:radial-gradient(ellipse at 0 0,color-mix(in srgb,var(--game-accent) 12%,transparent),transparent 75%),var(--surface);h1{font-size:32px;line-height:1.1}p{font-size:14px;line-height:1.5;margin-top:6px} }
     .meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 16px; }
-    .entry { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
+    .entry { border-top:3px solid var(--accent); padding: 18px; display: flex; flex-direction: column; gap: 12px; }
     .entry h2 { font-size: 22px; }
     .stake-tiles { grid-template-columns: repeat(3, 1fr); }
     .prize { font-size: 18px; }

@@ -1,6 +1,7 @@
 import { Component, computed, ElementRef, input, OnDestroy, OnInit, output, signal, viewChild } from '@angular/core';
 import { GameFinish, nextPaint, sleep } from './game-types';
 import { buzz, burst, flash, floatText, GameAudio, ripple, shake } from './game-fx';
+import { GameTools } from './game-tools';
 
 interface Round { delayMs: number; x: number; y: number; size: number; }
 interface Spec { rounds: Round[]; windowMs: number; countdownMs: number; interRoundMs: number; }
@@ -9,7 +10,7 @@ interface RoundResult { hit: boolean; reactionMs: number | null; falseStart?: bo
 const CYAN = '#22d3ee';
 
 /** Mirrors the server formula for instant feedback. The server score is authoritative. */
-const pointsFor = (rt: number) => Math.min(1000, Math.max(100, Math.round(1100 - rt * 0.8)));
+const pointsFor = (rt: number) => rt<100?0:Math.min(1000, Math.max(100, Math.round(1100 - rt * 0.8)));
 
 const rank = (ms: number) => (ms < 230 ? { label: 'Lightning', cls: 'gx-good', q: 1 } : ms < 300 ? { label: 'Fast', cls: 'gx-good', q: 0.75 } : ms < 400 ? { label: 'Good', cls: 'gx-warn', q: 0.5 } : { label: 'Slow', cls: 'gx-bad', q: 0.2 });
 
@@ -19,8 +20,10 @@ const rank = (ms: number) => (ms < 230 ? { label: 'Lightning', cls: 'gx-good', q
  */
 @Component({
   selector: 'app-reaction-rush',
+  imports:[GameTools],
   styleUrl: './game-hud.scss',
   template: `
+    <app-game-tools [audio]="audio" instructions="Wait for the circle, then tap it. Early taps lose the round. A focused target supports Enter/Space. The game cannot pause."/>
     <div class="gx-top">
       <div class="gx-score"><span>Score</span><strong [class.bump]="bump()">{{ score() }}</strong></div>
       <div class="gx-mid">@if (streak() >= 2) { <span class="gx-streak">{{ streak() }} in a row</span> }</div>
@@ -43,7 +46,7 @@ const rank = (ms: number) => (ms < 230 ? { label: 'Lightning', cls: 'gx-good', q
         }
         @case ('target') {
           <button class="orb" [style.left]="edge(current().x, current().size + 14)" [style.top]="edge(current().y, current().size + 14)" [style.width.px]="current().size + 14" [style.height.px]="current().size + 14"
-                  (pointerdown)="hit($event)" aria-label="Tap now"></button>
+                  (pointerdown)="hit($event)" (click)="$event.detail===0 && hit($event)" aria-label="Tap now"></button>
         }
         @case ('feedback') {
           <div class="gx-center">
@@ -88,7 +91,7 @@ export class ReactionRushGame implements OnInit, OnDestroy {
   readonly finished = output<GameFinish>();
   protected Math = Math;
   private arena = viewChild.required<ElementRef<HTMLElement>>('arena');
-  private audio = new GameAudio();
+  protected audio = new GameAudio();
 
   protected phase = signal<'countdown' | 'wait' | 'target' | 'feedback' | 'done'>('countdown');
   protected count = signal(3);
@@ -108,7 +111,7 @@ export class ReactionRushGame implements OnInit, OnDestroy {
   private destroyed = false;
 
   ngOnInit() { this.run(); }
-  ngOnDestroy() { this.destroyed = true; }
+  ngOnDestroy() { this.destroyed = true; this.resolveRound?.({hit:false,reactionMs:null}); this.audio.dispose(); }
 
   private async run() {
     this.startedAt = performance.now();
@@ -126,6 +129,7 @@ export class ReactionRushGame implements OnInit, OnDestroy {
       this.results.update((r) => [...r, result]);
       this.showFeedback(result);
       await sleep(spec.interRoundMs);
+      if(this.destroyed)return;
     }
     this.phase.set('done');
     this.finished.emit({ actions: { rounds: this.results() }, clientElapsedMs: Math.round(performance.now() - this.startedAt) });
@@ -146,7 +150,7 @@ export class ReactionRushGame implements OnInit, OnDestroy {
     const y = Math.min(box.height - rad, Math.max(rad, (round.y / 100) * box.height));
     if (r.hit && r.reactionMs) {
       const pts = pointsFor(r.reactionMs);
-      const k = rank(r.reactionMs);
+      const k = r.reactionMs<100?{label:'Too early to count',cls:'gx-bad',q:0}:rank(r.reactionMs);
       this.streak.update((n) => n + 1);
       this.bumpScore();
       burst(host, x, y, CYAN, 12);
@@ -186,19 +190,22 @@ export class ReactionRushGame implements OnInit, OnDestroy {
       const timer = setTimeout(async () => {
         if (settled) return;
         this.phase.set('target');
+        this.shownAt = 0;
         this.shownAt = await nextPaint();
+        if(this.destroyed || settled)return;
         this.audio.pop();
         timeout = setTimeout(() => settle({ hit: false, reactionMs: null }), windowMs);
       }, round.delayMs);
     });
   }
 
-  protected hit(ev: PointerEvent) {
+  protected hit(ev: Event) {
     ev.stopPropagation();
     this.audio.unlock();
     if (this.phase() !== 'target' || !this.resolveRound || !this.shownAt) return;
     const rt = Math.round(performance.now() - this.shownAt);
     this.shownAt = 0;
+    if(rt>this.spec().windowMs){this.resolveRound({hit:false,reactionMs:null});return;}
     this.resolveRound({ hit: true, reactionMs: rt });
   }
 

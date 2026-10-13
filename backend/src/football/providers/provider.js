@@ -54,4 +54,10 @@ export class FootballDataProvider {
 
   /** @returns {Promise<ProviderFixture|null>} */
   async getFixture(_providerFixtureId) { throw new Error('not implemented'); }
+
+  /** Optional offline historical import contract. User requests read stored rows. */
+  historicalSeasons() { return []; }
+  get historicalLicense() { return null; }
+  historicalUrl(_competitionCode, _season) { throw new Error('Historical imports are not supported by this provider.'); }
+  async loadHistoricalSeason(_competitionCode, _season, _options) { throw new Error('Historical imports are not supported by this provider.'); }
 }

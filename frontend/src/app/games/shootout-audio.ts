@@ -19,6 +19,8 @@ export class ShootoutAudio {
     try { localStorage.setItem(KEY, v ? 'off' : 'on'); } catch { /* storage unavailable */ }
   }
 
+  dispose() { const ctx=this.ctx;this.ctx=null;this.master=null;if(ctx && ctx.state!=='closed')void ctx.close().catch(()=>{}); }
+
   /** Call from a pointer event. Creates / resumes the audio context. */
   unlock() {
     try {

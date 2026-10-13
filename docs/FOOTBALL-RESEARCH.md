@@ -1,29 +1,49 @@
-# Football research and discovery
+# Historical football research
 
-The public `/football/research` page compares any two teams in the supported, locally synced directory. It does not require an upcoming fixture or an account. Team search, venue, competition and date filters are shareable through the URL. Fixture search also accepts matchup phrases such as `Liverpool vs Chelsea` in either team order.
+`/football/research` is public. Select two teams to compare, or open a fixture's preselected comparison. Team, competition, season, venue, date and sample selections survive refresh and are shareable. No registration is required.
 
-## Reading the results
+## Dashboard
 
-The page shows wins/draws/losses, average total goals, both teams scoring and over 2.5 goals, followed by past scores or each team's recent form. Percentages include their sample counts. Missing scores are excluded, never converted to zero. Regulation scores are used where supplied; otherwise the reported final score can include extra time. Identified awarded/unplayed matches are excluded. Source, update time, cached/partial status and coverage details are visible.
+A balanced comparison shows the selected sample, wins/draws/losses and percentages, goals for both teams, average goals, both teams scoring and over 2.5. Overview adds over 1.5/3.5 frequencies, clean sheets and a few deterministic insights. Meetings show dates, competition, venue, scores, outcomes, half-time scores and expandable optional statistics. Team form supports last 5/10, home/away samples and lightweight goals charts with readable values. All meetings are paginated in groups of 20 while the summary covers the full selected sample.
 
-These statistics describe the available history, not a complete all-time record or a prediction. Head-to-head uses up to 50 verified meetings; recent form uses up to 10 matches per team. Provider history is bounded to 500 results per team and supported enabled competitions. Football-data history explicitly requests the past 749 days, within its 750-day request limit, instead of its current-season default. Older synced records can also contribute. Historical coverage and freshness depend on the configured provider and its subscription. Existing settlement scores and challenge rules are unchanged.
+Unknown values remain unavailable; genuine zeros remain zero. Unverified, awarded/unplayed, conflicting scores and detected inconsistent season dates are excluded. Archive date-only values are displayed as calendar dates, without inventing kickoff times. These frequencies describe stored history and are not forecasts or betting advice. Completed seasons and recent form may have gaps; Sources & coverage explains provenance and the latest result/import dates.
 
-## API and loading
+## Source decision
 
-- `GET /api/football/teams?q=&competitionId=&limit=` searches the supported synced directory.
-- `GET /api/football/research?teamA=&teamB=&venue=all|home|away&competitionId=&dateFrom=&dateTo=` returns verified history, summaries, form and provenance.
-- Fixture detail supports `includeInsights=false` for fast initial loading. The browser requests research only when the player opens it.
-- Provider requests coalesce by team, with a bounded 15-minute cache, a short failure cooldown, explicit stale fallback and request timeouts. Frontend caches and search requests are bounded and discard stale responses.
-- Migration 018 adds research eligibility and score-duration metadata without changing settlement logic.
+The initial provider downloads [OpenFootball JSON](https://github.com/openfootball/football.json), whose [CC0-1.0 dedication](https://github.com/openfootball/football.json/blob/master/LICENSE.md) permits reuse and redistribution. The project explicitly provides raw download links. This uses published JSON datasets; HTML scraping, browser automation, CAPTCHA bypass and paywall/authentication bypass are unnecessary. The files do not contain shots, possession, corners, fouls or disciplinary cards. Badges continue using already configured team reference data, not scraped images.
 
-## Discovery and activity
+Football-Data.co.uk was evaluated for its richer downloadable statistics. Free download availability and a copyright notice do not establish permission to republish the required statistics in this product, so it is not imported without clearer permission. The existing free football-data.org integration continues syncing operational fixtures. Research requests read only stored records and make no provider calls.
 
-Landing, Play and Games feature a swipeable carousel with Chess always first and two randomly selected enabled live games. Picks remain stable during background refresh. Previous/next controls and labelled dots support keyboards; offscreen actions leave the tab order. Motion respects reduced-motion preferences and there is no autoplay. The public catalogue exposes only display metadata; playing still uses authenticated setup.
+OpenFootball updates its generated JSON daily, but upstream contributions are not guaranteed daily or complete. Coverage is reported as the available archive, never an all-time database. Selected source records contain inconsistent years in late-season rounds; they are retained raw and excluded rather than silently redated.
 
-Notifications now support server-side search, categories, unread filtering and pagination. The bell and full inbox share read operations, error recovery and race protection. Messages group into Today/Earlier, and long messages can expand. Escape closes the bell menu and restores focus.
+## Supported archives and commands
 
-## Validation
+Migration `019_historical_football.sql` adds imports/raw snapshots, explicit team aliases, normalized research matches and revision records. It adds date/pair/season indexes. Existing fixtures, challenges, settlements, timers and wallets are not populated or changed by historical imports.
 
-The release was checked against an isolated MySQL database and real browser interactions at desktop, 390px and 320px widths. Coverage includes provider provenance, missing scores, team orientation, filter validation, cache coalescing, natural-language fixture search, notification ownership/read races, keyboard team selection and stale UI responses. Production build and icon validation pass.
+Run from `backend` after migration and initial normal fixture synchronization:
 
-Provider reference: [Team history](https://docs.football-data.org/general/v4/team.html), [match score fields](https://docs.football-data.org/general/v4/match.html).
+```text
+npm run migrate
+npm run history:import -- --list
+npm run history:import -- --leagues=PL --seasons=all
+npm run history:import -- --leagues=PL,BL1,PD,SA,FL1 --seasons=all
+npm run history:import -- --leagues=PL --seasons=2024-25 --force
+```
+
+League codes: `PL` Premier League; `BL1` Bundesliga; `PD` Primera Division; `SA` Serie A; `FL1` Ligue 1. Supported seasons are 2015-16 through 2026-27. Counts reflect available verified results, including incomplete current seasons.
+
+Imports are sequential, limited to 60 allowlisted files per run, 2 MB per file, 15-second request timeouts and three HTTP attempts. They respect retry cooldowns and fail closed on access denials. A run stops after three file failures. Each season has a database advisory lock. Stored completed seasons skip downloads; current seasons check at most daily. `--force` conditionally rechecks archives for corrections using ETags. Failed updates retain the previous good data and log the error. A one-hour failure cooldown applies to ordinary retries.
+
+Hashes and stable club/season pairing keys prevent duplicates. Changed results preserve their previous raw record in revisions. Removed records become withdrawn. Raw snapshot, source URL, license, ETag, content hash and import times remain traceable. Team identity uses exact names in the same league or a reviewed explicit alias map; approximate name matching never merges clubs. Ambiguous cross-source identities stop an import. Unmatched names keep separate source identities rather than being fuzzy-merged.
+
+The `Update football history` GitHub workflow updates the latest supported season daily with existing deployment SSH credentials. Manual dispatch can select leagues/seasons and recheck archives. It runs independently of page requests and deployment. Adding later seasons requires an explicit catalogue update.
+
+## Replace or supplement the provider later
+
+`FootballDataProvider` now has optional offline `historicalSeasons`, `historicalLicense`, `historicalUrl` and `loadHistoricalSeason` methods. The OpenFootball adapter returns a normalized snapshot (season, competition, exact team identities, dates, verification status, full/half-time scores, optional statistic pairs, raw records and hashes).
+
+A paid adapter can implement the same contract, declare its permitted license/use, resolve source identities through explicit aliases to existing internal team IDs, and pass snapshots to `storeHistoricalSeason`. Register that adapter in the importer CLI after reviewing its permitted usage and source limits. The Angular page and analytics continue reading the same normalized tables; provider-specific fields do not enter the UI. Archive results remain separate from the operational settlement source. This release purchases or activates no paid API.
+
+## Related discovery
+
+Featured games retain permanent Chess plus two random enabled live games, swipe/keyboard controls and reduced-motion support. Notifications retain server search, unread/category filters, paging and shared read-state recovery.

@@ -1,6 +1,7 @@
 import { Component, computed, ElementRef, input, OnDestroy, OnInit, output, signal, viewChild } from '@angular/core';
 import { GameFinish, sleep } from './game-types';
 import { buzz, burst, floatText, flash, GameAudio, shake } from './game-fx';
+import { GameTools } from './game-tools';
 
 interface Spec { grid: number; rounds: { sequence: number[] }[]; flashMs: number; gapMs: number; inputLimitMs: number; countdownMs: number; }
 interface RoundInput { input: number[]; timeMs: number; }
@@ -13,8 +14,9 @@ const note = (cell: number) => SCALE[cell % 5] * (1 + Math.floor(cell / 5) * 0.5
 /** Mirrors the server formula for instant feedback. The server score is authoritative. */
 function pointsFor(seq: number[], entered: number[], timeMs: number) {
   const len = seq.length;
+  if(timeMs<len*110)return 0;
   const correct = entered.length === len && entered.every((c, j) => c === seq[j]);
-  if (correct) return len * 100 + Math.max(0, Math.min(300, Math.round(300 - timeMs / len / 8)));
+  if (correct && timeMs<=15000) return len * 100 + Math.max(0, Math.min(300, Math.round(300 - timeMs / len / 8)));
   let prefix = 0;
   while (prefix < entered.length && entered[prefix] === seq[prefix]) prefix++;
   return prefix * 20;
@@ -26,8 +28,10 @@ function pointsFor(seq: number[], entered: number[], timeMs: number) {
  */
 @Component({
   selector: 'app-memory-battle',
+  imports:[GameTools],
   styleUrl: './game-hud.scss',
   template: `
+    <app-game-tools [audio]="audio" instructions="Watch the numbered tiles, then repeat them in order. Tap, or use Tab and Enter/Space. A wrong tile ends the round. The game cannot pause."/>
     <div class="gx-top">
       <div class="gx-score"><span>Score</span><strong [class.bump]="bump()">{{ score() }}</strong></div>
       <div class="gx-mid"></div>
@@ -52,7 +56,7 @@ function pointsFor(seq: number[], entered: number[], timeMs: number) {
       <div class="board" #board [style.grid-template-columns]="'repeat(' + spec().grid + ', 1fr)'">
         @for (c of cells(); track c) {
           <button class="cell" [style.--c]="colour(c)" [class.lit]="lit() === c" [class.tap]="tapped() === c" [class.ok]="okCell() === c"
-                  [disabled]="phase() !== 'input'" (pointerdown)="tap(c)" [attr.aria-label]="'Tile ' + (c + 1)"></button>
+                  [disabled]="phase() !== 'input'" (pointerdown)="tap(c)" (click)="$event.detail===0 && tap(c)" [attr.aria-label]="'Tile ' + (c + 1)"><span>{{c+1}}</span></button>
         }
       </div>
 
@@ -74,6 +78,9 @@ function pointsFor(seq: number[], entered: number[], timeMs: number) {
     .cell { --c: #22d3ee; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--c) 40%, transparent); background: color-mix(in srgb, var(--c) 14%, #151a17);
       cursor: pointer; transition: background .08s, transform .08s, box-shadow .08s; touch-action: manipulation; padding: 0; }
     .cell:disabled { cursor: default; }
+    .cell {display:flex;align-items:center;justify-content:center;}
+    .cell span { color:var(--text-2);font-size:14px;font-weight:700;opacity:.8; }
+    .cell.lit span { color:#111; }
     .cell.lit { background: var(--c); box-shadow: 0 0 28px color-mix(in srgb, var(--c) 70%, transparent); border-color: var(--c); transform: scale(1.04); }
     .cell.tap { background: color-mix(in srgb, var(--c) 70%, #fff 10%); transform: scale(.95); }
     .cell.ok { box-shadow: 0 0 0 3px var(--win), 0 0 18px rgba(92, 203, 138, .5); }
@@ -89,7 +96,7 @@ export class MemoryBattleGame implements OnInit, OnDestroy {
   protected Math = Math;
   private arena = viewChild.required<ElementRef<HTMLElement>>('arena');
   private board = viewChild.required<ElementRef<HTMLElement>>('board');
-  private audio = new GameAudio();
+  protected audio = new GameAudio();
 
   protected phase = signal<'countdown' | 'show' | 'input' | 'feedback' | 'done'>('countdown');
   protected count = signal(3);
@@ -125,7 +132,7 @@ export class MemoryBattleGame implements OnInit, OnDestroy {
   private ticker: ReturnType<typeof setInterval> | undefined;
 
   ngOnInit() { this.ticker = setInterval(() => this.now.set(performance.now()), 150); this.run(); }
-  ngOnDestroy() { this.destroyed = true; clearInterval(this.ticker); }
+  ngOnDestroy() { this.destroyed = true; clearInterval(this.ticker); this.resolve?.(); this.audio.dispose(); }
 
   protected colour(cell: number) {
     const spec = this.spec();
@@ -150,10 +157,12 @@ export class MemoryBattleGame implements OnInit, OnDestroy {
       this.shown.set(0);
       this.phase.set('show');
       await sleep(550);
+      if (this.destroyed) return;
       for (const cell of spec.rounds[i].sequence) {
         this.lit.set(cell);
         this.audio.note(note(cell), spec.flashMs / 1000);
         await sleep(spec.flashMs);
+        if (this.destroyed) return;
         this.lit.set(null);
         this.shown.update((n) => n + 1);
         await sleep(spec.gapMs);
@@ -171,7 +180,7 @@ export class MemoryBattleGame implements OnInit, OnDestroy {
       if (this.destroyed) return;
       const timeMs = Math.round(performance.now() - this.inputStart);
       this.results.update((r) => [...r, { input: this.entered(), timeMs }]);
-      const ok = this.isCorrect(this.entered(), i);
+      const ok = this.isCorrect(this.entered(), i) && timeMs>=spec.rounds[i].sequence.length*110 && timeMs<=spec.inputLimitMs;
       this.lastOk.set(ok);
       this.phase.set('feedback');
       if (ok) {
@@ -183,13 +192,14 @@ export class MemoryBattleGame implements OnInit, OnDestroy {
         buzz([14, 30, 14]);
       }
       await sleep(ok ? 950 : 800);
+      if(this.destroyed)return;
     }
     this.phase.set('done');
     this.finished.emit({ actions: { rounds: this.results() }, clientElapsedMs: Math.round(performance.now() - start) });
   }
 
   protected tap(cell: number) {
-    if (this.phase() !== 'input') return;
+    if (this.phase() !== 'input' || !this.resolve) return;
     this.audio.unlock();
     const seq = this.seq();
     const pos = this.entered().length;

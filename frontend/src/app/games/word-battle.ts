@@ -2,6 +2,7 @@ import { Component, computed, ElementRef, HostListener, input, OnDestroy, OnInit
 import { MatIconModule } from '@angular/material/icon';
 import { GameFinish, sleep } from './game-types';
 import { buzz, burst, flash, floatText, GameAudio, shake } from './game-fx';
+import { GameTools } from './game-tools';
 
 interface Spec { words: { scrambled: string; length: number }[]; limitMs: number; countdownMs: number; }
 interface Answer { answer: string; timeMs: number; }
@@ -15,9 +16,10 @@ const PURPLE = '#a855f7';
  */
 @Component({
   selector: 'app-word-battle',
-  imports: [MatIconModule],
+  imports: [MatIconModule,GameTools],
   styleUrl: './game-hud.scss',
   template: `
+    <app-game-tools [audio]="audio" instructions="Tap letters or type on your keyboard. Backspace removes a letter; Enter locks a full word. Shuffle or skip if needed. Words are checked after the game. The game cannot pause."/>
     <div class="gx-top">
       <div class="gx-score"><span>Locked in</span><strong [class.bump]="bump()">{{ answeredCount() }}</strong></div>
       <div class="gx-mid"></div>
@@ -38,19 +40,19 @@ const PURPLE = '#a855f7';
 
           <div class="slots" [style.--n]="current().length">
             @for (s of slots(); track $index) {
-              <button class="slot" [class.filled]="s !== ''" [class.locked]="phase() !== 'input'" [disabled]="phase() !== 'input' || s === ''" (pointerdown)="removeAt($index)">{{ s }}</button>
+              <button class="slot" [class.filled]="s !== ''" [class.locked]="phase() !== 'input'" [disabled]="phase() !== 'input' || s === ''" (pointerdown)="removeAt($index)" (click)="$event.detail===0 && removeAt($index)" [attr.aria-label]="'Remove letter '+s+' from position '+($index+1)">{{ s }}</button>
             }
           </div>
 
-          <div class="pool" [style.--n]="current().length">
+          <div class="pool" [style.--n]="current().length" [style.--cols]="current().length>4?Math.ceil(current().length/2):current().length">
             @for (i of order(); track i) {
-              <button class="lt" [class.used]="picked().includes(i)" [disabled]="phase() !== 'input' || picked().includes(i)" (pointerdown)="pick(i)">{{ letters()[i] }}</button>
+              <button class="lt" [class.used]="picked().includes(i)" [disabled]="phase() !== 'input' || picked().includes(i)" (pointerdown)="pick(i)" (click)="$event.detail===0 && pick(i)" [attr.aria-label]="'Letter '+letters()[i]+', tile '+(i+1)">{{ letters()[i] }}</button>
             }
           </div>
 
           <div class="tools">
-            <button class="tool" type="button" [disabled]="phase() !== 'input'" (pointerdown)="shuffle()" aria-label="Shuffle the letters"><mat-icon>shuffle</mat-icon></button>
-            <button class="tool" type="button" [disabled]="phase() !== 'input' || picked().length === 0" (pointerdown)="backspace()" aria-label="Delete a letter"><mat-icon>backspace</mat-icon></button>
+            <button class="tool" type="button" [disabled]="phase() !== 'input'" (click)="shuffle()" aria-label="Shuffle the letters"><mat-icon>shuffle</mat-icon></button>
+            <button class="tool" type="button" [disabled]="phase() !== 'input' || picked().length === 0" (click)="backspace()" aria-label="Delete a letter"><mat-icon>backspace</mat-icon></button>
             <button class="tool skip" type="button" [disabled]="phase() !== 'input'" (click)="skip()">Skip</button>
           </div>
 
@@ -75,8 +77,8 @@ const PURPLE = '#a855f7';
     .slot.filled { border-style: solid; border-color: #a855f7; background: rgba(168, 85, 247, .18); animation: put .14s ease-out; }
     .slot.locked { opacity: .8; }
     @keyframes put { from { transform: scale(.8); } to { transform: scale(1); } }
-    .pool { display: flex; gap: 8px; justify-content: center; flex-wrap: nowrap; max-width: 420px; }
-    .lt { width: min(52px, calc((min(100vw - 64px, 420px) - (var(--n) - 1) * 8px) / var(--n))); height: 60px; border-radius: 10px; border: 1px solid #7c3aed; background: linear-gradient(180deg, #8b5cf6, #6d28d9); color: #fff;
+    .pool { display:grid;grid-template-columns:repeat(var(--cols),48px);gap:8px;justify-content:center;max-width:100%; }
+    .lt { width: 48px; height: 56px; border-radius: 10px; border: 1px solid #7c3aed; background: linear-gradient(180deg, #8b5cf6, #6d28d9); color: #fff;
       font-family: var(--font-display); font-size: 30px; font-weight: 700; padding: 0; cursor: pointer; touch-action: manipulation; box-shadow: 0 3px 0 #4c1d95; transition: transform .06s, opacity .15s; }
     .lt:active:not(:disabled) { transform: translateY(2px); box-shadow: 0 1px 0 #4c1d95; }
     .lt.used { opacity: .18; box-shadow: none; }
@@ -96,7 +98,7 @@ export class WordBattleGame implements OnInit, OnDestroy {
   readonly finished = output<GameFinish>();
   protected Math = Math;
   private arena = viewChild.required<ElementRef<HTMLElement>>('arena');
-  private audio = new GameAudio();
+  protected audio = new GameAudio();
 
   protected phase = signal<'countdown' | 'input' | 'feedback' | 'done'>('countdown');
   protected count = signal(3);
@@ -126,7 +128,7 @@ export class WordBattleGame implements OnInit, OnDestroy {
   protected pct = computed(() => Math.max(0, 100 - (this.elapsed() / this.spec().limitMs) * 100));
 
   ngOnInit() { this.ticker = setInterval(() => this.tickClock(), 200); this.run(); }
-  ngOnDestroy() { this.destroyed = true; clearInterval(this.ticker); }
+  ngOnDestroy() { this.destroyed = true; clearInterval(this.ticker); this.resolve?.({answer:'',timeMs:0}); this.audio.dispose(); }
 
   private tickClock() {
     this.now.set(performance.now());
@@ -157,6 +159,7 @@ export class WordBattleGame implements OnInit, OnDestroy {
       this.phase.set('feedback');
       this.celebrate(!!a.answer);
       await sleep(550);
+      if(this.destroyed)return;
     }
     this.phase.set('done');
     this.finished.emit({ actions: { words: this.answers() }, clientElapsedMs: Math.round(performance.now() - start) });
@@ -228,6 +231,7 @@ export class WordBattleGame implements OnInit, OnDestroy {
   @HostListener('window:keydown', ['$event'])
   protected onKey(ev: KeyboardEvent) {
     if (this.phase() !== 'input' || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    if (ev.key==='Enter' && (ev.target as HTMLElement)?.closest('button')) return;
     if (ev.key === 'Backspace') { ev.preventDefault(); this.backspace(); return; }
     if (ev.key === 'Enter') { ev.preventDefault(); this.lockIn(); return; }
     if (ev.key.length === 1 && /[a-z]/i.test(ev.key)) {

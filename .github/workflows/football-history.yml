@@ -1,0 +1,49 @@
+name: Update football history
+on:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+    inputs:
+      leagues:
+        description: 'League codes, comma separated (PL,BL1,PD,SA,FL1)'
+        default: 'PL,BL1,PD,SA,FL1'
+      seasons:
+        description: 'Seasons, comma separated, or all; blank updates latest supported season'
+        default: ''
+      force:
+        description: 'Conditionally recheck stored archives for corrections'
+        type: boolean
+        default: false
+concurrency:
+  group: head2head-football-history
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Import permitted datasets on the app server
+        env:
+          SSH_KEY: ${{ secrets.CPANEL_SSH_KEY }}
+          SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
+          SSH_USER: ${{ secrets.CPANEL_SSH_USER }}
+          SSH_PORT: ${{ secrets.CPANEL_SSH_PORT || '22' }}
+          APP_DIR: ${{ vars.CPANEL_APP_DIR }}
+          ACTIVATE: ${{ vars.CPANEL_NODE_ACTIVATE }}
+          LEAGUES: ${{ inputs.leagues || 'PL,BL1,PD,SA,FL1' }}
+          SEASONS: ${{ inputs.seasons }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -e
+          [[ "$LEAGUES" =~ ^(PL|BL1|PD|SA|FL1)(,(PL|BL1|PD|SA|FL1))*$ ]]
+          [[ -z "$SEASONS" || "$SEASONS" == all || "$SEASONS" =~ ^[0-9]{4}-[0-9]{2}(,[0-9]{4}-[0-9]{2})*$ ]]
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -p "$SSH_PORT" "$SSH_HOST" >> ~/.ssh/known_hosts
+          ARGS="--leagues=$LEAGUES"
+          if [[ -n "$SEASONS" ]]; then ARGS="$ARGS --seasons=$SEASONS"; fi
+          if [[ "$FORCE" == true ]]; then ARGS="$ARGS --force"; fi
+          ssh -i ~/.ssh/id_deploy -o IdentitiesOnly=yes -o BatchMode=yes -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" "set -e; source $ACTIVATE; cd $APP_DIR; npm run history:import -- $ARGS"
