@@ -61,3 +61,16 @@ test('download permissions and cooldowns are bounded without bypassing source re
   await assert.rejects(provider.loadHistoricalSeason('PL','2024-25',{fetcher:async()=>({status:403,ok:false,headers:new Headers()})}),/403/);
   await assert.rejects(provider.loadHistoricalSeason('PL','2024-25',{fetcher:async()=>({status:200,ok:true,headers:new Headers({'content-length':'3000000'})})}),/size limit/);
 });
+test('legacy latin1 accents link exactly to existing reference teams and repaired archive URLs remain usable',async()=>{
+  await query('ALTER TABLE football_teams MODIFY name VARCHAR(100) CHARACTER SET latin1 NOT NULL');
+  const source=new OpenFootballProvider();let raw={matches:[{date:'2018-08-01',team1:'FC Bayern München',team2:'Encoding Town',score:{ft:[2,0]}}]};
+  source.loadHistoricalSeason=async(code,season)=>({raw:JSON.stringify(raw),hash:digest(JSON.stringify(raw)),url:source.historicalUrl(code,season),matches:source.normalizeHistoricalSeason(raw,code,season)});
+  await importHistoricalSeason('BL1','2018-19',{provider:source,force:true});const oldTeam=await queryOne("SELECT team_id FROM football_team_aliases WHERE source='openfootball' AND competition_code='BL1' AND source_name='FC Bayern München'");
+  const competition=await query("INSERT INTO football_competitions(provider,provider_competition_id,code,name) VALUES('football-data','legacy-bl1','BL1','Bundesliga')");
+  const reference=await query("INSERT INTO football_teams(provider,provider_team_id,name) VALUES('football-data','legacy-bayern','FC Bayern München')");
+  const opponent=await queryOne("SELECT team_id FROM football_team_aliases WHERE source='openfootball' AND competition_code='BL1' AND source_name='Encoding Town'");
+  await query("INSERT INTO football_fixtures(provider,provider_fixture_id,competition_id,home_team_id,away_team_id,kickoff_at,status,is_simulated) VALUES('football-data','legacy-link',?,?,?,NOW(),'SCHEDULED',0)",[competition.insertId,reference.insertId,opponent.team_id]);
+  raw.matches[0].date='2018-08-02';await importHistoricalSeason('BL1','2018-19',{provider:source,force:true});
+  const linked=await queryOne("SELECT team_id FROM football_team_aliases WHERE source='openfootball' AND competition_code='BL1' AND source_name='FC Bayern München'");assert.equal(linked.team_id,reference.insertId);assert.equal((await queryOne("SELECT COUNT(*) AS n FROM football_history_matches WHERE status='FINISHED' AND home_team_id=?",[oldTeam.team_id])).n,0);
+  const comparison=await researchTeams({teamA:oldTeam.team_id,teamB:opponent.team_id});assert.equal(comparison.teamA.id,reference.insertId);assert.equal(comparison.headToHead.summary.played,1);assert.equal((await searchTeams({q:'Bayern'})).teams.length,1);
+});

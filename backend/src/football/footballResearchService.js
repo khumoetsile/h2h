@@ -26,7 +26,12 @@ export async function searchTeams({ q = '', competitionId, limit = 20 } = {}) {
   return { teams: rows.map(t=>({...teamView(t),competitions:comps.filter(c=>c.team_id===t.id).map(({team_id,...c})=>c)})), total: Number(counts[0].total), provider: 'local-history', lastUpdatedAt: (await queryOne('SELECT MAX(last_imported_at) AS updated FROM football_history_imports'))?.updated || null };
 }
 export async function researchTeam(id) {
-  const t = await queryOne(`SELECT t.* FROM football_teams t WHERE t.id=? AND (${eligible})`, [id, config.football.provider]);
+  let t = await queryOne(`SELECT t.* FROM football_teams t WHERE t.id=? AND (${eligible})`, [id, config.football.provider]);
+  if(!t){
+    const redirected=await query(`SELECT DISTINCT current.* FROM football_teams old JOIN football_team_aliases a ON a.source=old.provider AND BINARY CONVERT(a.source_name USING utf8mb4)=BINARY CONVERT(old.name USING utf8mb4) JOIN football_teams current ON current.id=a.team_id
+      WHERE old.id=? AND current.id<>old.id AND EXISTS(SELECT 1 FROM football_history_matches h JOIN football_competitions c ON c.id=h.competition_id WHERE c.code=a.competition_code AND (h.home_team_id=old.id OR h.away_team_id=old.id))`,[id]);
+    if(redirected.length===1)t=redirected[0];
+  }
   if (!t) throw notFound('This team has no supported football history or fixtures.');
   return { team: teamView(t) };
 }
@@ -64,7 +69,10 @@ export async function researchTeams(filters) {
   filters = { venue: 'all', form: 10, meetings: 'all', page: 1, ...filters };
   if (filters.teamA === filters.teamB) throw badRequest('SAME_TEAM', 'Choose two different teams.');
   if (filters.competitionId && !(await queryOne('SELECT id FROM football_competitions WHERE id=? AND is_enabled=1', [filters.competitionId]))) throw notFound('This competition is not available.');
-  const [{ team: teamA }, { team: teamB }, stored] = await Promise.all([researchTeam(filters.teamA), researchTeam(filters.teamB), storedMatches(filters.teamA, filters.teamB)]);
+  const [{ team: teamA }, { team: teamB }] = await Promise.all([researchTeam(filters.teamA), researchTeam(filters.teamB)]);
+  if(teamA.id===teamB.id)throw badRequest('SAME_TEAM','Choose two different teams.');
+  filters={...filters,teamA:teamA.id,teamB:teamB.id};
+  const stored=await storedMatches(teamA.id,teamB.id);
   const competitions = [...new Map(stored.matches.map(m => [m.competition.id, m.competition])).values()];
   const scoped = stored.matches.filter(m => (!filters.competitionId || m.competition.id === filters.competitionId) && (!filters.dateFrom || m.date >= filters.dateFrom) && (!filters.dateTo || m.date <= filters.dateTo) && (!filters.season || m.season === filters.season));
   const valid = scoped.filter(validScore);

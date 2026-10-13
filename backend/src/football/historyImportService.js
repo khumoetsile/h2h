@@ -16,11 +16,20 @@ export const canonicalSourceName = (code, name) => ALIASES[code]?.[name] || name
 async function resolveTeam(tx, code, name, competitionId, identities, source) {
   const canonical = source==='openfootball'?canonicalSourceName(code, name):name;
   if (identities.has(canonical)) return identities.get(canonical);
-  const known = await tx.one('SELECT team_id FROM football_team_aliases WHERE source = ? AND competition_code = ? AND source_name = ?', [source, code, canonical]);
+  const known = await tx.one('SELECT a.team_id,t.provider FROM football_team_aliases a JOIN football_teams t ON t.id=a.team_id WHERE a.source = ? AND a.competition_code = ? AND a.source_name = ?', [source, code, canonical]);
   let teamId = known?.team_id;
   let resolution = 'SOURCE_ID';
+  const references = await tx.q(`SELECT DISTINCT t.id FROM football_teams t WHERE t.provider<>? AND BINARY CONVERT(t.name USING utf8mb4)=BINARY CONVERT(? USING utf8mb4) AND
+    (EXISTS(SELECT 1 FROM football_fixtures f WHERE f.competition_id=? AND f.is_simulated=0 AND (f.home_team_id=t.id OR f.away_team_id=t.id)) OR EXISTS(SELECT 1 FROM football_history_matches h WHERE h.competition_id=? AND h.status='FINISHED' AND (h.home_team_id=t.id OR h.away_team_id=t.id)))`, [source,canonical,competitionId,competitionId]);
+  if(references.length>1 && (!known || known.provider===source))throw new Error(`Ambiguous exact team identity for ${code}: ${canonical}`);
+  // Older hosted databases may store names in latin1. Compare converted UTF-8
+  // bytes exactly; raw BINARY comparisons against UTF-8 parameters miss accents.
+  if(references.length===1 && (!known || known.provider===source)){
+    teamId=references[0].id;resolution='EXACT_IN_LEAGUE';
+    await tx.q('INSERT INTO football_team_aliases(source,competition_code,source_name,team_id,resolution) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE team_id=VALUES(team_id),resolution=VALUES(resolution)',[source,code,canonical,teamId,resolution]);
+  }
   if (!teamId) {
-    const exact = await tx.q(`SELECT DISTINCT t.id FROM football_teams t WHERE BINARY t.name = ? AND
+    const exact = await tx.q(`SELECT DISTINCT t.id FROM football_teams t WHERE BINARY CONVERT(t.name USING utf8mb4) = BINARY CONVERT(? USING utf8mb4) AND
       (EXISTS(SELECT 1 FROM football_fixtures f WHERE f.competition_id=? AND f.is_simulated=0 AND (f.home_team_id=t.id OR f.away_team_id=t.id)) OR EXISTS(SELECT 1 FROM football_history_matches h WHERE h.competition_id=? AND h.status='FINISHED' AND (h.home_team_id=t.id OR h.away_team_id=t.id)))`, [canonical,competitionId,competitionId]);
     if (exact.length === 1) { teamId = exact[0].id; resolution = 'EXACT_IN_LEAGUE'; }
     else if (exact.length > 1) throw new Error(`Ambiguous exact team identity for ${code}: ${canonical}`);

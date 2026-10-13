@@ -17,7 +17,7 @@ const score = value => Array.isArray(value) && value.length === 2 && value.every
 export class OpenFootballProvider extends FootballDataProvider {
   get name() { return 'openfootball'; }
   get historicalLicense() { return 'CC0-1.0'; }
-  hashPayload(raw) { return digest(`normalizer-v3:${raw}`); }
+  hashPayload(raw) { return digest(`normalizer-v4:${raw}`); }
   capabilities() { return { statistics: false, events: false, historical: true }; }
   async listCompetitions() { return Object.entries(HISTORY_LEAGUES).map(([code, c]) => ({ code, providerId: code, name: c.name, country: c.country, emblemUrl: null })); }
   historicalSeasons() { return [...HISTORY_SEASONS]; }

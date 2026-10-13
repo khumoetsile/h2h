@@ -38,6 +38,7 @@ export class FootballResearchPage {
       if(filters.dateFrom&&filters.dateTo&&filters.dateFrom>filters.dateTo){this.formError.set('Choose an end date after the start date.');return;}
       const data=await this.store.research(filters,force);
       if(version!==this.version)return;this.data.set(data);this.competitions.set(data.competitions);this.seasons.set(data.seasons??[]);this.teamA.set(data.teamA);this.teamB.set(data.teamB);this.formError.set('');
+      if(data.teamA.id!==filters.teamA||data.teamB.id!==filters.teamB)void this.router.navigate([],{relativeTo:this.route,queryParams:{teamA:data.teamA.id,teamB:data.teamB.id},queryParamsHandling:'merge',replaceUrl:true});
       this.seo.publish(`${data.teamA.name} vs ${data.teamB.name} history`,`Head-to-head scores and recent form from available football history.`,'/football/research',!data.metadata.isSimulated);
     }catch(err){if(version===this.version)this.error.set(apiError(err).message);}finally{if(version===this.version)this.loading.set(false);}
   }
