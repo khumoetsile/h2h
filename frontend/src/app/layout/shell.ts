@@ -1,4 +1,5 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
@@ -13,6 +14,9 @@ import { Avatar } from '../shared/ui';
 import { ActiveMatchBar } from './active-match-bar';
 import { AdsConsent } from './ads-consent';
 import { AgoPipe, MoneyPipe } from '../shared/pipes';
+import { Toast } from '../core/toast.service';
+import { NotificationInbox, NotificationResponse } from '../shared/notification-inbox';
+import { NotificationItem, groupNotifications, notificationIcon, notificationLabel, notificationLink } from '../shared/notification-presentation';
 
 interface NavItem { label: string; icon: string; link: string; exact?: boolean; }
 
@@ -67,40 +71,66 @@ export class Shell {
     return this.router.isActive(item.link, { paths: item.exact ? 'exact' : 'subset', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' });
   }
 
-  protected notifications = signal<AppNotification[]>([]);
+  protected inbox = inject(NotificationInbox);
+  private destroyRef = inject(DestroyRef);
+  private toast = inject(Toast);
+  protected notifications = signal<NotificationItem[]>([]);
+  protected notificationGroups = computed(() => groupNotifications(this.notifications()));
   protected loadingNotifications = signal(false);
+  protected notificationError = signal('');
+  protected notificationActionError = signal('');
+  protected notificationIcon = notificationIcon;
+  protected notificationLabel = notificationLabel;
+  protected notificationLink = notificationLink;
+  private notificationSequence = 0;
+  private notificationMenuOpen = false;
+  private notificationRefresh: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
-    this.realtime.notification$.subscribe((n) => this.notifications.update((list) => [n, ...list].slice(0, 20)));
+    this.realtime.notification$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.refreshNotifications());
+    this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.refreshNotifications());
+    this.inbox.changed$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((change) => {
+      this.notifications.update((items) => change.kind === 'read' ? items.map((item) => item.id === change.id ? { ...item, isRead: true } : item) : change.confirmed ? items.map((item) => ({ ...item, isRead: true })) : items);
+      this.refreshNotifications();
+    });
+    this.destroyRef.onDestroy(() => { ++this.notificationSequence; if (this.notificationRefresh) clearTimeout(this.notificationRefresh); });
+  }
+
+  notificationMenuOpened() { this.notificationMenuOpen = true; void this.loadNotifications(); }
+  notificationMenuClosed() { this.notificationMenuOpen = false; }
+  private refreshNotifications() {
+    ++this.notificationSequence;
+    if (!this.notificationMenuOpen) return;
+    if (this.notificationRefresh) clearTimeout(this.notificationRefresh);
+    this.notificationRefresh = setTimeout(() => { this.notificationRefresh = null; void this.loadNotifications(); }, 150);
   }
 
   async loadNotifications() {
+    const sequence = ++this.notificationSequence;
+    const revision = this.inbox.captureRevision();
     this.loadingNotifications.set(true);
+    this.notificationError.set('');
     try {
-      const res = await this.api.get<{ notifications: AppNotification[]; unread: number }>('/notifications');
-      this.notifications.set(res.notifications.slice(0, 8));
-      this.auth.unread.set(res.unread);
-    } catch { /* dropdown shows empty state */ }
-    this.loadingNotifications.set(false);
+      const res = await this.api.get<NotificationResponse>('/notifications', { pageSize: 8 });
+      if (sequence !== this.notificationSequence) return;
+      this.notifications.set(res.notifications);
+      this.inbox.applyCount(res.unread, revision);
+    } catch {
+      if (sequence === this.notificationSequence) this.notificationError.set('Could not load your activity. Try again.');
+    } finally { if (sequence === this.notificationSequence) this.loadingNotifications.set(false); }
   }
 
   async open(n: AppNotification) {
     if (!n.isRead) {
-      try {
-        const r = await this.api.post<{ unread: number }>(`/notifications/${n.id}/read`);
-        this.auth.unread.set(r.unread);
-        this.notifications.update((l) => l.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
-      } catch { /* ignore */ }
+      try { await this.inbox.markRead(n); }
+      catch (err) { this.toast.error(err); }
     }
-    if (n.link) this.router.navigateByUrl(n.link);
   }
 
   async markAllRead() {
-    try {
-      await this.api.post('/notifications/read-all');
-      this.auth.unread.set(0);
-      this.notifications.update((l) => l.map((x) => ({ ...x, isRead: true })));
-    } catch { /* ignore */ }
+    this.notificationActionError.set('');
+    try { await this.inbox.markAllRead(); }
+    catch { this.notificationActionError.set('Could not mark notifications as read. Try again.'); }
   }
 
   logout() { this.auth.logout(); }

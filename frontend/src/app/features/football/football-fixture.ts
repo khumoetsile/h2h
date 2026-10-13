@@ -1,4 +1,4 @@
-import { Component, DestroyRef, computed, inject, input, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, computed, inject, input, OnChanges, OnInit, SimpleChanges, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { A11yModule } from '@angular/cdk/a11y';
 import { DatePipe } from '@angular/common';
@@ -21,6 +21,8 @@ import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, LoadError, Spinner } from '../../shared/ui';
 import { JoinSheet, OpenChallengeCard } from './open-challenge';
 import { readGuestFollowedFixtures, writeGuestFollowedFixtures } from './football-follow-storage';
+import { FootballResearch, FootballResearchStore } from '../../core/football-research';
+import { FootballResearchResults } from './football-research-results';
 
 /**
  * Fixture + challenge builder: question -> your pick -> stake -> who you
@@ -31,11 +33,11 @@ import { readGuestFollowedFixtures, writeGuestFollowedFixtures } from './footbal
  */
 @Component({
   selector: 'app-football-fixture',
-  imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet],
+  imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet, FootballResearchResults],
   templateUrl: './football-fixture.html',
   styleUrls: ['./football-fixture.scss', './football-fixture-insights.scss'],
 })
-export class FootballFixturePage implements OnInit {
+export class FootballFixturePage implements OnInit,OnChanges {
   readonly fixtureId = input.required<string>();
   private api = inject(Api);
   private seo = inject(SeoService);
@@ -47,6 +49,12 @@ export class FootballFixturePage implements OnInit {
   private destroyRef = inject(DestroyRef);
   private rematchSvc = inject(RematchService);
   private loading = false;
+  private loadVersion=0;
+  private researchStore=inject(FootballResearchStore);
+  protected researchData=signal<FootballResearch|null>(null);
+  protected researchOpen=signal(false);
+  protected researchLoading=signal(false);
+  protected researchError=signal('');
 
   protected fixture = signal<FootballFixture | null>(null);
   protected openChallenges = signal<OpenFootballChallenge[]>([]);
@@ -177,12 +185,29 @@ export class FootballFixturePage implements OnInit {
     });
   }
 
+  ngOnChanges(changes:SimpleChanges){
+    if(!changes['fixtureId']||changes['fixtureId'].firstChange)return;
+    ++this.loadVersion;this.loading=false;this.fixture.set(null);this.openChallenges.set([]);this.type.set(null);this.pick.set(null);this.stake.set(null);this.mode.set(null);this.opponent.set(null);this.query='';this.results.set([]);++this.searchVersion;this.reviewOpen.set(false);this.joinTarget.set(null);this.formError.set('');this.researchData.set(null);this.researchOpen.set(false);this.researchLoading.set(false);this.researchError.set('');
+    void this.load();
+  }
+
+  protected toggleResearch(){this.researchOpen.update(value=>!value);if(this.researchOpen()&&!this.researchData())void this.loadResearch();}
+  async loadResearch(force=false){
+    const fixture=this.fixture();if(!fixture||this.researchLoading())return;
+    this.researchLoading.set(true);this.researchError.set('');
+    try{const data=await this.researchStore.research({teamA:fixture.homeTeam.id,teamB:fixture.awayTeam.id,venue:'all'},force);if(this.fixture()?.id===fixture.id)this.researchData.set(data);}
+    catch(err){if(this.fixture()?.id===fixture.id)this.researchError.set(apiError(err).message);}
+    finally{if(this.fixture()?.id===fixture.id)this.researchLoading.set(false);}
+  }
+
   async load(silent = false) {
     if (this.loading) return;
     this.loading = true;
+    const version=++this.loadVersion;const fixtureId=this.fixtureId();
     if (!silent) this.error.set('');
     try {
-      const res = await this.api.get<{ fixture: FootballFixture; openChallenges: OpenFootballChallenge[] }>(`/football/fixtures/${this.fixtureId()}`);
+      const res = await this.api.get<{ fixture: FootballFixture; openChallenges: OpenFootballChallenge[] }>(`/football/fixtures/${fixtureId}`,{includeInsights:false});
+      if(version!==this.loadVersion||fixtureId!==this.fixtureId())return;
       const first = !this.fixture();
       const previousEvents = new Set(this.fixture()?.events?.map((event) => event.id) ?? []);
       const newEvents = res.fixture.events?.filter((event) => !previousEvents.has(event.id)) ?? [];
@@ -208,10 +233,11 @@ export class FootballFixturePage implements OnInit {
       if (first) this.applyDefaults(res.fixture);
       if (!silent && this.auth.isLoggedIn()) this.auth.refreshMe().catch(() => {});
     } catch (err) {
+      if(version!==this.loadVersion)return;
       if (!silent) this.error.set(apiError(err).message);
       else this.refreshError.set('Could not refresh match data. Retrying automatically.');
     } finally {
-      this.loading = false;
+      if(version===this.loadVersion)this.loading = false;
     }
   }
 

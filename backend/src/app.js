@@ -11,6 +11,7 @@ import { requireAdmin, requireAuth } from './middleware/auth.js';
 import { errorHandler, notFoundHandler } from './middleware/error.js';
 import { ah } from './utils/errors.js';
 import { getSettings } from './services/settingsService.js';
+import { listGames } from './services/gameService.js';
 import { computePrize } from './utils/money.js';
 import { publicTimerConfig } from './timers.js';
 import authRoutes from './routes/auth.js';
@@ -114,6 +115,11 @@ export function createApp() {
     });
   }));
 
+  app.get('/api/game-catalogue', ah(async (_req,res) => {
+    const games = await listGames();
+    res.setHeader('Cache-Control','public, max-age=30');
+    res.json({games:games.map(({id,slug,name,tagline,estimatedDurationSeconds,accentColor,isEnabled})=>({id,slug,name,tagline,estimatedDurationSeconds,accentColor,isEnabled}))});
+  }));
   app.use('/api/auth', authRoutes);
   app.use('/api/invites', inviteRoutes);
   // Public football reads must be routed before the authenticated /api

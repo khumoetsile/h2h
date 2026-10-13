@@ -1,12 +1,8 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { apiError } from '../../core/api-error';
 import { ConfigStore } from '../../core/config.store';
 import { formatMoney } from '../../core/format';
-import { QuickPlay } from '../../core/quick-play';
-import { PitchArt } from '../../shared/pitch-art';
-import { ChessArt } from '../../shared/chess-art';
+import { ChessDiscovery } from '../../shared/chess-discovery';
 
 /**
  * What a stranger sees first. One promise, one button. Tapping Play creates a guest account behind the scenes
@@ -14,18 +10,14 @@ import { ChessArt } from '../../shared/chess-art';
  */
 @Component({
   selector: 'app-landing',
-  imports: [RouterLink, MatProgressSpinnerModule, PitchArt, ChessArt],
+  imports: [RouterLink, ChessDiscovery],
   template: `
     <main class="land">
       <header class="land-nav"><div class="brand"><span aria-hidden="true">//</span> Head2Head</div><a routerLink="/login">Sign in <span aria-hidden="true">↗</span></a></header>
       <div class="intro"><span class="eyebrow">A little competition. A lasting rivalry.</span><h1>Your people.<br><span>Your next rivalry.</span></h1><p class="lead">A quick shootout or a thoughtful game of chess. Challenge someone and make your next move.</p></div>
-      <div class="modes">
-        <section class="mode"><app-pitch-art class="art" /><div class="mode-copy"><span class="eyebrow">Play live · About two minutes</span><h2>Meet on the pitch.</h2><p>Take turns shooting and saving against another player.</p><button class="btn btn-primary btn-block" [disabled]="busy()" (click)="play()">@if(busy()) { <mat-spinner diameter="24" /> } @else { Set up a shootout <span aria-hidden="true">→</span> }</button></div></section>
-        <section class="mode chess"><app-chess-art class="art" /><div class="mode-copy"><span class="eyebrow">Play across days · New</span><h2>Think. Move. Return.</h2><p>Invite a friend to chess. Save each move and return before your next deadline.</p><a class="btn btn-block" routerLink="/chess">Explore chess <span aria-hidden="true">→</span></a></div></section>
-      </div>
-      @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+      <app-chess-discovery />
       <p class="demo-note">Start with {{ bonus() }} in demo funds. Review every entry before playing. No real money.</p>
-      <footer class="land-footer"><a routerLink="/football">Football fixtures &amp; scores</a><a routerLink="/help">How to play &amp; help</a></footer>
+      <footer class="land-footer"><a routerLink="/football">Fixtures &amp; scores</a><a routerLink="/football/research">Football research</a><a routerLink="/help">How to play &amp; help</a></footer>
     </main>
   `,
   styles: [`
@@ -38,21 +30,8 @@ import { ChessArt } from '../../shared/chess-art';
   `],
 })
 export class LandingPage {
-  private quick = inject(QuickPlay);
   private config = inject(ConfigStore);
 
-  protected busy = signal(false);
-  protected error = signal('');
   protected bonus = computed(() => formatMoney(this.config.config()?.signupBonus ?? 250));
 
-  protected async play() {
-    this.busy.set(true);
-    this.error.set('');
-    try {
-      await this.quick.playNow();
-    } catch (err) {
-      this.error.set(apiError(err).message);
-      this.busy.set(false);
-    }
-  }
 }

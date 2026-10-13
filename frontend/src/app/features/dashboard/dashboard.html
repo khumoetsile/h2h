@@ -7,7 +7,7 @@
       <a class="welcome-help" routerLink="/help" aria-label="How to play">How to play <span aria-hidden="true">↗</span></a>
     </div>
 
-    <app-chess-discovery class="chess-discovery" />
+    <app-chess-discovery class="chess-discovery" [gamePool]="data()?.games ?? null" [loadFromApi]="false" />
     <app-chess-activity class="chess-activity" [limit]="3" [activeOnly]="true" [compact]="true" />
 
     <!-- A match in progress is shown by the bar at the top of every screen, so it is not repeated here. -->

@@ -162,8 +162,8 @@ export class OutcomeChip {
   imports: [MatIconModule],
   template: `<span class="gi" [style.--c]="color()" [style.width.px]="size()" [style.height.px]="size()"><mat-icon [style.font-size.px]="size() * 0.5" [style.width.px]="size() * 0.5" [style.height.px]="size() * 0.5">{{ icon() }}</mat-icon></span>`,
   styles: [`
-    .gi { display: inline-flex; align-items: center; justify-content: center; border-radius: 4px; flex-shrink: 0;
-      background: var(--surface-3); color: var(--text-2); }
+    .gi { display: inline-flex; align-items: center; justify-content: center; border-radius: 12px; flex-shrink: 0;
+      background: color-mix(in srgb,var(--c) 10%,var(--surface-3)); color: var(--c); }
   `],
 })
 export class GameIcon {

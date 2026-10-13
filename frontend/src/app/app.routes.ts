@@ -25,6 +25,7 @@ export const routes: Routes = [
       { path: 'chess/:code', title: 'Chess game', loadComponent: () => import('./features/chess/chess-game').then((m) => m.ChessGamePage) },
       { path: 'games/:slug', canActivate: [playerGuard], title: 'Play', loadComponent: () => import('./features/games/game-detail').then((m) => m.GameDetailPage) },
       { path: 'football', title: 'Football', loadComponent: () => import('./features/football/football-list').then((m) => m.FootballListPage) },
+      { path: 'football/research', title: 'Football research', loadComponent: () => import('./features/football/football-research').then((m) => m.FootballResearchPage) },
       { path: 'football/teams/:teamId', title: 'Team fixtures and results', loadComponent: () => import('./features/football/football-team').then((m) => m.FootballTeamPage) },
       { path: 'football/:fixtureId', title: 'Fixture', loadComponent: () => import('./features/football/football-fixture').then((m) => m.FootballFixturePage) },
       { path: 'match/:code', canActivate: [playerGuard], title: 'Match', loadComponent: () => import('./features/match/match-lobby').then((m) => m.MatchLobbyPage) },

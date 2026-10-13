@@ -15,7 +15,11 @@
 - Admin settings use shrinking form columns and single-column phone limits; numeric inputs no longer force horizontal page overflow.
 - Production hides the shared demo-account shortcuts unless explicitly enabled with `SHOW_DEMO_ACCOUNTS=true`.
 
-## Account recovery
+## Football research, discovery and notifications
+
+Public team comparison, searchable fixture filters, goals/scoring samples and recent form are now available, with compact summaries and optional coverage details. Fixture history loads on demand. Featured games rotate two enabled live games alongside permanent Chess, with swipe and keyboard controls. The notification bell and inbox now share reliable read states, search, categories and recovery. See [Football research and discovery](FOOTBALL-RESEARCH.md) for behavior, data limits and validation.
+
+## Account recovery configuration
 
 `/forgot-password` and `/reset-password` use a 30-minute random, single-use token. The database stores its SHA-256 hash, not the emailed token. Tokens are invalidated on use and password change; recovery revokes old sessions and creates an audit event. Requests are rate limited, have an account cooldown and return the same public response for an existing/unknown email. Access logs omit query strings, and pages use a no-referrer policy.
 

@@ -1,9 +1,10 @@
 import { Component, DestroyRef, computed, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { FormsModule } from '@angular/forms';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
-import { interval } from 'rxjs';
+import { interval, Subject, debounceTime } from 'rxjs';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
 import { AuthService } from '../../core/auth.service';
@@ -20,7 +21,7 @@ import { EmptyState, LoadError } from '../../shared/ui';
 import { JoinSheet, OpenChallengeCard } from './open-challenge';
 import { readGuestFollowedFixtures, writeGuestFollowedFixtures } from './football-follow-storage';
 
-type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
+type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
 
 /**
  * FOOTBALL home — built around what players actually do: join someone
@@ -30,7 +31,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
  */
 @Component({
   selector: 'app-football-list',
-  imports: [RouterLink, DatePipe, MatIconModule, MoneyPipe, EmptyState, LoadError, Countdown, OpenChallengeCard, JoinSheet],
+  imports: [RouterLink, FormsModule, DatePipe, MatIconModule, MoneyPipe, EmptyState, LoadError, Countdown, OpenChallengeCard, JoinSheet],
   template: `
     <div class="page">
       <div class="segmented tabs play-tabs">
@@ -41,11 +42,13 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       <header class="hero">
         <div class="grow">
           <h1>Football fixtures &amp; results</h1>
-          <p class="sub">Browse upcoming matches, live scores and past results for free.</p>
+          <p class="sub">Fixtures, scores and rivalries. Find your match.</p>
         </div>
         <button class="btn btn-ghost btn-lg" (click)="scrollToResults()"><mat-icon>history</mat-icon>Past results</button>
         <button class="btn btn-primary btn-lg create" (click)="scrollToFixtures()"><mat-icon>{{ auth.isLoggedIn() ? 'swords' : 'sports_soccer' }}</mat-icon> {{ auth.isLoggedIn() ? 'Create challenge' : 'Browse fixtures' }}</button>
       </header>
+
+      <div class="football-search-row"><label class="fixture-search"><mat-icon aria-hidden="true">search</mat-icon><input type="search" [ngModel]="searchText" (ngModelChange)="onSearch($event)" maxlength="80" aria-label="Search available fixtures and results by team or competition" placeholder="Search teams or competitions…"/>@if(searchText){<button type="button" (click)="onSearch('')" aria-label="Clear fixture search">×</button>}</label><a class="research-entry" routerLink="/football/research">Football research <span aria-hidden="true">↗</span></a></div>
 
       @if (!auth.isLoggedIn()) {
         <div class="card public-join">
@@ -144,22 +147,24 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       <!-- Fixtures -->
       <section id="fixtures" tabindex="-1" aria-labelledby="fixtures-title" [attr.aria-busy]="fixtures() === null && !error()">
         <div class="section-title">
-          <div><h2 id="fixtures-title">Upcoming fixtures &amp; live scores</h2><p class="sub">Browse by competition or date. Open any match for its match centre.</p></div>
+          <div><h2 id="fixtures-title">Fixtures &amp; live scores</h2><p class="sub">{{searchQuery()?'Matches in available football data':'Choose a day. Open a match.'}}</p></div><button class="btn btn-ghost btn-sm" (click)="load()">Refresh</button>
         </div>
         <div class="football-filters">
           <label>Competition
-            <select #competition (change)="selectCompetition(competition.value)">
+            <input type="search" [ngModel]="competitionSearch()" (ngModelChange)="competitionSearch.set($event)" aria-label="Search competition filters" placeholder="Find a competition…"/>
+            <select #competition [value]="competitionId()??''" (change)="selectCompetition(competition.value)">
               <option value="">All competitions</option>
-              @for (c of competitions(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
+              @for (c of filteredCompetitions(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
             </select>
           </label>
-          <label>From <input #dateFrom type="date" aria-label="Filter fixtures and results from this date" (change)="selectDates(dateFrom.value, dateTo.value)" /></label>
-          <label>To <input #dateTo type="date" aria-label="Filter fixtures and results through this date" (change)="selectDates(dateFrom.value, dateTo.value)" /></label>
+          <label>From <input #fromInput type="date" [value]="dateFrom()" aria-label="Filter fixtures and results from this date" (change)="selectDates(fromInput.value, toInput.value)" /></label>
+          <label>To <input #toInput type="date" [value]="dateTo()" aria-label="Filter fixtures and results through this date" (change)="selectDates(fromInput.value, toInput.value)" /></label>
         </div>
         @if (competitionError()) { <p class="muted small">{{ competitionError() }}</p> }
+        @if(filterError()){<p class="form-error" role="alert">{{filterError()}}</p>}
         <div class="segmented tabs day-tabs">
           @for (t of dayTabs; track t.key) {
-            <button [class.active]="day() === t.key" [attr.aria-pressed]="day() === t.key" (click)="day.set(t.key)">
+            <button [class.active]="day() === t.key" [attr.aria-pressed]="day() === t.key" (click)="selectDay(t.key)">
               @if (t.key === 'live') { <span class="live-dot live-red"></span> }
               {{ t.label }} @if (fixtures()) { <span class="count-muted">{{ byDay()[t.key].length }}</span> }
             </button>
@@ -167,12 +172,10 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         </div>
         @if (error()) {
           <app-load-error [message]="error()" (retry)="load()" />
-        } @else if (!lastUpdatedAt() && fixtures()?.length === 0) {
-          <div class="card notice"><mat-icon>cloud_off</mat-icon><div><strong>Football data is not available yet</strong><p class="muted small">No synced fixtures are available. Please check back after the football data source has been configured and synchronized.</p></div></div>
         } @else if (!fixtures()) {
           <div class="card-grid">@for (i of [1,2,3]; track i) { <div class="card sk"><div class="skeleton" style="height:90px"></div></div> }</div>
         } @else if (byDay()[day()].length === 0) {
-          <app-empty icon="sports_soccer" [title]="emptyTitle()" text="Try another day." />
+          <app-empty icon="sports_soccer" [title]="emptyTitle()" text="Try All, another competition or a different search.">@if(hasFilters()){<button class="btn btn-ghost" (click)="clearFilters()">Clear filters</button>}</app-empty>
         } @else {
           <div class="card-grid">
             @for (f of byDay()[day()]; track f.id) {
@@ -205,6 +208,8 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
             }
           </div>
         }
+        @if(fixturesMoreError()){<p class="form-error" role="status">{{fixturesMoreError()}}</p>}
+        @if(fixtures()&&fixtures()!.length<fixturesTotal()) {<div class="results-more"><button class="btn btn-ghost" [disabled]="loadingMoreFixtures()" (click)="loadMoreFixtures()">{{loadingMoreFixtures()?'Loading fixtures…':'More fixtures'}} <span aria-hidden="true">↓</span></button></div>}
         @if (anySimulated()) { <p class="muted tiny sim-note">Simulated demo fixtures are shown because no live football data provider is configured.</p> }
         @if (fixtures() && lastUpdatedAt()) { <p class="muted tiny">Football data last updated {{ lastUpdatedAt() | date: 'EEE d MMM, HH:mm' }}. Live updates may be delayed.</p> }
       </section>
@@ -213,7 +218,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         <div class="section-title">
           <div>
             <h2 id="results-title">Past match results</h2>
-            <p class="sub">Browse completed scores. Use the competition and date filters above to narrow your search.</p>
+            <p class="sub">Available scores. Search and filters apply here too.</p>
           </div>
           @if (resultsTotal() > 0) { <span class="muted small">{{ results()?.length ?? 0 }} of {{ resultsTotal() }} matches</span> }
         </div>
@@ -222,7 +227,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         } @else if (!results()) {
           <div class="card-grid">@for (i of [1,2,3]; track i) { <div class="card sk"><div class="skeleton" style="height:90px"></div></div> }</div>
         } @else if (results()!.length === 0) {
-          <app-empty icon="sports_soccer" title="No past results for these filters" text="Try a different competition or date range." />
+          <app-empty icon="sports_soccer" [title]="hasFilters()?'No past results match these filters':'No past results available yet'" text="Try a different search or date range.">@if(hasFilters()){<button class="btn btn-ghost" (click)="clearFilters()">Clear filters</button>}</app-empty>
         } @else {
           <div class="card-grid">
             @for (f of results(); track f.id) {
@@ -233,6 +238,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
               </a>
             }
           </div>
+          @if(resultsMoreError()){<p class="form-error" role="status">{{resultsMoreError()}}</p>}
           @if (results()!.length < resultsTotal()) {
             <div class="results-more">
               <button class="btn btn-ghost" [disabled]="loadingMoreResults()" (click)="loadMoreResults()">
@@ -278,6 +284,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
   `,
   styles: [`
     .play-tabs { margin-bottom: 16px; }
+    .football-search-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-block:20px}.fixture-search{display:flex;align-items:center;gap:10px;flex:1;min-width:210px;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;padding:0 14px}.fixture-search:focus-within{outline:2px solid var(--accent);outline-offset:2px}.fixture-search>mat-icon{color:var(--muted);flex-shrink:0}.fixture-search input{width:100%;min-width:0;min-height:52px;border:0;background:transparent;color:var(--text);font:inherit;outline:none!important}.fixture-search button{width:44px;height:44px;color:var(--text-2);font-size:26px;flex-shrink:0}.research-entry{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 14px;border:1px solid #8f875155;border-radius:9px;font-size:13px;color:#e3d19e;background:#d9c8910c}
     .hero { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
       .grow { flex: 1; min-width: 200px; } .sub { color: var(--text-2); margin-top: 4px; } }
     .create { flex: 1 1 100%; }
@@ -299,9 +306,10 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       a { display: grid; gap: 4px; color: inherit; text-decoration: none; min-width: 0; }
       strong { overflow-wrap: anywhere; } }
     .unfollow-label { font-size: 11px; }
-    .day-tabs { margin-bottom: 12px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); overflow: hidden; }
+    .day-tabs { margin-bottom: 12px; display: flex;flex-wrap:wrap;overflow:visible; }
+    .day-tabs button{flex:1 0 55px;min-height:44px}
     .day-tabs button { padding: 8px 4px; min-width: 0; font-size: 13px; gap: 3px; }
-    @media (min-width: 640px) { .day-tabs { display: inline-grid; } .day-tabs button { padding: 8px 14px; font-size: 14px; } }
+    @media (min-width: 640px) { .day-tabs { display: inline-flex; } .day-tabs button { padding: 8px 14px; font-size: 14px; } }
     .count-muted { color: var(--muted); font-weight: 500; font-size: 12px; }
     .live-red { color: var(--loss); margin-right: 2px; }
     .fixture { display: flex; flex-direction: column; gap: 10px; padding: 16px; min-width: 0; text-decoration: none; color: inherit; }
@@ -328,12 +336,17 @@ export class FootballListPage implements OnInit {
   private seo = inject(SeoService);
   protected auth = inject(AuthService);
   private router = inject(Router);
+  private route=inject(ActivatedRoute);
   private realtime = inject(RealtimeService);
   private clock = inject(ServerClock);
   private destroyRef = inject(DestroyRef);
   protected rematch = inject(RematchService);
 
   protected fixtures = signal<FootballFixture[] | null>(null);
+  protected fixturesTotal=signal(0);
+  protected fixturesMoreError=signal('');protected resultsMoreError=signal('');
+  protected loadingMoreFixtures=signal(false);
+  private fixturesPage=1;
   protected followedFixturesServer = signal<FootballFixture[]>([]);
   protected guestFollowedIds = signal<number[]>(readGuestFollowedFixtures());
   protected followError = signal('');
@@ -343,11 +356,15 @@ export class FootballListPage implements OnInit {
   protected resultsError = signal('');
   private resultsPage = 1;
   private resultsQueryVersion = 0;
+  private loadingGeneration:number|null=null;
   protected competitions = signal<FootballCompetition[]>([]);
   protected lastUpdatedAt = signal<string | null>(null);
-  private competitionId = signal<number | null>(null);
-  private dateFrom = signal('');
-  private dateTo = signal('');
+  protected competitionId = signal<number | null>(null);
+  protected dateFrom = signal('');
+  protected dateTo = signal('');
+  protected searchQuery=signal('');protected searchText='';protected competitionSearch=signal('');protected filterError=signal('');
+  protected filteredCompetitions=computed(()=>this.competitions().filter(c=>c.id===this.competitionId()||`${c.name} ${c.code} ${c.country??''}`.toLowerCase().includes(this.competitionSearch().trim().toLowerCase())));
+  private searchChanges=new Subject<string>();private filterKey='';
   protected error = signal('');
   protected competitionError = signal('');
   protected open = signal<OpenFootballChallenge[] | null>(null);
@@ -360,6 +377,7 @@ export class FootballListPage implements OnInit {
   private dayChosen = false;
 
   protected dayTabs: { key: DayTab; label: string }[] = [
+    {key:'all',label:'All'},
     { key: 'live', label: 'Live' }, { key: 'today', label: 'Today' }, { key: 'tomorrow', label: 'Tomorrow' }, { key: 'later', label: 'Later' },
   ];
 
@@ -375,7 +393,7 @@ export class FootballListPage implements OnInit {
 
   /** Fixtures bucketed by the player's local calendar day, relative to server time. */
   protected byDay = computed(() => {
-    const out: Record<DayTab, FootballFixture[]> = { live: [], today: [], tomorrow: [], later: [] };
+    const out: Record<DayTab, FootballFixture[]> = { all:this.fixtures()??[],live: [], today: [], tomorrow: [], later: [] };
     const now = new Date(this.clock.now());
     const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
     const startTomorrow = startToday + 86400000;
@@ -389,13 +407,21 @@ export class FootballListPage implements OnInit {
     }
     return out;
   });
-  protected emptyTitle = computed(() => ({ live: 'No matches are live right now', today: 'No more fixtures today', tomorrow: 'No fixtures tomorrow', later: 'No later fixtures yet' })[this.day()]);
+  protected hasFilters=computed(()=>!!(this.searchQuery()||this.competitionId()||this.dateFrom()||this.dateTo()));
+  protected emptyTitle = computed(() => this.hasFilters()?'No fixtures match these filters':({ all:'No upcoming fixtures available yet',live: 'No matches are live right now', today: 'No more fixtures today', tomorrow: 'No fixtures tomorrow', later: 'No later fixtures yet' })[this.day()]);
 
   ngOnInit() {
     this.seo.publish('Football fixtures, live scores and results', 'Browse upcoming football fixtures, live scores and recent results. View match centres and find relevant Head2Head challenges.', '/football');
     const opp = this.opponent();
     if (opp) this.rematch.setPending({ username: opp.replace(/^@/, ''), avatarColor: '#64748B' });
-    this.load();
+    this.searchChanges.pipe(debounceTime(250),takeUntilDestroyed(this.destroyRef)).subscribe(()=>this.persistFilters());
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(query=>{
+      const q=(query.get('q')??'').trim().slice(0,80);const c=Number(query.get('competitionId'));const from=query.get('dateFrom')??'',to=query.get('dateTo')??'';
+      const key=JSON.stringify({q,competitionId:Number.isSafeInteger(c)&&c>0?c:null,from,to});
+      this.searchText=q;this.searchQuery.set(q);this.competitionId.set(Number.isSafeInteger(c)&&c>0?c:null);this.dateFrom.set(from);this.dateTo.set(to);
+      const day=query.get('day');if(this.dayTabs.some(t=>t.key===day)){this.day.set(day as DayTab);this.dayChosen=true;}
+      if(key!==this.filterKey){this.filterKey=key;this.fixtures.set(null);this.results.set(null);void this.load();}
+    });
     this.loadCompetitions();
     if (this.auth.isLoggedIn()) {
       this.loadOpen();
@@ -403,13 +429,13 @@ export class FootballListPage implements OnInit {
       this.loadFollowed();
     }
     const refresh = () => { this.loadOpen(); this.loadMine(); };
-    this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => { this.load(); refresh(); });
+    this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => { this.load(true); refresh(); });
     this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(refresh);
     this.realtime.queue$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.loadOpen());
-    this.realtime.config$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load());
+    this.realtime.config$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
     // Other players' new challenges aren't pushed to everyone — poll gently.
-    interval(10000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.loadOpen());
-    interval(60000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => { this.load(); this.loadMine(); });
+    interval(10000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {if(!document.hidden)void this.loadOpen();});
+    interval(60000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => {if(!document.hidden){void this.load(true);void this.loadMine();}});
   }
 
   state(m: MatchSummary) { return DISPLAY_STATE[m.displayState]; }
@@ -459,36 +485,33 @@ export class FootballListPage implements OnInit {
     if (e.refresh) this.loadOpen();
   }
 
-  async load() {
+  async load(silent=false) {
+    // Keep expanded lists stable. A deliberate Refresh resets pagination.
+    if(silent&&(this.fixturesPage>4||this.resultsPage>8||this.loadingMoreFixtures()||this.loadingMoreResults()))return;
     const queryVersion = ++this.resultsQueryVersion;
+    this.loadingGeneration=queryVersion;
     this.error.set('');
     this.resultsError.set('');
-    this.resultsPage = 1;
-    this.results.set(null);
-    this.resultsTotal.set(0);
+    if(!silent){this.resultsPage=1;this.fixturesPage=1;this.fixtures.set(null);this.results.set(null);this.resultsTotal.set(0);this.fixturesTotal.set(0);this.fixturesMoreError.set('');this.resultsMoreError.set('');}
     try {
-      const filters = { competitionId: this.competitionId(), dateFrom: this.dateFrom(), dateTo: this.dateTo(), pageSize: 100 };
-      const [upcoming, results] = await Promise.all([
-        this.api.get<{ fixtures: FootballFixture[]; lastUpdatedAt: string | null }>('/football/fixtures', filters),
-        this.api.get<{ fixtures: FootballFixture[]; total: number }>('/football/fixtures', { ...filters, status: 'completed', pageSize: 12 }),
+      const filters = {q:this.searchQuery(),competitionId: this.competitionId(), dateFrom: this.dateFrom(), dateTo: this.dateTo()};
+      const [upcomingResult, resultsResult] = await Promise.allSettled([
+        this.api.get<{ fixtures: FootballFixture[]; total:number; lastUpdatedAt: string | null }>('/football/fixtures',{...filters,pageSize:this.fixturesPage*24}),
+        this.api.get<{ fixtures: FootballFixture[]; total: number }>('/football/fixtures', { ...filters, status: 'completed', pageSize:this.resultsPage*12 }),
       ]);
       if (queryVersion !== this.resultsQueryVersion) return;
-      this.fixtures.set(upcoming.fixtures);
-      this.results.set(results.fixtures);
-      this.resultsTotal.set(results.total);
-      this.lastUpdatedAt.set(upcoming.lastUpdatedAt);
+      if(upcomingResult.status==='fulfilled'){
+        const upcoming=upcomingResult.value;this.fixtures.set(upcoming.fixtures);this.fixturesTotal.set(upcoming.total??upcoming.fixtures.length);this.lastUpdatedAt.set(upcoming.lastUpdatedAt);
+        this.seo.publish('Football fixtures, live scores and results','Explore available football fixtures and results. Compare teams in Head2Head research.','/football',upcoming.fixtures.length>0&&!upcoming.fixtures.some(f=>f.isSimulated));
+      }else{this.error.set(apiError(upcomingResult.reason).message);if(!this.fixtures())this.fixtures.set([]);}
+      if(resultsResult.status==='fulfilled'){this.results.set(resultsResult.value.fixtures);this.resultsTotal.set(resultsResult.value.total);}
+      else{this.resultsError.set(apiError(resultsResult.reason).message);if(!this.results())this.results.set([]);}
       this.guestFollowedIds.set(readGuestFollowedFixtures());
       if (this.auth.isLoggedIn()) void this.loadFollowed();
-      this.seo.publish(
-        'Football fixtures, live scores and results',
-        'Browse upcoming football fixtures, live scores and recent results. View match centres and find relevant Head2Head challenges.',
-        '/football',
-        upcoming.fixtures.length > 0 && !upcoming.fixtures.some((f) => f.isSimulated),
-      );
       if (!this.dayChosen) {
         // Open on the first day that actually has something to show.
         const b = this.byDay();
-        this.day.set((['live', 'today', 'tomorrow', 'later'] as DayTab[]).find((k) => b[k].length) ?? 'today');
+        this.day.set(this.searchQuery()?'all':(['live', 'today', 'tomorrow', 'later'] as DayTab[]).find((k) => b[k].length) ?? 'today');
         this.dayChosen = true;
       }
 
@@ -499,7 +522,14 @@ export class FootballListPage implements OnInit {
         this.resultsError.set(message);
         this.results.set([]);
       }
-    }
+    }finally{if(this.loadingGeneration===queryVersion)this.loadingGeneration=null;}
+  }
+
+  async loadMoreFixtures(){
+    if(this.loadingMoreFixtures()||(this.fixtures()?.length??0)>=this.fixturesTotal())return;
+    this.loadingMoreFixtures.set(true);this.fixturesMoreError.set('');const version=this.resultsQueryVersion;const next=this.fixturesPage+1;
+    try{const response=await this.api.get<{fixtures:FootballFixture[];total:number}>('/football/fixtures',{q:this.searchQuery(),competitionId:this.competitionId(),dateFrom:this.dateFrom(),dateTo:this.dateTo(),page:next,pageSize:24});if(version!==this.resultsQueryVersion)return;this.fixtures.update(current=>[...new Map([...(current??[]),...response.fixtures].map(f=>[f.id,f])).values()]);this.fixturesPage=next;this.fixturesTotal.set(response.total);}
+    catch(err){if(version===this.resultsQueryVersion)this.fixturesMoreError.set(apiError(err).message);}finally{this.loadingMoreFixtures.set(false);}
   }
 
   async loadFollowed() {
@@ -534,12 +564,13 @@ export class FootballListPage implements OnInit {
   async loadMoreResults() {
     if (this.loadingMoreResults() || this.resultsPage * 12 >= this.resultsTotal()) return;
     this.loadingMoreResults.set(true);
-    this.resultsError.set('');
+    this.resultsMoreError.set('');
     const queryVersion = this.resultsQueryVersion;
     const nextPage = this.resultsPage + 1;
     try {
       const response = await this.api.get<{ fixtures: FootballFixture[]; total: number }>('/football/fixtures', {
         competitionId: this.competitionId(),
+        q:this.searchQuery(),
         dateFrom: this.dateFrom(),
         dateTo: this.dateTo(),
         status: 'completed',
@@ -547,11 +578,11 @@ export class FootballListPage implements OnInit {
         pageSize: 12,
       });
       if (queryVersion !== this.resultsQueryVersion) return;
-      this.results.update((current) => [...(current ?? []), ...response.fixtures]);
+      this.results.update((current) => [...new Map([...(current??[]),...response.fixtures].map(f=>[f.id,f])).values()]);
       this.resultsPage = nextPage;
       this.resultsTotal.set(response.total);
     } catch (err) {
-      if (queryVersion === this.resultsQueryVersion) this.resultsError.set(apiError(err).message);
+      if (queryVersion === this.resultsQueryVersion) this.resultsMoreError.set(apiError(err).message);
     } finally {
       this.loadingMoreResults.set(false);
     }
@@ -567,16 +598,21 @@ export class FootballListPage implements OnInit {
 
   selectCompetition(value: string) {
     this.competitionId.set(value ? Number(value) : null);
-    this.fixtures.set(null);
-    this.load();
+    this.persistFilters();
   }
 
   selectDates(from: string, to: string) {
     this.dateFrom.set(from);
     this.dateTo.set(to);
-    this.fixtures.set(null);
-    this.load();
+    const days=from&&to?(Date.parse(to)-Date.parse(from))/86400000:0;
+    if((from&&to&&from>to)||days>90){this.filterError.set('Choose a date range of up to 90 days.');return;}
+    this.filterError.set('');this.persistFilters();
   }
+
+  onSearch(value:string){this.searchText=value;const q=value.trim().slice(0,80);if(q===this.searchQuery())return;this.searchQuery.set(q);++this.resultsQueryVersion;this.fixtures.set(null);this.results.set(null);this.error.set('');this.resultsError.set('');this.day.set(q?'all':'today');this.dayChosen=false;this.searchChanges.next(value);}
+  selectDay(day:DayTab){this.day.set(day);this.dayChosen=true;this.persistFilters();}
+  clearFilters(){this.searchText='';this.searchQuery.set('');this.competitionId.set(null);this.competitionSearch.set('');this.dateFrom.set('');this.dateTo.set('');this.filterError.set('');this.day.set('all');this.dayChosen=true;this.persistFilters();}
+  private persistFilters(){const key=JSON.stringify({q:this.searchQuery(),competitionId:this.competitionId(),from:this.dateFrom(),to:this.dateTo()});if(key!==this.filterKey){++this.resultsQueryVersion;this.fixtures.set(null);this.results.set(null);}else if(this.fixtures()===null&&this.loadingGeneration!==this.resultsQueryVersion)void this.load();void this.router.navigate([],{relativeTo:this.route,queryParams:{q:this.searchQuery()||null,competitionId:this.competitionId(),dateFrom:this.dateFrom()||null,dateTo:this.dateTo()||null,day:this.day()},queryParamsHandling:'merge',replaceUrl:true});}
 
   async loadOpen() {
     if (!this.auth.isLoggedIn()) return;

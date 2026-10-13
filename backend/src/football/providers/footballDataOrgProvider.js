@@ -68,6 +68,12 @@ export class FootballDataOrgProvider extends FootballDataProvider {
       venue: m.venue || null,
       kickoffAt: m.utcDate,
       status: STATUS_MAP[m.status] || 'SCHEDULED',
+      // Half-time fallbacks are useful for live display, never final-score
+      // evidence for research. This flag does not alter settlement behaviour.
+      researchEligible: m.status !== 'AWARDED' && (m.status !== 'FINISHED'
+        || (Number.isSafeInteger(m.score?.fullTime?.home) && m.score.fullTime.home >= 0
+          && Number.isSafeInteger(m.score?.fullTime?.away) && m.score.fullTime.away >= 0)),
+      scoreDuration: m.score?.duration || null,
       minute: m.minute ?? null,
       homeScore: m.score?.fullTime?.home ?? m.score?.halfTime?.home ?? null,
       awayScore: m.score?.fullTime?.away ?? m.score?.halfTime?.away ?? null,
@@ -139,14 +145,16 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     if (cached && cached.expiresAt > Date.now()) return cached.promise;
     if (cached) this.teamMatchesCache.delete(key);
 
-    const entry = { expiresAt: Date.now() + 15 * 60 * 1000, promise: null };
+    const entry = { expiresAt: Date.now() + 15 * 60 * 1000, promise: null, fetchedAt: null };
     entry.promise = this.#get(`/teams/${encodeURIComponent(key)}/matches?status=FINISHED&limit=500`)
       .then((data) => {
         if (!Array.isArray(data.matches)) throw new Error(`football-data.org team history for ${key} did not include a matches array.`);
+        entry.fetchedAt = new Date().toISOString();
         return data.matches.map((match) => ({
           ...this.#fixture(match),
-          homeScore: match.score?.fullTime?.home ?? null,
-          awayScore: match.score?.fullTime?.away ?? null,
+          homeScore: Number.isSafeInteger(match.score?.regularTime?.home) && Number.isSafeInteger(match.score?.regularTime?.away) ? match.score.regularTime.home : match.score?.fullTime?.home ?? null,
+          awayScore: Number.isSafeInteger(match.score?.regularTime?.home) && Number.isSafeInteger(match.score?.regularTime?.away) ? match.score.regularTime.away : match.score?.fullTime?.away ?? null,
+          scoreBasis: Number.isSafeInteger(match.score?.regularTime?.home) && Number.isSafeInteger(match.score?.regularTime?.away) || match.score?.duration === 'REGULAR' ? 'REGULATION' : 'REPORTED_FINAL',
           competitionName: match.competition?.name || match.competition?.code || null,
           venue: match.venue || null,
         }));
@@ -162,6 +170,12 @@ export class FootballDataOrgProvider extends FootballDataProvider {
 
   async getTeamMatches(teamProviderId) {
     return this.#getTeamMatches(teamProviderId);
+  }
+
+  /** Research needs the actual cache fetch time, rather than the page load time. */
+  async getTeamMatchesSnapshot(teamProviderId) {
+    const matches = await this.#getTeamMatches(teamProviderId);
+    return { matches, fetchedAt: this.teamMatchesCache.get(String(teamProviderId))?.fetchedAt || null };
   }
 
   async getHeadToHead(providerFixtureId, homeTeamProviderId, awayTeamProviderId) {

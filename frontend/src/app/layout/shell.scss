@@ -61,21 +61,28 @@
   }
 }
 .um-head { padding: 10px 16px 8px; display: flex; flex-direction: column; border-bottom: 1px solid var(--border); margin-bottom: 4px; }
-.notif-panel { width: min(360px, 92vw); }
-.np-head { display: flex; align-items: center; justify-content: space-between; padding: 8px 14px 8px 16px; border-bottom: 1px solid var(--border); }
-.np-empty { padding: 28px 16px; text-align: center; color: var(--muted); font-size: 14px; }
-.np-item {
-  width: 100%; display: flex; gap: 10px; text-align: left; background: transparent; border: 0; color: var(--text); padding: 12px 16px; cursor: pointer;
-  border-bottom: 1px solid var(--border);
-  &:hover { background: var(--surface-3); }
-  .np-dot { width: 7px; height: 7px; border-radius: 50%; margin-top: 7px; flex-shrink: 0; background: transparent; }
-  &.unread .np-dot { background: var(--accent); }
-  .np-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-  .np-title { font-weight: 600; font-size: 14px; }
-  .np-msg { color: var(--text-2); font-size: 13px; line-height: 1.35; }
-  .np-time { color: var(--muted); font-size: 12px; }
-}
-.np-all { display: block; text-align: center; padding: 10px; color: var(--accent); font-weight: 600; font-size: 13px; }
+// Only this menu's overlay receives these dimensions; account-menu behavior
+// and styling remain managed by Angular Material.
+::ng-deep .mat-mdc-menu-panel.notif-menu { min-width:min(380px,calc(100vw - 24px)); max-width:min(380px,calc(100vw - 24px)); border:1px solid var(--border-strong); border-radius:14px; }
+::ng-deep .mat-mdc-menu-panel.notif-menu .mat-mdc-menu-content { padding:0; }
+.notif-panel { width:100%; }
+.np-head { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:14px 16px; border-bottom:1px solid var(--border); }
+.np-head > div { display:grid; gap:3px; }.np-head strong { font-size:16px; }.np-head span { color:var(--muted); font-size:11px; }
+.np-mark-all.mat-mdc-menu-item { width:auto; min-width:0; min-height:44px; padding:6px 0 6px 10px; color:var(--accent); font-size:12px; }
+.np-activity { max-height:min(60dvh,470px); overflow-y:auto; overscroll-behavior:contain; }
+.np-group-label { padding:12px 16px 6px; color:var(--muted); font-size:10px; text-transform:uppercase; font-weight:700; letter-spacing:.1em; }
+.np-empty { padding:28px 22px; text-align:center; color:var(--muted); font-size:13px; display:grid; justify-items:center; gap:9px; }.np-empty strong { color:var(--text-2); font-size:14px; }.np-empty > mat-icon { margin-bottom:3px; }
+.np-item.mat-mdc-menu-item { min-height:88px; height:auto; width:100%; padding:12px 16px; color:var(--text); border-bottom:1px solid var(--border); align-items:flex-start; }
+.np-item.mat-mdc-menu-item > mat-icon { margin-right:12px; margin-top:3px; font-size:20px; width:20px; height:20px; color:var(--muted); }
+.np-item.unread { background:var(--accent-soft); }.np-item.unread > mat-icon { color:var(--accent); }
+.np-body { display:flex; flex-direction:column; gap:4px; min-width:0; }
+.np-title { font-size:13px; line-height:1.4; font-weight:650; overflow-wrap:anywhere; }
+.np-msg { color:var(--text-2); font-size:12px; line-height:1.5; display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:2; overflow:hidden; overflow-wrap:anywhere; }
+.np-time { color:var(--muted); font-size:10px; line-height:1.5; }.np-item.unread .np-time { color:var(--accent); }
+.np-all.mat-mdc-menu-item { min-height:52px; font-size:13px; color:var(--accent); font-weight:600; border-top:1px solid var(--border); }
+.np-all > mat-icon { color:var(--accent); }
+.np-error { padding:12px 16px; font-size:12px; color:var(--text-2); background:var(--loss-soft); border-bottom:1px solid var(--border); }
+.np-error .mat-mdc-menu-item { min-height:44px; padding:6px 0; font-size:12px; color:var(--accent); }
 
 // Narrow phones (320–430px): logo + wallet + bell + avatar must never push
 // the page wider than the screen.

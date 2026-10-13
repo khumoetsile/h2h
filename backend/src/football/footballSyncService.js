@@ -59,8 +59,8 @@ async function upsertFixture(provider, competitionRow, fx) {
        (provider, provider_fixture_id, competition_id, season, home_team_id, away_team_id, kickoff_at, status, minute, match_phase,
         home_score, away_score, home_shots, away_shots, home_shots_on_target, away_shots_on_target,
         home_possession, away_possession, home_corners, away_corners, home_cards, away_cards,
-        first_goal_team, stats_available, ball_coordinates, is_simulated, last_synced_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+        first_goal_team, stats_available, ball_coordinates, is_simulated, research_eligible, score_duration, last_synced_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
      ON DUPLICATE KEY UPDATE
        kickoff_at = VALUES(kickoff_at), status = VALUES(status), minute = VALUES(minute),
        match_phase = COALESCE(VALUES(match_phase), match_phase),
@@ -72,7 +72,7 @@ async function upsertFixture(provider, competitionRow, fx) {
        home_cards = VALUES(home_cards), away_cards = VALUES(away_cards),
        first_goal_team = VALUES(first_goal_team), stats_available = VALUES(stats_available),
        ball_coordinates = COALESCE(VALUES(ball_coordinates), ball_coordinates),
-       last_synced_at = NOW()`,
+       research_eligible = VALUES(research_eligible), score_duration = VALUES(score_duration), last_synced_at = NOW()`,
     [
       provider.name, fx.providerId, competitionRow.id, fx.season, homeId, awayId, new Date(fx.kickoffAt), fx.status, fx.minute, fx.phase || null,
       fx.homeScore, fx.awayScore, fx.stats.homeShots ?? null, fx.stats.awayShots ?? null,
@@ -80,7 +80,7 @@ async function upsertFixture(provider, competitionRow, fx) {
       fx.stats.homePossession ?? null, fx.stats.awayPossession ?? null,
       fx.stats.homeCorners ?? null, fx.stats.awayCorners ?? null,
       fx.stats.homeCards ?? null, fx.stats.awayCards ?? null, fx.stats.firstGoalTeam ?? null, fx.statsAvailable ? 1 : 0,
-      Array.isArray(fx.ballCoordinates) ? JSON.stringify(fx.ballCoordinates) : null, isSimulated,
+      Array.isArray(fx.ballCoordinates) ? JSON.stringify(fx.ballCoordinates) : null, isSimulated, fx.researchEligible === false ? 0 : 1, fx.scoreDuration || null,
     ],
   );
   return queryOne('SELECT * FROM football_fixtures WHERE provider = ? AND provider_fixture_id = ?', [provider.name, fx.providerId]);

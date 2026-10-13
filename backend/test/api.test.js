@@ -56,6 +56,18 @@ before(async () => {
   await seed({ log: quiet });
 });
 
+describe('public discovery catalogue', () => {
+  test('shows enabled game metadata to visitors while match actions still require authentication', async () => {
+    const response=await api().get('/api/game-catalogue');
+    assert.equal(response.status,200);
+    assert.ok(response.body.games.length>=3);
+    assert.ok(response.body.games.every(game=>game.isEnabled && game.slug && game.name));
+    assert.equal(response.body.games[0].stakes,undefined);
+    assert.equal(response.body.games[0].waitingByStake,undefined);
+    assert.equal((await api().post('/api/matches/find').send({gameId:response.body.games[0].id,stake:5})).status,401);
+  });
+});
+
 describe('password recovery', () => {
   test('concurrent requests send only one recovery link per account cooldown',async()=>{
     const player=await newPlayer('cooldown');

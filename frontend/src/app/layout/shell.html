@@ -23,9 +23,9 @@
     }
 
     @if (auth.isLoggedIn()) {
-      <button class="icon-btn" [matMenuTriggerFor]="notifMenu" (menuOpened)="loadNotifications()" aria-label="Notifications">
+      <button class="icon-btn" [matMenuTriggerFor]="notifMenu" (menuOpened)="notificationMenuOpened()" (menuClosed)="notificationMenuClosed()" [attr.aria-label]="auth.unread() ? 'Notifications, '+auth.unread()+' unread' : 'Notifications'">
         <mat-icon>notifications</mat-icon>
-        @if (auth.unread() > 0) { <span class="badge">{{ auth.unread() > 99 ? '99+' : auth.unread() }}</span> }
+        @if (auth.unread() > 0) { <span class="badge" aria-hidden="true">{{ auth.unread() > 99 ? '99+' : auth.unread() }}</span> }
       </button>
     } @else {
       <a class="btn btn-ghost btn-sm" routerLink="/login" [queryParams]="{next:router.url}">Sign in</a>
@@ -42,28 +42,27 @@
 </header>
 
 <mat-menu #notifMenu="matMenu" xPosition="before" class="notif-menu">
-  <div class="notif-panel" (click)="$event.stopPropagation()" (keydown)="$event.stopPropagation()">
+  <div class="notif-panel">
     <div class="np-head">
-      <strong>Notifications</strong>
-      @if (auth.unread() > 0) { <button class="btn btn-ghost btn-sm" (click)="markAllRead()">Mark all read</button> }
+      <div><strong>Notifications</strong><span>{{ auth.unread() }} unread</span></div>
+      <button mat-menu-item class="np-mark-all" [disabled]="!auth.unread() || inbox.readingAll()" (click)="$event.stopPropagation(); markAllRead()">{{ inbox.readingAll() ? 'Marking…' : 'Mark all read' }}</button>
     </div>
+    @if (notificationActionError()) { <div class="np-error" role="alert">{{ notificationActionError() }}<button mat-menu-item (click)="$event.stopPropagation(); markAllRead()">Retry marking all read</button></div> }
+    @if (notificationError()) { <div class="np-error" role="alert">{{ notificationError() }}<button mat-menu-item (click)="$event.stopPropagation(); loadNotifications()">Retry loading activity</button></div> }
     @if (loadingNotifications() && notifications().length === 0) {
-      <div class="np-empty">Loading…</div>
+      <div class="np-empty" role="status">Loading your activity…</div>
     } @else if (notifications().length === 0) {
-      <div class="np-empty">You're all caught up.</div>
+      @if (!notificationError()) { <div class="np-empty"><mat-icon aria-hidden="true">notifications_none</mat-icon><strong>You’re all caught up.</strong><span>Your invitations and results will appear here.</span></div> }
     } @else {
-      @for (n of notifications(); track n.id) {
-        <button class="np-item" [class.unread]="!n.isRead" (click)="open(n)">
-          <span class="np-dot"></span>
-          <span class="np-body">
-            <span class="np-title">{{ n.title }}</span>
-            <span class="np-msg">{{ n.message }}</span>
-            <span class="np-time">{{ n.createdAt | ago }}</span>
-          </span>
-        </button>
-      }
+      <div class="np-activity" [attr.aria-busy]="loadingNotifications()">@for (group of notificationGroups(); track group.label) {
+        <div class="np-group-label">{{ group.label }}</div>
+        @for (n of group.items; track n.id) {
+          @if (notificationLink(n); as destination) { <a mat-menu-item class="np-item" [class.unread]="!n.isRead" [routerLink]="destination" [attr.aria-label]="notificationLabel(n)" [attr.aria-describedby]="'notification-menu-message-'+n.id" (click)="open(n)"><mat-icon aria-hidden="true">{{ notificationIcon(n) }}</mat-icon><span class="np-body"><span class="np-title">{{ n.title }}</span><span class="np-msg" [id]="'notification-menu-message-'+n.id">{{ n.message }}</span><span class="np-time">{{ n.createdAt | ago }} · {{ n.isRead ? 'Read' : 'Unread' }}</span></span></a> }
+          @else { <button mat-menu-item class="np-item" [class.unread]="!n.isRead" [attr.aria-label]="notificationLabel(n)" [attr.aria-describedby]="'notification-menu-message-'+n.id" [disabled]="inbox.isPending(n.id)" (click)="open(n)"><mat-icon aria-hidden="true">{{ notificationIcon(n) }}</mat-icon><span class="np-body"><span class="np-title">{{ n.title }}</span><span class="np-msg" [id]="'notification-menu-message-'+n.id">{{ n.message }}</span><span class="np-time">{{ n.createdAt | ago }} · {{ n.isRead ? 'Read' : 'Unread' }}</span></span></button> }
+        }
+      }</div>
     }
-    <a class="np-all" routerLink="/notifications">View all notifications</a>
+    <a mat-menu-item class="np-all" routerLink="/notifications">View all activity <mat-icon aria-hidden="true">chevron_right</mat-icon></a>
   </div>
 </mat-menu>
 

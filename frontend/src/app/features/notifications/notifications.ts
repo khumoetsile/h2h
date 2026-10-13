@@ -1,107 +1,131 @@
-import { Component, inject, OnInit, signal } from '@angular/core';
-import { Router } from '@angular/router';
+import { Component, DestroyRef, OnInit, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { DatePipe } from '@angular/common';
+import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../core/api.service';
+import { apiError } from '../../core/api-error';
 import { AuthService } from '../../core/auth.service';
-import { AppNotification } from '../../core/models';
+import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { GetApp } from '../../shared/get-app';
+import { NotificationInbox, NotificationResponse } from '../../shared/notification-inbox';
+import { NotificationItem, groupNotifications, notificationCategoryLabel, notificationIcon, notificationLabel, notificationLink } from '../../shared/notification-presentation';
 import { AgoPipe } from '../../shared/pipes';
 import { EmptyState, LoadError, SkeletonList } from '../../shared/ui';
 
-const ICONS: Record<string, string> = {
-  CHESS_TURN: 'grid_view', CHESS_DRAW_OFFER: 'balance',
-  CHALLENGE_RECEIVED: 'swords', CHALLENGE_ACCEPTED: 'handshake', CHALLENGE_DECLINED: 'block', CHALLENGE_EXPIRED: 'schedule',
-  MATCH_FOUND: 'person_search', MATCH_STARTING: 'play_circle', MATCH_WON: 'emoji_events', MATCH_LOST: 'sentiment_dissatisfied',
-  MATCH_DRAW: 'balance', MATCH_CANCELLED: 'cancel', DEPOSIT: 'savings', WITHDRAWAL: 'payments', WELCOME: 'waving_hand', ADMIN: 'campaign',
-};
+const PAGE_SIZE = 20;
 
 @Component({
   selector: 'app-notifications',
-  imports: [MatIconModule, GetApp, AgoPipe, EmptyState, LoadError, SkeletonList],
-  template: `
-    <div class="page page-narrow">
-      <app-get-app variant="settings" />
-      <div class="page-head">
-        <div><h1>Notifications</h1><p class="sub">{{ auth.unread() }} unread</p></div>
-        <div class="row">
-          <div class="segmented">
-            <button [class.active]="!unreadOnly()" [attr.aria-pressed]="!unreadOnly()" (click)="setUnread(false)">All</button>
-            <button [class.active]="unreadOnly()" [attr.aria-pressed]="unreadOnly()" (click)="setUnread(true)">Unread</button>
-          </div>
-          <button class="btn btn-sm" [disabled]="auth.unread() === 0" (click)="readAll()"><mat-icon>done_all</mat-icon>Mark all read</button>
-        </div>
-      </div>
-      <div class="card card-flush">
-        @if (error()) { <app-load-error [message]="error()" (retry)="load()" /> }
-        @else if (!items()) { <app-skeleton-list [rows]="6" /> }
-        @else if (items()!.length === 0) { <app-empty icon="notifications_off" [title]="unreadOnly() ? 'No unread notifications' : 'No notifications yet'" text="Challenges, match results and wallet activity show up here." /> }
-        @else {
-          <div class="list">
-            @for (n of items(); track n.id) {
-              <div class="list-item clickable" [class.unread]="!n.isRead" (click)="open(n)">
-                <span class="ic"><mat-icon>{{ icon(n.type) }}</mat-icon></span>
-                <div class="grow">
-                  <button type="button" class="t" (click)="$event.stopPropagation(); open(n)">{{ n.title }}</button>
-                  <div class="text-2 small">{{ n.message }}</div>
-                  <div class="muted tiny">{{ n.createdAt | ago }}</div>
-                </div>
-                @if (!n.isRead) { <button class="btn btn-ghost btn-sm" (click)="$event.stopPropagation(); markRead(n)">Mark read</button> }
-              </div>
-            }
-          </div>
-        }
-      </div>
-    </div>
-  `,
-  styles: [`
-    .ic { width: 36px; height: 36px; border-radius: 8px; background: var(--surface-2); display: flex; align-items: center; justify-content: center; color: var(--text-2); flex-shrink: 0; }
-    .grow { flex: 1; min-width: 0; } .t { font-weight: 600; }
-    .unread { background: rgba(245,112,31,.05); .ic { color: var(--accent); background: var(--accent-soft); } }
-    .list-item { align-items: flex-start; }
-  `],
+  imports: [DatePipe, FormsModule, RouterLink, MatIconModule, GetApp, AgoPipe, EmptyState, LoadError, SkeletonList],
+  templateUrl: './notifications.html', styleUrl: './notifications.scss',
 })
 export class NotificationsPage implements OnInit {
   private api = inject(Api);
   protected auth = inject(AuthService);
-  private router = inject(Router);
+  protected inbox = inject(NotificationInbox);
+  private realtime = inject(RealtimeService);
   private toast = inject(Toast);
-  protected items = signal<AppNotification[] | null>(null);
+  private destroyRef = inject(DestroyRef);
+  protected items = signal<NotificationItem[] | null>(null);
+  protected groups = computed(() => groupNotifications(this.items() ?? []));
   protected unreadOnly = signal(false);
+  protected category = signal('all');
+  protected search = '';
+  protected total = signal(0);
+  protected page = signal(1);
+  protected loading = signal(false);
+  protected loadingMore = signal(false);
   protected error = signal('');
+  protected moreError = signal('');
+  protected readAllError = signal('');
+  protected rowErrors = signal<Record<string, string>>({});
+  protected expanded = signal<Array<number | string>>([]);
+  protected categories = [{ value: 'all', label: 'All activity' }, { value: 'games', label: 'Games' }, { value: 'football', label: 'Football' }, { value: 'wallet', label: 'Wallet' }];
+  protected icon = notificationIcon;
+  protected label = notificationLabel;
+  protected link = notificationLink;
+  protected categoryLabel = notificationCategoryLabel;
+  private requestSequence = 0;
+  private searchQuery = '';
+  private searchTimer: ReturnType<typeof setTimeout> | null = null;
+  private refreshTimer: ReturnType<typeof setTimeout> | null = null;
+  private destroyed = false;
 
-  ngOnInit() { this.load(); }
-  icon(type: string) { return ICONS[type] ?? 'notifications'; }
-  setUnread(v: boolean) { this.unreadOnly.set(v); this.items.set(null); this.load(); }
-
-  async load() {
-    this.error.set('');
+  constructor() {
+    this.realtime.notification$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.scheduleRefresh());
+    this.realtime.reconnected$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.scheduleRefresh());
+    this.inbox.changed$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((change) => {
+      if (change.kind === 'read') this.items.update((items) => items && (this.unreadOnly() ? items.filter((item) => item.id !== change.id) : items.map((item) => item.id === change.id ? { ...item, isRead: true } : item)));
+      else if (change.confirmed) this.items.update((items) => items && (this.unreadOnly() ? [] : items.map((item) => ({ ...item, isRead: true }))));
+      this.scheduleRefresh();
+    });
+    this.destroyRef.onDestroy(() => {
+      this.destroyed = true;
+      if (this.searchTimer) clearTimeout(this.searchTimer);
+      if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    });
+  }
+  ngOnInit() { void this.load(); }
+  setUnread(value: boolean) { if (this.unreadOnly() !== value) { this.unreadOnly.set(value); this.reset(); } }
+  setCategory(value: string) { if (this.category() !== value) { this.category.set(value); this.reset(); } }
+  setSearch(value: string) {
+    this.search = value; ++this.requestSequence;
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = setTimeout(() => { this.searchTimer = null; this.searchQuery = this.search.trim(); this.reset(); }, 300);
+  }
+  clearSearch() {
+    if (this.searchTimer) clearTimeout(this.searchTimer);
+    this.searchTimer = null; this.search = ''; this.searchQuery = ''; this.reset();
+  }
+  private reset() {
+    this.page.set(1); this.items.set(null); this.total.set(0); this.expanded.set([]); this.rowErrors.set({}); this.moreError.set(''); this.loadingMore.set(false);
+    void this.load();
+  }
+  private scheduleRefresh() {
+    ++this.requestSequence;
+    if (this.refreshTimer) clearTimeout(this.refreshTimer);
+    this.refreshTimer = setTimeout(() => { this.refreshTimer = null; void this.load(); }, 150);
+  }
+  async load(append = false) {
+    if (append && this.loadingMore()) return;
+    const sequence = ++this.requestSequence;
+    const revision = this.inbox.captureRevision();
+    const page = append ? this.page() + 1 : this.page();
+    const params = { unread: this.unreadOnly() || null, category: this.category(), search: this.searchQuery || null, pageSize: PAGE_SIZE };
+    if (append) { this.loadingMore.set(true); this.moreError.set(''); } else { this.loading.set(true); this.error.set(''); }
     try {
-      const r = await this.api.get<{ notifications: AppNotification[]; unread: number }>('/notifications', { unread: this.unreadOnly() || null });
-      this.items.set(r.notifications);
-      this.auth.unread.set(r.unread);
-    } catch { this.error.set('Could not load notifications.'); }
+      // Refresh all visible pages so new entries cannot shift older boundaries
+      // into duplicates or erase the activity a person is currently reading.
+      const responses = await Promise.all((append ? [page] : Array.from({ length: page }, (_, index) => index + 1)).map((number) => this.api.get<NotificationResponse>('/notifications', { ...params, page: number })));
+      if (this.destroyed || sequence !== this.requestSequence) return;
+      const incoming = responses.flatMap((response) => response.notifications);
+      const merged = append ? [...(this.items() ?? []), ...incoming] : incoming;
+      this.items.set([...new Map(merged.map((item) => [item.id, item])).values()]);
+      this.moreError.set('');
+      this.total.set(responses.at(-1)!.total ?? incoming.length); this.page.set(page);
+      this.inbox.applyCount(responses.at(-1)!.unread, revision);
+    } catch (err) {
+      if (this.destroyed || sequence !== this.requestSequence) return;
+      if (append) this.moreError.set(apiError(err).message); else this.error.set(apiError(err).message);
+    } finally { if (sequence === this.requestSequence) { this.loading.set(false); this.loadingMore.set(false); } }
   }
-
-  async markRead(n: AppNotification) {
-    try {
-      const r = await this.api.post<{ unread: number }>(`/notifications/${n.id}/read`);
-      this.auth.unread.set(r.unread);
-      this.items.update((l) => (this.unreadOnly() ? l!.filter((x) => x.id !== n.id) : l!.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))));
-    } catch (err) { this.toast.error(err); }
+  toggleExpanded(id: number | string) { this.expanded.update((ids) => ids.includes(id) ? ids.filter((value) => value !== id) : [...ids, id]); }
+  async markRead(item: NotificationItem) {
+    this.rowErrors.update((errors) => ({ ...errors, [item.id]: '' }));
+    try { await this.inbox.markRead(item); }
+    catch (err) { this.rowErrors.update((errors) => ({ ...errors, [item.id]: apiError(err).message })); }
   }
-
-  async open(n: AppNotification) {
-    if (!n.isRead) await this.markRead(n);
-    if (n.link) this.router.navigateByUrl(n.link);
+  open(item: NotificationItem) {
+    if (item.isRead) return;
+    if (notificationLink(item)) void this.inbox.markRead(item).catch((err) => this.toast.error(err));
+    else void this.markRead(item);
   }
-
   async readAll() {
-    try {
-      await this.api.post('/notifications/read-all');
-      this.auth.unread.set(0);
-      this.items.update((l) => (this.unreadOnly() ? [] : l!.map((x) => ({ ...x, isRead: true }))));
-      this.toast.success('All notifications marked as read.');
-    } catch (err) { this.toast.error(err); }
+    this.readAllError.set('');
+    try { await this.inbox.markAllRead(); }
+    catch (err) { this.readAllError.set(apiError(err).message); }
   }
 }

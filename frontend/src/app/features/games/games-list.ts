@@ -28,7 +28,7 @@ import { ChessDiscovery } from '../../shared/chess-discovery';
         </div>
       </div>
 
-      <app-chess-discovery class="chess-discovery" />
+      <app-chess-discovery class="chess-discovery" [gamePool]="games()" [loadFromApi]="false" />
       <div class="live-heading"><div><span class="mode-label">Play live</span><h2>Quick games, real opponents.</h2></div><p class="muted small">Be online together for these matches.</p></div>
 
       <div class="segmented tabs play-tabs">

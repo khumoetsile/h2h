@@ -47,136 +47,15 @@
           @if (refreshError()) { <p class="refresh-error" role="status">{{ refreshError() }}</p> }
         </div>
 
-        @if (f.headToHead; as h2h) {
-          <section class="card how h2h-card" aria-labelledby="h2h-title">
-            <div class="pulse-heading">
-              <div><h3 id="h2h-title">Head-to-head history</h3><p class="muted small">This fixture: {{ f.homeTeam.name }} vs {{ f.awayTeam.name }}</p></div>
-              @if (h2h.status === 'UNAVAILABLE') {
-                <span class="chip">History unavailable</span>
-              } @else if (h2h.status === 'UNSUPPORTED') {
-                <span class="chip">History not supported</span>
-              } @else {
-                <span class="chip">{{ h2h.summary.played }} previous meetings</span>
-              }
-            </div>
-            @if (h2h.matches.length) {
-              <nav class="h2h-tabs" aria-label="History sections">
-                <a [routerLink]="[]" fragment="h2h-record" queryParamsHandling="preserve">Record</a>
-                <a [routerLink]="[]" fragment="h2h-stats" queryParamsHandling="preserve">Stats</a>
-                <a [routerLink]="[]" fragment="team-form" queryParamsHandling="preserve">Team form</a>
-              </nav>
-            }
-            @if (h2h.matches.length) {
-              <div class="h2h-summary h2h-record" id="h2h-record" [attr.aria-label]="f.homeTeam.name + ' versus ' + f.awayTeam.name + ' record'">
-                <div><strong>{{ h2h.summary.homeWins }}</strong><span>{{ f.homeTeam.shortName || f.homeTeam.name }} wins</span></div>
-                <div><strong>{{ h2h.summary.draws }}</strong><span>Draws</span></div>
-                <div><strong>{{ h2h.summary.awayWins }}</strong><span>{{ f.awayTeam.shortName || f.awayTeam.name }} wins</span></div>
-              </div>
-              <details class="h2h-more-details">
-                <summary id="h2h-stats">Stats</summary>
-                <div class="h2h-details-content">
-              <div class="h2h-coverage">
-                <span>{{ h2h.source === 'PROVIDER' ? 'Football data provider' : 'Head2Head synced history' }}</span>
-                @if (h2h.summary.firstMeetingAt && h2h.summary.latestMeetingAt) {
-                  <span>Coverage: {{ h2h.summary.firstMeetingAt | date: 'd MMM yyyy' }} – {{ h2h.summary.latestMeetingAt | date: 'd MMM yyyy' }}</span>
-                }
-                @if (h2h.summary.capped) { <span>Showing up to 50 most recent available meetings; older results may exist.</span> }
-              </div>
-              <div class="h2h-team-goals" aria-label="Total goals scored in the recorded meetings">
-                <div><span>{{ f.homeTeam.shortName || f.homeTeam.name }} goals</span><strong>{{ h2h.summary.goalsFor }}</strong></div>
-                <div><span>{{ f.awayTeam.shortName || f.awayTeam.name }} goals</span><strong>{{ h2h.summary.goalsAgainst }}</strong></div>
-              </div>
-              <div class="h2h-venue-splits" aria-label="Head-to-head record by venue">
-                <div><strong>{{ f.homeTeam.shortName || f.homeTeam.name }} hosted</strong><span>{{ h2h.summary.homeAtHome.wins }}W {{ h2h.summary.homeAtHome.draws }}D {{ h2h.summary.homeAtHome.losses }}L · {{ h2h.summary.homeAtHome.played }} matches</span></div>
-                <div><strong>{{ f.awayTeam.shortName || f.awayTeam.name }} hosted</strong><span>{{ h2h.summary.awayAtHome.losses }}W {{ h2h.summary.awayAtHome.draws }}D {{ h2h.summary.awayAtHome.wins }}L · {{ h2h.summary.awayAtHome.played }} matches</span></div>
-              </div>
-              <p class="muted tiny h2h-sample">Scoring patterns across all {{ h2h.summary.played }} recorded meetings</p>
-              <div class="h2h-insights" aria-label="Historical scoring patterns">
-                <div><strong>{{ h2h.summary.averageGoals }}</strong><span>Avg total goals</span></div>
-                <div><strong>{{ h2h.summary.bothTeamsScored }}/{{ h2h.summary.played }} · {{ h2h.summary.bothTeamsScoredPct }}%</strong><span>Both teams scored</span></div>
-                <div><strong>{{ h2h.summary.over15 }}/{{ h2h.summary.played }} · {{ h2h.summary.over15Pct }}%</strong><span>Over 1.5 total goals</span></div>
-                <div><strong>{{ h2h.summary.over25 }}/{{ h2h.summary.played }} · {{ h2h.summary.over25Pct }}%</strong><span>Over 2.5 goals</span></div>
-                <div><strong>{{ h2h.summary.cleanSheets }}/{{ h2h.summary.played }}</strong><span>{{ f.homeTeam.shortName || f.homeTeam.name }} clean sheets</span></div>
-                <div><strong>{{ h2h.summary.opponentCleanSheets }}/{{ h2h.summary.played }}</strong><span>{{ f.awayTeam.shortName || f.awayTeam.name }} clean sheets</span></div>
-              </div>
-              @if (h2h.source === 'SYNCED') { <p class="muted tiny">Showing meetings already synced by Head2Head; the provider did not return these results in its current response.</p> }
-                </div>
-              </details>
-            } @else if (h2h.status === 'UNAVAILABLE') {
-              <div class="data-unavailable">
-                <p class="muted small">The football data provider could not supply this history. The record will appear when the provider makes it available.</p>
-              </div>
-            } @else if (h2h.status === 'UNSUPPORTED') {
-              <p class="muted small">Past head-to-head results are not available from this football data source yet.</p>
-            } @else {
-              <p class="muted small">No previous meetings between these teams were returned by the football data source.</p>
-            }
-            <details class="h2h-more-details h2h-team-details">
-              <summary id="team-form">Team form & standings</summary>
-              <h4 class="form-title">Recent form</h4>
-            <div class="recent-form">
-              @for (entry of recentForm(); track entry.team.id) {
-                <section class="form-team" [attr.aria-label]="entry.team.name + ' recent form'">
-                  <div class="form-heading">
-                    <strong>{{ entry.team.name }}</strong>
-                    <span class="muted tiny">{{ entry.form.summary.played }} recent matches</span>
-                    @if (entry.form.matches.length) {
-                      <span class="muted tiny">{{ entry.form.source === 'PROVIDER' ? 'Provider history' : entry.form.source === 'COMBINED' ? 'Provider and Head2Head history' : 'Head2Head synced results' }}</span>
-                    }
-                  </div>
-                  @if (entry.form.matches.length) {
-                    <div class="form-list">
-                      @for (match of entry.form.matches; track match.id) {
-                        <div class="form-row">
-                          <span class="muted tiny form-date">{{ match.kickoffAt | date: 'd MMM yyyy' }}</span>
-                          <span class="form-opponent">@if (match.opponentCrestUrl) { <img [src]="match.opponentCrestUrl" alt="" loading="lazy"> }{{ match.venue === 'HOME' ? 'vs' : '@' }} {{ match.opponent }}</span>
-                          <strong class="form-score">{{ match.teamScore }}–{{ match.opponentScore }}</strong>
-                          <span class="form-result" [class.form-win]="match.outcome === 'W'" [class.form-draw]="match.outcome === 'D'" [class.form-loss]="match.outcome === 'L'">{{ match.outcome }}</span>
-                          @if (match.competition) { <small class="form-competition">{{ match.competition }}</small> }
-                        </div>
-                      }
-                    </div>
-                    <div class="muted tiny form-record">
-                      <span>{{ entry.form.summary.wins }}W · {{ entry.form.summary.draws }}D · {{ entry.form.summary.losses }}L</span>
-                      <span>{{ entry.form.summary.goalsFor }} scored · {{ entry.form.summary.goalsAgainst }} conceded</span>
-                      <span>BTTS {{ entry.form.summary.bothTeamsScored }}/{{ entry.form.summary.played }}</span>
-                      <span>O2.5 {{ entry.form.summary.over25 }}/{{ entry.form.summary.played }}</span>
-                    </div>
-                  } @else {
-                    @if (entry.form.status === 'UNAVAILABLE') {
-                      <p class="muted tiny">Recent results could not be loaded from the match-history service.</p>
-                    } @else if (entry.form.status === 'UNSUPPORTED') {
-                      <p class="muted tiny">Recent match history is not available from this football data source.</p>
-                    } @else {
-                      <p class="muted tiny">No earlier completed matches were found in the available history.</p>
-                    }
-                  }
-                </section>
-              }
-            </div>
-            <h4 class="form-title">{{ f.competition.name }} standings</h4>
-            @if (h2h.standings.status === 'AVAILABLE' && (h2h.standings.home || h2h.standings.away)) {
-              <div class="standing-pair">
-                @for (standing of [h2h.standings.home, h2h.standings.away]; track standing?.teamProviderId) {
-                  @if (standing) {
-                    <div class="standing-card">
-                      <strong>{{ standing.position }}<sup>{{ standing.position === 1 ? 'st' : standing.position === 2 ? 'nd' : standing.position === 3 ? 'rd' : 'th' }}</sup> · {{ standing.teamName }}</strong>
-                      <span>{{ standing.points }} pts · {{ standing.played }} played</span>
-                      <span>{{ standing.won }}W {{ standing.drawn }}D {{ standing.lost }}L · GD {{ standing.goalDifference }}</span>
-                    </div>
-                  }
-                }
-              </div>
-            } @else if (h2h.standings.status === 'UNAVAILABLE') {
-              <p class="muted tiny">Standings are currently unavailable from this data source.</p>
-            } @else {
-              <p class="muted tiny">Standings are not supported by this football data source.</p>
-            }
-              <p class="muted tiny h2h-disclaimer">Historical results are not a prediction. Form uses up to five earlier completed matches.</p>
-            </details>
-          </section>
-        }
-
+        <section class="fixture-research" aria-label="Matchup research">
+          <div class="research-preview"><div><strong>Head-to-head &amp; form</strong><span>Past scores. Goals. Your next rivalry.</span></div><button class="btn btn-ghost btn-sm" [attr.aria-expanded]="researchOpen()" (click)="toggleResearch()">{{researchOpen()?'Hide':'Explore'}} <span aria-hidden="true">{{researchOpen()?'−':'+'}}</span></button></div>
+          @if(researchOpen()){
+            @if(researchError()){<app-load-error [message]="researchError()" (retry)="loadResearch(true)"/>}
+            @else if(researchLoading()){<div class="insights-skeleton" role="status" aria-label="Loading matchup history"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
+            @else if(researchData();as data){<app-football-research-results [data]="data" [compact]="true"/>}
+          }
+          <a class="research-open" routerLink="/football/research" [queryParams]="{teamA:f.homeTeam.id,teamB:f.awayTeam.id}">Open football research <span aria-hidden="true">↗</span></a>
+        </section>
         @if (f.status === 'LIVE' || f.status === 'FINISHED') {
           <section class="card pulse-card" aria-labelledby="pulse-title">
             <div class="pulse-heading">

@@ -4,6 +4,8 @@ Usability updates, password-recovery setup and the proposed friends-league featu
 
 Correspondence chess, its per-move deadlines, settlement rules and configuration are documented in [Chess](docs/CHESS.md).
 
+Public matchup history, scoring trends, game discovery and notification improvements are documented in [Football research](docs/FOOTBALL-RESEARCH.md).
+
 > ⚠️ **DEMO MODE — ALL MONEY IS SIMULATED.**
 > Deposits, stakes, winnings, fees and withdrawals use **demo funds only**. No payment
 > provider (DPO, Orange Money, MyZaka, Mascom, FNB, Visa, Mastercard, PayPal, Stripe or any

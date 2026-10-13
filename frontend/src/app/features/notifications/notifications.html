@@ -1,0 +1,33 @@
+<div class="notifications-page page page-narrow">
+  <div class="activity-heading">
+    <div><span class="eyebrow">YOUR ACTIVITY</span><h1>Notifications</h1><p>{{ auth.unread() ? auth.unread()+' unread · pick up where you left off.' : 'You’re all caught up.' }}</p></div>
+    <button type="button" class="btn mark-all" [disabled]="!auth.unread() || inbox.readingAll()" (click)="readAll()"><mat-icon aria-hidden="true">done_all</mat-icon>{{ inbox.readingAll() ? 'Marking as read…' : 'Mark all read' }}</button>
+  </div>
+  <div class="activity-controls">
+    <div class="control-line"><div class="segmented" role="group" aria-label="Read status"><button type="button" [class.active]="!unreadOnly()" [attr.aria-pressed]="!unreadOnly()" (click)="setUnread(false)">All</button><button type="button" [class.active]="unreadOnly()" [attr.aria-pressed]="unreadOnly()" (click)="setUnread(true)">Unread</button></div><span class="result-count" role="status">{{ loading() ? 'Updating…' : total()+' notifications' }}</span></div>
+    <div class="category-filters" role="group" aria-label="Activity type">@for (filter of categories; track filter.value) { <button type="button" [class.active]="category() === filter.value" [attr.aria-pressed]="category() === filter.value" (click)="setCategory(filter.value)">{{ filter.label }}</button> }</div>
+    <div class="activity-search"><mat-icon aria-hidden="true">search</mat-icon><label class="sr-only" for="notification-search">Search notifications</label><input id="notification-search" type="search" name="notificationSearch" [ngModel]="search" (ngModelChange)="setSearch($event)" maxlength="100" placeholder="Search your activity" autocomplete="off" />@if (search) { <button type="button" aria-label="Clear notification search" (click)="clearSearch()"><mat-icon aria-hidden="true">close</mat-icon></button> }</div>
+  </div>
+  @if (readAllError()) { <div class="activity-error" role="alert"><span>{{ readAllError() }}</span><button type="button" class="btn btn-sm" (click)="readAll()">Try marking all read again</button></div> }
+  @if (error()) { <app-load-error [message]="error()" (retry)="load()" /> }
+  @if (!items() && !error()) { <div class="activity-card"><app-skeleton-list [rows]="5" /></div> }
+  @else if (items(); as notifications) {
+    @if (!notifications.length && !loading()) { <div class="activity-card"><app-empty icon="notifications_off" [title]="search ? 'No matching activity' : unreadOnly() ? 'You’re all caught up' : 'No notifications here yet'" [text]="search ? 'Try a different search or choose another activity type.' : 'Friend invitations, game results and wallet updates appear here.'" /></div> }
+    @for (group of groups(); track group.label) {
+      <section class="notification-group" [attr.aria-label]="group.label+' notifications'"><h2>{{ group.label }}</h2>
+        <ol class="activity-card" [attr.aria-busy]="loading()">@for (n of group.items; track n.id) {
+          <li class="notification-row" [class.unread]="!n.isRead"><span class="activity-icon" aria-hidden="true"><mat-icon>{{ icon(n) }}</mat-icon></span><div class="notification-content">
+            @if (link(n); as destination) { <a class="notification-primary" [routerLink]="destination" [attr.aria-label]="label(n)" [attr.aria-describedby]="'notification-message-'+n.id" (click)="open(n)"><span class="notification-title">{{ n.title }}<mat-icon class="row-arrow" aria-hidden="true">chevron_right</mat-icon></span><span class="notification-message" [class.expanded]="expanded().includes(n.id)" [id]="'notification-message-'+n.id">{{ n.message }}</span></a> }
+            @else { <button type="button" class="notification-primary" [attr.aria-label]="label(n)" [attr.aria-describedby]="'notification-message-'+n.id" [disabled]="inbox.isPending(n.id)" (click)="open(n)"><span class="notification-title">{{ n.title }}</span><span class="notification-message" [class.expanded]="expanded().includes(n.id)" [id]="'notification-message-'+n.id">{{ n.message }}</span></button> }
+            <div class="notification-meta"><span>{{ categoryLabel(n) }}</span><span aria-hidden="true">·</span><time [attr.datetime]="n.createdAt" [title]="n.createdAt | date:'medium'">{{ n.createdAt | ago }}</time><span class="read-status"><span class="read-dot" aria-hidden="true"></span>{{ n.isRead ? 'Read' : 'Unread' }}</span></div>
+            <div class="row-actions">@if (n.message.length > 120) { <button type="button" [attr.aria-expanded]="expanded().includes(n.id)" [attr.aria-controls]="'notification-message-'+n.id" (click)="toggleExpanded(n.id)">{{ expanded().includes(n.id) ? 'Show less' : 'Show message' }}</button> }@if (!n.isRead) { <button type="button" [disabled]="inbox.isPending(n.id) || inbox.readingAll()" [attr.aria-label]="'Mark '+n.title+' as read'" (click)="markRead(n)">{{ inbox.isPending(n.id) ? 'Marking…' : 'Mark read' }}</button> }</div>
+            @if (rowErrors()[n.id]) { <div class="row-error" role="alert"><span>{{ rowErrors()[n.id] }}</span><button type="button" [disabled]="inbox.isPending(n.id)" (click)="markRead(n)">Retry marking read</button></div> }
+          </div></li>
+        }</ol>
+      </section>
+    }
+    @if (moreError()) { <div class="activity-error" role="alert">{{ moreError() }}</div> }
+    @if (notifications.length < total()) { <button type="button" class="btn load-more" [disabled]="loadingMore() || loading()" (click)="load(true)">{{ loadingMore() ? 'Loading older activity…' : moreError() ? 'Try loading older activity again' : 'Load older activity' }}</button> }
+  }
+  <details class="notification-preferences"><summary><mat-icon aria-hidden="true">notifications</mat-icon><span>Phone alerts &amp; app settings</span><mat-icon class="preference-chevron" aria-hidden="true">expand_more</mat-icon></summary><div class="preference-content"><app-get-app variant="settings" /></div></details>
+</div>

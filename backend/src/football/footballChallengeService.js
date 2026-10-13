@@ -18,6 +18,7 @@ import { getFootballProvider } from './providerRegistry.js';
 import { recordAudit } from '../services/auditService.js';
 import { acceptanceDeadline } from '../timers.js';
 import { logSystemError } from '../services/systemErrorService.js';
+import { escapeLike, fixtureSearchTokens } from '../utils/search.js';
 
 const PICKS_BY_TYPE = { TEAM: ['HOME', 'AWAY'], YES_NO: ['YES', 'NO'] };
 const opposite = (pickType, pick) => PICKS_BY_TYPE[pickType].find((p) => p !== pick);
@@ -255,11 +256,18 @@ async function getRecentTeamForm({ rows, teamId, providerTeamId, teamName, kicko
   }
 }
 
-export async function listFixtures({ competitionId, status, dateFrom, dateTo, teamId, page = 1, pageSize = 50 } = {}) {
-  const where = ['comp.is_enabled = 1'];
+export async function listFixtures({ competitionId, status, dateFrom, dateTo, teamId, q, page = 1, pageSize = 50 } = {}) {
+  const provider = getFootballProvider();
+  const where = ['comp.is_enabled = 1', 'comp.provider = ?', 'fx.provider = ?'];
   // Once a real data provider is connected, fixtures left over from the simulated one (seed data) must not be offered as real games.
   if (config.football.provider !== 'mock') where.push('fx.is_simulated = 0');
-  const params = [];
+  const params = [provider.name, provider.name];
+  if (q?.trim()) {
+    for (const token of fixtureSearchTokens(q)) {
+      where.push("CONCAT_WS(' ', ht.name, ht.short_name, at.name, at.short_name, comp.name, comp.code) LIKE ? ESCAPE '!'");
+      params.push(`%${escapeLike(token)}%`);
+    }
+  }
   if (competitionId) { where.push('fx.competition_id = ?'); params.push(competitionId); }
   if (status === 'live') where.push(`fx.status = 'LIVE'`);
   else if (status === 'upcoming') where.push(`fx.status = 'SCHEDULED'`);
@@ -271,12 +279,13 @@ export async function listFixtures({ competitionId, status, dateFrom, dateTo, te
   const whereSql = `WHERE ${where.join(' AND ')}`;
   const [summary] = await query(
     `SELECT COUNT(*) AS total, MAX(fx.last_synced_at) AS lastUpdatedAt FROM football_fixtures fx
-     JOIN football_competitions comp ON comp.id = fx.competition_id ${whereSql}`,
+     JOIN football_competitions comp ON comp.id = fx.competition_id
+     JOIN football_teams ht ON ht.id = fx.home_team_id JOIN football_teams at ON at.id = fx.away_team_id ${whereSql}`,
     params,
   );
   const offset = (page - 1) * pageSize;
   const rows = await query(
-    `${FIXTURE_SELECT} ${whereSql} ORDER BY fx.kickoff_at ${status === 'completed' ? 'DESC' : 'ASC'} LIMIT ? OFFSET ?`,
+    `${FIXTURE_SELECT} ${whereSql} ORDER BY fx.kickoff_at ${status === 'completed' ? 'DESC' : 'ASC'}, fx.id ${status === 'completed' ? 'DESC' : 'ASC'} LIMIT ? OFFSET ?`,
     [...params, pageSize, offset],
   );
   return {
@@ -297,7 +306,7 @@ export async function listChallengeTypes() {
     .map((t) => ({ id: t.id, slug: t.slug, name: t.name, question: t.question_template, pickType: t.pick_type, settlementSummary: t.settlement_summary }));
 }
 
-export async function getFixtureDetail(fixtureId) {
+export async function getFixtureDetail(fixtureId, { includeInsights = true } = {}) {
   const simulatedFilter = config.football.provider === 'mock' ? '' : ' AND fx.is_simulated = 0';
   const row = (await query(`${FIXTURE_SELECT} WHERE fx.id = ? AND comp.is_enabled = 1${simulatedFilter}`, [fixtureId]))[0];
   if (!row) throw notFound('Fixture not found.');
@@ -308,6 +317,18 @@ export async function getFixtureDetail(fixtureId) {
     'SELECT id, provider_event_id AS providerEventId, minute, sort_order AS sortOrder, type, team, player_name AS playerName, detail FROM football_events WHERE fixture_id = ? ORDER BY sort_order, minute, id',
     [fixtureId],
   );
+  const base = {
+    ...mapFixtureRow(row),
+    stats: {
+      shots: { home: row.home_shots, away: row.away_shots },
+      shotsOnTarget: { home: row.home_shots_on_target, away: row.away_shots_on_target },
+      possession: { home: row.home_possession, away: row.away_possession },
+      corners: { home: row.home_corners, away: row.away_corners },
+      cards: { home: row.home_cards, away: row.away_cards },
+    },
+    events, headToHead: null, recentMeetings: [], lastUpdatedAt: row.last_synced_at, challengeTypes: types, stakes: settings.stake_amounts,
+  };
+  if (!includeInsights) return base;
   const meetings = await query(
     `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND fx.home_score IS NOT NULL AND fx.away_score IS NOT NULL
        AND comp.is_enabled = 1 AND comp.provider = ?${simulatedFilter}

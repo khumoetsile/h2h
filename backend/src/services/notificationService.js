@@ -23,5 +23,5 @@ export async function notify(tx, userId, { type, title, message, link = null }) 
 }
 
 export function mapNotification(n) {
-  return { id: n.id, type: n.type, title: n.title, message: n.message, link: n.link, isRead: !!n.is_read, createdAt: n.created_at };
+  return { id: n.id, type: n.type, title: n.title, message: n.message, link: n.link, isRead: !!n.is_read, createdAt: n.created_at, ...(n.category ? { category: n.category } : {}) };
 }

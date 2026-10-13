@@ -1,4 +1,4 @@
-import { Component, inject, input, OnInit, signal } from '@angular/core';
+import { Component, inject, input, OnChanges, OnInit, SimpleChanges, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -29,6 +29,7 @@ interface TeamPageData {
         <header class="team-head card">
           @if (data()!.team.crestUrl) { <img [src]="data()!.team.crestUrl!" [alt]="data()!.team.name + ' crest'" width="52" height="52" /> }
           <div><h1>{{ data()!.team.name }}</h1><p class="muted small">Team fixtures and recent results</p></div>
+          <a class="btn btn-primary btn-sm" routerLink="/football/research" [queryParams]="{teamA:data()!.team.id}">Compare a rival →</a>
         </header>
         <section>
           <div class="section-title"><div><h2>Upcoming fixtures</h2><p class="sub">Matches found in synced football data</p></div></div>
@@ -58,7 +59,7 @@ interface TeamPageData {
   `,
   styles: [`
     .back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 16px; }
-    .team-head { display: flex; align-items: center; gap: 14px; padding: 18px; margin-bottom: 24px; }
+    .team-head { display: flex; align-items: center; gap: 14px; padding: 18px; margin-bottom: 24px; flex-wrap:wrap; }.team-head>div{flex:1;min-width:0}.team-head h1{overflow-wrap:anywhere}
     .team-head img { object-fit: contain; }
     .team-head h1 { margin-bottom: 2px; }
     .section-title { margin: 20px 0 10px; }
@@ -66,19 +67,23 @@ interface TeamPageData {
     .fixture strong { overflow-wrap: anywhere; }
   `],
 })
-export class FootballTeamPage implements OnInit {
+export class FootballTeamPage implements OnInit,OnChanges {
   readonly teamId = input.required<string>();
   private api = inject(Api);
   private seo = inject(SeoService);
   protected data = signal<TeamPageData | null>(null);
   protected error = signal('');
+  private loadVersion=0;
 
   ngOnInit() { this.load(); }
+  ngOnChanges(changes:SimpleChanges){if(changes['teamId']&&!changes['teamId'].firstChange){this.data.set(null);void this.load();}}
 
   async load() {
     this.error.set('');
+    const version=++this.loadVersion;const teamId=this.teamId();
     try {
-      const response = await this.api.get<TeamPageData>(`/football/teams/${this.teamId()}`);
+      const response = await this.api.get<TeamPageData>(`/football/teams/${teamId}`);
+      if(version!==this.loadVersion||teamId!==this.teamId())return;
       this.data.set(response);
       this.seo.publish(
         `${response.team.name} fixtures and results`,
@@ -87,7 +92,7 @@ export class FootballTeamPage implements OnInit {
         !response.upcoming.some((fx) => fx.isSimulated) && !response.recentResults.some((fx) => fx.isSimulated),
       );
     } catch (err) {
-      this.error.set(apiError(err).message);
+      if(version===this.loadVersion)this.error.set(apiError(err).message);
     }
   }
 }
