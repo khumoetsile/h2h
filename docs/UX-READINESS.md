@@ -34,9 +34,29 @@ SMTP_FROM=<verified sender address>
 
 For implicit TLS on port 465 use `SMTP_SECURE=true`. Keep secrets out of Git. Use a provider-authorized sender, restart, then perform one real delivery test to an account you own. Until SMTP is configured, the UI explicitly says recovery is unavailable rather than claiming an email was sent. Saved guest accounts without a registered email require administrator help; this pass does not add an email-verification/account-email-change flow.
 
+## Planned feature: Play anytime
+
+Add asynchronous friend challenges that players can join and resume without an invitation deadline or turn countdown. The working interpretation of "non time bound" is an untimed, turn-based game: neither participant needs to be online together, and taking longer does not reduce their score. The first game's rules still need choosing. This is a roadmap item; no asynchronous game engine has shipped in this pass.
+
+Recommended placement in the existing app:
+
+| Location | Player experience |
+| --- | --- |
+| Play (`/dashboard`) | A visible **Play anytime** card, described as "Take turns whenever you're ready", alongside the existing game discovery. Returning players see **Your turn** and a **Continue game** action. |
+| Games (`/games`) and game setup (`/games/:slug`) | Clearly distinguish **Play live** and **Play anytime**. Offer the anytime option only for games designed for saved turns. Explain the rules before creating a challenge. |
+| Challenges (`/challenges`) | The permanent home for anytime invitations and games. Separate **Your turn**, **Waiting for friend**, **Invitations** and **Completed**; show opponent and last activity. Reuse the existing mobile Challenges destination. |
+| My matches (`/matches`) | Include anytime games in the player's history, identify the mode, and link active games to their saved turn. Avoid duplicate or conflicting status labels across screens. |
+| Invitation links and notifications | Persistent links open the exact challenge, preserve the destination through login/account creation, and allow acceptance later. Show an in-app turn indicator; offer optional reminders with frequency controls. |
+
+Start with a free, non-wallet turn-based word or puzzle duel. Choose the game after a small user trial. Existing timed skill scoring and football deadlines stay intact; a dedicated asynchronous lifecycle must save each committed move on the server, validate whose turn it is, reject duplicate moves, and resume correctly after a reload or on another device. A player must be able to leave after a saved turn without forfeiting.
+
+Invitations can be declined or withdrawn, and players can agree to end a game. Old games may be voluntarily archived with clear behavior; do not silently turn inactivity into a loss. Authentication links and sessions can retain their security expiry independently of the game's lifetime. Paid entries require explicit cancellation, inactivity, settlement and refund rules before they can be considered: indefinite challenges must not indefinitely lock wallet balances.
+
+Test discovery, invite acceptance, save-and-resume, cross-device continuation, duplicate submission, withdrawal and reminders with real participants. Measure invites accepted, first turns completed, games finished, time to return for a turn and repeat opponents. Treat audience growth as a hypothesis to validate.
+
 ## Recommended growth feature: weekly friends leagues
 
-Create a private league with a persistent invite link; let friends compete on a weekly skill challenge at different times. Reuse server-side scoring, show a weekly leaderboard, offer opt-in reminders and let players share a result card. Start with demo/free participation and no referral cash incentives. Keep the normal live 1v1 experience alongside it.
+Create a private league with a persistent invite link; let friends compete on a weekly skill challenge at different times. Reuse server-side scoring, show a weekly leaderboard, offer opt-in reminders and let players share a result card. Start with demo/free participation and no referral cash incentives. Keep the normal live 1v1 experience alongside it. A weekly leaderboard has a defined reporting period; the separate Play anytime mode above has no participation or turn deadline. League scheduling must not impose a deadline on an existing anytime game.
 
 Why this fits: the app already has games, server scoring, player identities, rivalry records and WhatsApp invitations. A league makes those invitations useful beyond a short-lived match seat, and asynchronous participation avoids requiring everyone to be online together. This is a product hypothesis, not a guarantee of audience growth.
 
@@ -55,6 +75,6 @@ Remaining launch work:
 3. Complete keyboard/screen-reader coverage of the game arenas, particularly pointer-heavy Aim Challenge and dynamic timed targets. Gameplay/scoring rules were not changed in this pass.
 4. Review live football provider freshness and unsupported statistics; avoid promoting unreliable fixture data.
 5. Add player blocking/reporting and support moderation before broadly promoting social invitations.
-6. Add product event measurement and persistent leagues only after the core journey is validated. Nothing here claims that real-money functionality is ready.
+6. Validate and build free Play anytime friend challenges, then test persistent leagues and product event measurement. Neither feature is implemented by this UX pass. Nothing here claims that real-money functionality is ready.
 
 Security reference: [OWASP password recovery guidance](https://cheatsheetseries.owasp.org/cheatsheets/Forgot_Password_Cheat_Sheet.html).
