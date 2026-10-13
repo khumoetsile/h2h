@@ -85,7 +85,7 @@ export class SkeletonList {
   template: `
     <div class="err">
       <mat-icon>cloud_off</mat-icon>
-      <div class="msg">{{ message() }}</div>
+      <div class="msg" role="status">{{ message() }}</div>
       <button class="btn btn-sm" (click)="retry.emit()"><mat-icon>refresh</mat-icon>Try again</button>
     </div>`,
   styles: [`

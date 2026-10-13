@@ -35,7 +35,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
     <div class="page">
       <div class="segmented tabs play-tabs">
         <a routerLink="/games"><mat-icon inline>sports_esports</mat-icon> Games</a>
-        <button class="active"><mat-icon inline>sports_soccer</mat-icon> Football</button>
+        <button class="active" aria-pressed="true"><mat-icon inline>sports_soccer</mat-icon> Football</button>
       </div>
 
       <header class="hero">
@@ -142,9 +142,9 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
       }
 
       <!-- Fixtures -->
-      <section id="fixtures">
+      <section id="fixtures" tabindex="-1" aria-labelledby="fixtures-title" [attr.aria-busy]="fixtures() === null && !error()">
         <div class="section-title">
-          <div><h2>Upcoming fixtures &amp; live scores</h2><p class="sub">Browse by competition or date. Open any match for its match centre.</p></div>
+          <div><h2 id="fixtures-title">Upcoming fixtures &amp; live scores</h2><p class="sub">Browse by competition or date. Open any match for its match centre.</p></div>
         </div>
         <div class="football-filters">
           <label>Competition
@@ -159,9 +159,9 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
         @if (competitionError()) { <p class="muted small">{{ competitionError() }}</p> }
         <div class="segmented tabs day-tabs">
           @for (t of dayTabs; track t.key) {
-            <button [class.active]="day() === t.key" (click)="day.set(t.key)">
+            <button [class.active]="day() === t.key" [attr.aria-pressed]="day() === t.key" (click)="day.set(t.key)">
               @if (t.key === 'live') { <span class="live-dot live-red"></span> }
-              {{ t.label }} <span class="count-muted">{{ byDay()[t.key].length }}</span>
+              {{ t.label }} @if (fixtures()) { <span class="count-muted">{{ byDay()[t.key].length }}</span> }
             </button>
           }
         </div>
@@ -206,13 +206,13 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
           </div>
         }
         @if (anySimulated()) { <p class="muted tiny sim-note">Simulated demo fixtures are shown because no live football data provider is configured.</p> }
-        @if (lastUpdatedAt()) { <p class="muted tiny">Football data last updated {{ lastUpdatedAt() | date: 'EEE d MMM, HH:mm' }}. Live updates may be delayed.</p> }
+        @if (fixtures() && lastUpdatedAt()) { <p class="muted tiny">Football data last updated {{ lastUpdatedAt() | date: 'EEE d MMM, HH:mm' }}. Live updates may be delayed.</p> }
       </section>
 
-      <section id="past-results">
+      <section id="past-results" tabindex="-1" aria-labelledby="results-title">
         <div class="section-title">
           <div>
-            <h2>Past match results</h2>
+            <h2 id="results-title">Past match results</h2>
             <p class="sub">Browse completed scores. Use the competition and date filters above to narrow your search.</p>
           </div>
           @if (resultsTotal() > 0) { <span class="muted small">{{ results()?.length ?? 0 }} of {{ resultsTotal() }} matches</span> }
@@ -311,10 +311,13 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
     .waiting { color: var(--demo); display: flex; align-items: center; gap: 4px; }
     .sim-note { margin-top: 10px; }
     .public-join { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 16px 0; padding: 16px;
-      .grow { flex: 1; min-width: 0; } }
-    .football-filters { display: flex; flex-wrap: wrap; gap: 10px; margin: 12px 0;
-      label { display: grid; gap: 4px; color: var(--text-2); font-size: 12px; }
-      select, input { min-height: 40px; padding: 7px 10px; color: var(--text); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); } }
+      .grow { flex: 1; min-width: 0; } p { margin-top: 6px; } .btn { flex-shrink: 0; } }
+    @media (max-width: 599px) { .public-join { flex-direction: column; align-items: stretch; } }
+    section[id] { scroll-margin-top: calc(var(--header-h) + 16px); }
+    .football-filters { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin: 16px 0;
+      label { display: grid; min-width: 0; gap: 6px; color: var(--text-2); font-size: 14px; }
+      select, input { width: 100%; min-width: 0; min-height: 48px; padding: 10px 12px; font-size: 16px; color: var(--text); background: var(--surface); border: 1px solid var(--border-strong); border-radius: var(--radius-sm); } }
+    @media (min-width: 600px) { .football-filters { grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); } }
   `],
 })
 export class FootballListPage implements OnInit {
@@ -431,11 +434,17 @@ export class FootballListPage implements OnInit {
   }
 
   scrollToFixtures() {
-    document.getElementById('fixtures')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    this.focusSection('fixtures');
   }
 
   scrollToResults() {
-    document.getElementById('past-results')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    this.focusSection('past-results');
+  }
+
+  private focusSection(id: string) {
+    const section = document.getElementById(id);
+    section?.focus({ preventScroll: true });
+    section?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth', block: 'start' });
   }
 
   rematchWith(m: MatchSummary) {
@@ -557,12 +566,14 @@ export class FootballListPage implements OnInit {
 
   selectCompetition(value: string) {
     this.competitionId.set(value ? Number(value) : null);
+    this.fixtures.set(null);
     this.load();
   }
 
   selectDates(from: string, to: string) {
     this.dateFrom.set(from);
     this.dateTo.set(to);
+    this.fixtures.set(null);
     this.load();
   }
 

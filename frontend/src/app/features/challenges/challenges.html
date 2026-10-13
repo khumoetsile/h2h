@@ -1,7 +1,7 @@
 <div class="page">
   <div class="page-head">
     <div><h1>Challenges</h1><p class="sub">Invites to and from specific players. Each one has a timer to accept.</p></div>
-    <a class="btn btn-ghost btn-sm" routerLink="/matches"><mat-icon>history</mat-icon>My challenges</a>
+    <a class="btn btn-ghost btn-sm" routerLink="/matches"><mat-icon>history</mat-icon>My matches</a>
   </div>
 
   <a class="btn btn-primary btn-lg btn-block new-btn" routerLink="/challenges/new">
@@ -9,9 +9,9 @@
   </a>
 
   <div class="segmented tabs">
-    <button [class.active]="tab() === 'incoming'" (click)="tab.set('incoming')">Incoming @if (incoming().length) { <span class="count">{{ incoming().length }}</span> }</button>
-    <button [class.active]="tab() === 'outgoing'" (click)="tab.set('outgoing')">Sent @if (outgoing().length) { <span class="count">{{ outgoing().length }}</span> }</button>
-    <button [class.active]="tab() === 'history'" (click)="tab.set('history')">History</button>
+    <button [class.active]="tab() === 'incoming'" [attr.aria-pressed]="tab() === 'incoming'" (click)="tab.set('incoming')">Incoming @if (incoming().length) { <span class="count">{{ incoming().length }}</span> }</button>
+    <button [class.active]="tab() === 'outgoing'" [attr.aria-pressed]="tab() === 'outgoing'" (click)="tab.set('outgoing')">Sent @if (outgoing().length) { <span class="count">{{ outgoing().length }}</span> }</button>
+    <button [class.active]="tab() === 'history'" [attr.aria-pressed]="tab() === 'history'" (click)="tab.set('history')">History</button>
   </div>
 
   <div class="card card-flush">

@@ -40,8 +40,8 @@ const DEMO_PLAYER_PASSWORD = 'Player123!';
         <h2>Welcome back</h2>
         <p class="sub">Sign in to your {{ brand.name }} account.</p>
 
-        @if (notice()) { <div class="form-error" style="margin-bottom:14px"><mat-icon>info</mat-icon>{{ notice() }}</div> }
-        @if (error()) { <div class="form-error" style="margin-bottom:14px"><mat-icon>error</mat-icon>{{ error() }}</div> }
+        @if (notice()) { <div class="form-error" role="status" style="margin-bottom:14px"><mat-icon>info</mat-icon>{{ notice() }}</div> }
+        @if (error()) { <div class="form-error" role="alert" style="margin-bottom:14px"><mat-icon>error</mat-icon>{{ error() }}</div> }
 
         <form class="form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
           <mat-form-field>
@@ -61,7 +61,7 @@ const DEMO_PLAYER_PASSWORD = 'Player123!';
             <mat-checkbox formControlName="remember">Keep me signed in</mat-checkbox>
           </div>
           <button class="btn btn-primary btn-lg btn-block" type="submit" [disabled]="loading()">
-            @if (loading()) { <mat-spinner diameter="20" /> } @else { Sign in }
+            @if (loading()) { <mat-spinner diameter="20" /> Signing in… } @else { Sign in }
           </button>
         </form>
         <p class="foot">New here? <a class="link" routerLink="/register" [queryParams]="{ next: route.snapshot.queryParamMap.get('next') }">Create an account</a></p>

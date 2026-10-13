@@ -53,7 +53,7 @@ const DEFAULT_STAKE = 10;
           <h2>Pick your stake</h2>
           <div class="tiles stake-tiles">
             @for (s of g.stakes ?? []; track s.stake) {
-              <button class="tile" [class.selected]="stake()?.stake === s.stake" [disabled]="s.stake > available()" (click)="choose(s)">
+              <button class="tile" [class.selected]="stake()?.stake === s.stake" [attr.aria-pressed]="stake()?.stake === s.stake" [disabled]="s.stake > available()" (click)="choose(s)">
                 {{ s.stake | money }}
                 @if (waitingFor(s.stake) > 0) { <small>{{ waitingFor(s.stake) }} waiting</small> }
               </button>
@@ -115,8 +115,7 @@ const DEFAULT_STAKE = 10;
     .center { text-align: center; padding: 6px; }
     .note { line-height: 1.45; }
     .how { margin-top: 14px; padding: 0; }
-    .how summary { cursor: pointer; padding: 16px 18px; font-family: var(--font-display); font-size: 20px; font-weight: 600; list-style: none; }
-    .how summary::-webkit-details-marker { display: none; }
+    .how summary { cursor: pointer; padding: 16px 18px; font-family: var(--font-display); font-size: 20px; font-weight: 600; }
     .how[open] summary { border-bottom: 1px solid var(--border); }
     .how p, .how ul { margin: 0; padding: 14px 18px 0; }
     .rules { padding-left: 36px; display: flex; flex-direction: column; gap: 6px; line-height: 1.4; padding-bottom: 16px; }

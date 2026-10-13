@@ -17,7 +17,7 @@
         <p class="sub">Search for a player by their username.</p>
         <div class="search-box">
           <mat-icon>search</mat-icon>
-          <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" autocomplete="off" autofocus />
+          <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" aria-label="Search for a player by username" autocomplete="off" autofocus />
           @if (searching()) { <mat-spinner diameter="20" /> }
         </div>
         @if (query.trim().length > 0 && !searching() && results().length === 0) {

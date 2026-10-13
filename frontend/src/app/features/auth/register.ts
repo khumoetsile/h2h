@@ -54,7 +54,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
         </div>
         <h2>Create account</h2>
         <p class="sub">It takes less than a minute.</p>
-        @if (error()) { <div class="form-error" style="margin-bottom:14px"><mat-icon>error</mat-icon>{{ error() }}</div> }
+        @if (error()) { <div class="form-error" role="alert" style="margin-bottom:14px"><mat-icon>error</mat-icon>{{ error() }}</div> }
 
         <form class="form" [formGroup]="form" (ngSubmit)="submit()" novalidate>
           <div class="form-row">
@@ -104,7 +104,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
           </mat-form-field>
           <div class="remember"><mat-checkbox formControlName="remember">Keep me signed in</mat-checkbox></div>
           <button class="btn btn-primary btn-lg btn-block" type="submit" [disabled]="loading()">
-            @if (loading()) { <mat-spinner diameter="20" /> } @else { Create account }
+            @if (loading()) { <mat-spinner diameter="20" /> Creating account… } @else { Create account }
           </button>
           <p class="muted tiny" style="margin-top:12px;text-align:center">DEMO prototype: deposits, stakes and winnings use simulated funds only.</p>
         </form>

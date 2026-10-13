@@ -11,7 +11,7 @@ export interface ApiErrorInfo {
 export function apiError(err: unknown): ApiErrorInfo {
   if (err instanceof HttpErrorResponse) {
     if (err.status === 0) {
-      return { status: 0, code: 'NETWORK', message: 'Cannot reach the server. Check your connection (is the API running?) and try again.', fields: {} };
+      return { status: 0, code: 'NETWORK', message: 'We could not connect. Check your internet connection and try again.', fields: {} };
     }
     const body = err.error?.error;
     if (body?.message) {
@@ -20,7 +20,7 @@ export function apiError(err: unknown): ApiErrorInfo {
     if (err.status === 504 || err.status === 502) {
       return { status: err.status, code: 'NETWORK', message: 'The server is not responding. Please try again shortly.', fields: {} };
     }
-    return { status: err.status, code: 'ERROR', message: `Request failed (${err.status}). Please try again.`, fields: {} };
+    return { status: err.status, code: 'ERROR', message: err.status >= 500 ? 'This service is temporarily unavailable. Please try again shortly.' : 'We could not complete your request. Please try again.', fields: {} };
   }
   return { status: -1, code: 'ERROR', message: 'Something went wrong. Please try again.', fields: {} };
 }

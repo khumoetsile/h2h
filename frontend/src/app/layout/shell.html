@@ -1,21 +1,23 @@
+<a class="skip-link" href="#main-content" (click)="$event.preventDefault(); mainContent.focus()">Skip to content</a>
 <header class="topbar">
   <div class="topbar-inner">
-    <a class="logo" [routerLink]="auth.isLoggedIn() ? auth.homeUrl() : '/football'">
+    <a class="logo" [attr.aria-label]="brand.name + ' home'" [routerLink]="auth.isLoggedIn() ? auth.homeUrl() : '/'">
       <svg viewBox="0 0 32 32" width="26" height="26" aria-hidden="true"><path d="M6 26 L13 6 L18 6 L11 26 Z" fill="var(--accent)"/><path d="M15 26 L22 6 L27 6 L20 26 Z" fill="var(--text)"/></svg>
       <span>{{ brand.name }}</span>
       @if (auth.isAdmin()) { <span class="chip chip-info admin-tag">Admin</span> }
     </a>
 
-    <nav class="desktop-nav hide-mobile">
+    <nav class="desktop-nav hide-mobile" aria-label="Main">
       @for (item of nav(); track item.link) {
-        <a [routerLink]="item.link" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: !!item.exact }">{{ item.label }}</a>
+        <a [routerLink]="item.link" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: !!item.exact }">{{ item.label }}</a>
       }
     </nav>
 
     <div class="spacer"></div>
 
     @if (!auth.isAdmin() && auth.wallet(); as w) {
-      <a class="wallet-chip" routerLink="/wallet" matTooltip="Demo wallet: no real money">
+      <a class="wallet-chip" routerLink="/wallet" matTooltip="Demo wallet: no real money" [attr.aria-label]="'Demo wallet, available balance ' + (w.available | money)">
+        <span class="chip chip-demo">Demo</span>
         <span class="wc-amount money">{{ w.available | money }}</span>
       </a>
     }
@@ -75,9 +77,14 @@
   <button mat-menu-item routerLink="/profile"><mat-icon>person</mat-icon>Profile</button>
   @if (!auth.isAdmin()) {
     <button mat-menu-item routerLink="/wallet"><mat-icon>account_balance_wallet</mat-icon>Balance</button>
-    <button mat-menu-item routerLink="/matches"><mat-icon>history</mat-icon>My challenges</button>
+    <button mat-menu-item routerLink="/matches"><mat-icon>history</mat-icon>My matches</button>
+    <button mat-menu-item routerLink="/challenges"><mat-icon>swords</mat-icon>Challenges</button>
     <button mat-menu-item routerLink="/leaderboard"><mat-icon>leaderboard</mat-icon>Rankings</button>
     <button mat-menu-item routerLink="/wallet/transactions"><mat-icon>receipt_long</mat-icon>Activity</button>
+  } @else {
+    @for (item of nav(); track item.link) {
+      <button mat-menu-item [routerLink]="item.link"><mat-icon>{{ item.icon }}</mat-icon>{{ item.label }}</button>
+    }
   }
   <button mat-menu-item routerLink="/notifications"><mat-icon>notifications</mat-icon>Notifications</button>
   <button mat-menu-item (click)="logout()"><mat-icon>logout</mat-icon>Sign out</button>
@@ -93,13 +100,13 @@
   </aside>
 }
 
-<main class="content">
+<main #mainContent class="content" id="main-content" tabindex="-1">
   <router-outlet />
 </main>
 
-<nav class="bottom-nav hide-desktop">
+<nav class="bottom-nav hide-desktop" aria-label="Main">
   @for (item of bottomNav(); track item.link) {
-    <a [routerLink]="item.link" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: !!item.exact }">
+    <a [routerLink]="item.link" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: !!item.exact }">
       <mat-icon>{{ item.icon }}</mat-icon>
       <span>{{ item.label }}</span>
     </a>

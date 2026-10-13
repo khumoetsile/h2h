@@ -25,11 +25,11 @@ type Filter = 'all' | 'active' | 'wins' | 'losses' | 'draws' | 'void' | 'timed_o
   template: `
     <div class="page page-narrow">
       <div class="page-head">
-        <div><h1>My challenges</h1><p class="sub">What happened to every challenge you've been in.</p></div>
+        <div><h1>My matches</h1><p class="sub">Your active matches and past results.</p></div>
       </div>
       <div class="segmented filters">
         @for (f of filters; track f.key) {
-          <button [class.active]="filter() === f.key" (click)="setFilter(f.key)">{{ f.label }}</button>
+          <button [class.active]="filter() === f.key" [attr.aria-pressed]="filter() === f.key" (click)="setFilter(f.key)">{{ f.label }}</button>
         }
       </div>
 
