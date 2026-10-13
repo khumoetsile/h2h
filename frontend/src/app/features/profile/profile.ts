@@ -13,12 +13,13 @@ import { User, UserStats } from '../../core/models';
 import { Toast } from '../../core/toast.service';
 import { Avatar, LoadError, Spinner } from '../../shared/ui';
 import { StatsPanel } from './stats-panel';
+import { SaveAccount } from '../../shared/save-account';
 
 const COLORS = ['#3B82F6', '#22D3EE', '#A855F7', '#F97316', '#10B981', '#EF4444', '#EAB308', '#EC4899', '#14B8A6', '#6366F1'];
 
 @Component({
   selector: 'app-profile',
-  imports: [ReactiveFormsModule, RouterLink, DatePipe, MatFormFieldModule, MatInputModule, MatIconModule, MatProgressSpinnerModule, Avatar, LoadError, Spinner, StatsPanel],
+  imports: [SaveAccount, ReactiveFormsModule, RouterLink, DatePipe, MatFormFieldModule, MatInputModule, MatIconModule, MatProgressSpinnerModule, Avatar, LoadError, Spinner, StatsPanel],
   template: `
     <div class="page">
       @if (auth.user(); as u) {
@@ -35,6 +36,7 @@ const COLORS = ['#3B82F6', '#22D3EE', '#A855F7', '#F97316', '#10B981', '#EF4444'
           </div>
         </section>
 
+        <app-save-account style="display:block;margin-top:16px" />
         @if (editing()) {
           <section class="edit-grid fade-in">
             <form class="card form" [formGroup]="form" (ngSubmit)="save()">

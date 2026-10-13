@@ -26,17 +26,18 @@ import { Toast } from '../core/toast.service';
         } @else {
           <form class="form" (ngSubmit)="save()">
             <strong>Save your account</strong>
-            <label>Your name
+            <label>Username
               <input class="field" name="u" [(ngModel)]="username" autocapitalize="none" autocomplete="username" maxlength="20" />
             </label>
+            <p class="muted small">3–20 letters, numbers or underscores. Use this username to sign in later.</p>
             <label>Choose a password
               <input class="field" name="p" type="password" [(ngModel)]="password" autocomplete="new-password" placeholder="At least 6 characters" />
             </label>
-            @if (error()) { <p class="form-error">{{ error() }}</p> }
+            @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
             <button class="btn btn-primary btn-block" type="submit" [disabled]="busy()">
-              @if (busy()) { <mat-spinner diameter="20" /> } @else { Save account }
+              @if (busy()) { <mat-spinner diameter="20" /> Saving… } @else { Save account }
             </button>
-            <p class="muted tiny">Your balance is demo funds for now. No real money is involved yet.</p>
+            <p class="muted tiny">All balances are simulated. No real money is involved. Email recovery requires a registered email; saved guest accounts currently need administrator help if their password is lost.</p>
           </form>
         }
       </section>

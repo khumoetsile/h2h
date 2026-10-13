@@ -72,6 +72,7 @@ const DEFAULT_STAKE = 10;
           }
           @if (findError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ findError() }}</div> }
 
+          <p class="muted small">Practice also uses the selected demo entry. It is against a bot, with no waiting.</p>
           <div class="actions">
             @if (available() < (g.stakes?.[0]?.stake ?? 0)) {
               <a class="btn btn-primary btn-play btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add money to play</a>

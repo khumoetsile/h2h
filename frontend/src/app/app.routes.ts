@@ -4,7 +4,7 @@ import { Shell } from './layout/shell';
 
 export const routes: Routes = [
   {path:'help',title:'Help',loadComponent:()=>import('./features/help').then(m=>m.HelpPage)},
-  {path:'forgot-password',canActivate:[guestGuard],title:'Recover account',loadComponent:()=>import('./features/auth/recovery').then(m=>m.RecoveryPage)},
+  {path:'forgot-password',title:'Recover account',loadComponent:()=>import('./features/auth/recovery').then(m=>m.RecoveryPage)},
   {path:'reset-password',title:'Reset password',loadComponent:()=>import('./features/auth/recovery').then(m=>m.RecoveryPage)},
   { path: '', pathMatch: 'full', canActivate: [landingGuard], title: 'Play', loadComponent: () => import('./features/landing/landing').then((m) => m.LandingPage) },
   { path: 'login', canActivate: [guestGuard], title: 'Sign in', loadComponent: () => import('./features/auth/login').then((m) => m.LoginPage) },
