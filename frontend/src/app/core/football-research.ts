@@ -24,7 +24,7 @@ export interface FootballResearch {
   teamA:ResearchTeam;teamB:ResearchTeam;filters:ResearchFilters;
   headToHead:{status:'AVAILABLE'|'EMPTY'|'PARTIAL'|'UNAVAILABLE';matches:ResearchMeeting[];summary:ResearchSummary;byVenue:{home:ResearchSummary;away:ResearchSummary}};
   form:{teamA:{matches:ResearchFormMatch[];summary:ResearchSummary};teamB:{matches:ResearchFormMatch[];summary:ResearchSummary}};
-  metadata:{provider:string;source:'PROVIDER'|'SYNCED'|'COMBINED'|null;updatedAt:string|null;stale:boolean;providerStatus:'AVAILABLE'|'UNAVAILABLE'|'UNSUPPORTED';sampleLimit:number;historyLimit:number;excludedUnverified:number;notice:string;isSimulated:boolean;scoreBasis?:'REGULATION'|'REPORTED_FINAL'};
+  metadata:{historyCoverage?:string|null;provider:string;source:'PROVIDER'|'SYNCED'|'COMBINED'|null;updatedAt:string|null;stale:boolean;providerStatus:'AVAILABLE'|'UNAVAILABLE'|'UNSUPPORTED';sampleLimit:number;historyLimit:number;excludedUnverified:number;notice:string;isSimulated:boolean;scoreBasis?:'REGULATION'|'REPORTED_FINAL'};
   competitions:FootballCompetition[];serverNow:string;
 }
 

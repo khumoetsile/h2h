@@ -208,15 +208,18 @@ test('aggregate helper never converts unknown or invalid scores into scoreless d
 
 test('football-data research snapshots retain fetched time, awarded flags and explicitly supplied regulation scores', async () => {
   let calls = 0;
+  let requestedUrl;
   const raw = {
     id: 1234, status: 'FINISHED', utcDate: '2026-01-01T12:00:00Z', competition: { code: 'PL', name: 'Premier League' },
     homeTeam: { id: 1, name: 'Home' }, awayTeam: { id: 2, name: 'Away' },
     score: { duration: 'EXTRA_TIME', regularTime: { home: 1, away: 1 }, fullTime: { home: 2, away: 1 } },
   };
-  globalThis.fetch = async () => { calls++; return { ok: true, json: async () => ({ matches: [raw, { ...raw, id: 1235, status: 'AWARDED' }, { ...raw, id: 1236, score: { duration: 'REGULAR', fullTime: { home: null, away: null }, halfTime: { home: 0, away: 0 } } }] }) }; };
+  globalThis.fetch = async url => { requestedUrl = new URL(url); calls++; return { ok: true, json: async () => ({ matches: [raw, { ...raw, id: 1235, status: 'AWARDED' }, { ...raw, id: 1236, score: { duration: 'REGULAR', fullTime: { home: null, away: null }, halfTime: { home: 0, away: 0 } } }] }) }; };
   const realProvider = new FootballDataOrgProvider({ apiKey: 'test', baseUrl: 'https://provider.example' });
   const [a, b] = await Promise.all([realProvider.getTeamMatchesSnapshot('1'), realProvider.getTeamMatchesSnapshot('1')]);
   assert.equal(calls, 1);
+  assert.equal(requestedUrl.searchParams.get('limit'), '500');
+  assert.equal((new Date(requestedUrl.searchParams.get('dateTo')) - new Date(requestedUrl.searchParams.get('dateFrom'))) / 86400000, 749, 'History crosses seasons within the provider date-range limit');
   assert.equal(a.fetchedAt, b.fetchedAt);
   assert.ok(a.fetchedAt);
   assert.equal(a.matches[0].homeScore, 1);

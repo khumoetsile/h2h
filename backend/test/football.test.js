@@ -228,10 +228,10 @@ describe('football: browsing', () => {
       if (url.endsWith('/matches/123/head2head?limit=10')) {
         return { ok: false, status: 403, text: async () => 'head2head unavailable on plan' };
       }
-      if (url.endsWith('/teams/10/matches?status=FINISHED&limit=500')) {
+      if (url.includes('/teams/10/matches?status=FINISHED&limit=500&dateFrom=')) {
         return { ok: true, json: async () => ({ matches: [meeting] }) };
       }
-      if (url.endsWith('/teams/20/matches?status=FINISHED&limit=500')) {
+      if (url.includes('/teams/20/matches?status=FINISHED&limit=500&dateFrom=')) {
         return { ok: true, json: async () => ({ matches: [meeting] }) };
       }
       throw new Error(`Unexpected football-data URL: ${url}`);

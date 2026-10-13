@@ -6,7 +6,7 @@ The public `/football/research` page compares any two teams in the supported, lo
 
 The page shows wins/draws/losses, average total goals, both teams scoring and over 2.5 goals, followed by past scores or each team's recent form. Percentages include their sample counts. Missing scores are excluded, never converted to zero. Regulation scores are used where supplied; otherwise the reported final score can include extra time. Identified awarded/unplayed matches are excluded. Source, update time, cached/partial status and coverage details are visible.
 
-These statistics describe the available history, not a complete all-time record or a prediction. Head-to-head uses up to 50 verified meetings; recent form uses up to 10 matches per team. Provider history is bounded to 500 results per team and supported enabled competitions. Historical coverage and freshness depend on the configured provider and its subscription. Existing settlement scores and challenge rules are unchanged.
+These statistics describe the available history, not a complete all-time record or a prediction. Head-to-head uses up to 50 verified meetings; recent form uses up to 10 matches per team. Provider history is bounded to 500 results per team and supported enabled competitions. Football-data history explicitly requests the past 749 days, within its 750-day request limit, instead of its current-season default. Older synced records can also contribute. Historical coverage and freshness depend on the configured provider and its subscription. Existing settlement scores and challenge rules are unchanged.
 
 ## API and loading
 

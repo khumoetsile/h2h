@@ -245,6 +245,7 @@ export async function researchTeams(filters) {
     form,
     metadata: {
       provider: provider.name, source, updatedAt, stale, providerStatus, sampleLimit: H2H_LIMIT, historyLimit: HISTORY_LIMIT,
+      historyCoverage: provider.name === 'football-data' ? 'Provider history covers the past 749 days; older synced scores may also appear.' : null,
       excludedUnverified: comparable.length - verified.length, isSimulated: provider.name === 'mock',
       scoreBasis: used.every(match => match.scoreBasis === 'REGULATION') && used.length ? 'REGULATION' : 'REPORTED_FINAL',
       notice: `${provider.name === 'mock' ? 'Simulated development data. ' : ''}Computed only from available completed matches with verified scores in supported competitions; awarded or unplayed matches are excluded where identified. Uses regulation scores when supplied, otherwise the reported final score, which may include extra time. These are historical score trends. Up to ${HISTORY_LIMIT} provider results per team; head-to-head uses the latest ${H2H_LIMIT}, form the latest ${FORM_LIMIT}. Coverage depends on the connected provider and is not a complete all-time record.${providerStatus === 'UNAVAILABLE' ? ' The history source is currently unavailable; showing saved results where available.' : ''}${stale ? ' Previously fetched provider history is marked stale.' : ''}`,

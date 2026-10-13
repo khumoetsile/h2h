@@ -146,7 +146,12 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     if (cached) this.teamMatchesCache.delete(key);
 
     const entry = { expiresAt: Date.now() + 15 * 60 * 1000, promise: null, fetchedAt: null };
-    entry.promise = this.#get(`/teams/${encodeURIComponent(key)}/matches?status=FINISHED&limit=500`)
+    // The provider defaults to the current season. Its date range is capped at
+    // 750 days; request a rolling 749-day window so cross-season rivals appear.
+    const historyTo = new Date();
+    const historyFrom = new Date(historyTo.getTime() - 749 * 86400000);
+    const historyQuery = new URLSearchParams({ status: 'FINISHED', limit: '500', dateFrom: historyFrom.toISOString().slice(0, 10), dateTo: historyTo.toISOString().slice(0, 10) });
+    entry.promise = this.#get(`/teams/${encodeURIComponent(key)}/matches?${historyQuery}`)
       .then((data) => {
         if (!Array.isArray(data.matches)) throw new Error(`football-data.org team history for ${key} did not include a matches array.`);
         entry.fetchedAt = new Date().toISOString();
