@@ -53,6 +53,10 @@ export class MatchDetailPage implements OnInit {
     try {
       const path = this.auth.isAdmin() ? `/admin/matches/${this.code()}` : `/matches/${this.code()}`;
       const { match } = await this.api.get<{ match: MatchView }>(path);
+      if (!this.auth.isAdmin() && match.category === 'CHESS') {
+        await this.router.navigate(['/chess', match.chess?.code ?? match.code], { replaceUrl: true });
+        return;
+      }
       if (!this.auth.isAdmin() && !['COMPLETED', 'CANCELLED'].includes(match.status)) {
         this.router.navigate(['/match', match.code], { replaceUrl: true });
         return;
@@ -91,6 +95,7 @@ export class MatchDetailPage implements OnInit {
 
   playAgain() {
     const m = this.match();
+    if (m?.category === 'CHESS') { this.router.navigate(['/chess']); return; }
     if (m) this.router.navigate(['/games', m.game.slug]);
   }
 
@@ -98,6 +103,7 @@ export class MatchDetailPage implements OnInit {
     const m = this.match();
     const opp = this.right();
     if (!m || !opp) return;
+    if (m.category === 'CHESS') { this.router.navigate(['/chess'], {queryParams:{opponent:opp.username}}); return; }
     if (opp.isBot) { this.playAgain(); return; }
     this.rematching.set(true);
     try {

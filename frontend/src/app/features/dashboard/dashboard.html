@@ -2,8 +2,13 @@
   @if (error() && !data()) {
     <app-load-error [message]="error()" (retry)="load()" />
   } @else {
-    <p class="hi fade-in">Hi, <strong>{{ auth.user()?.username }}</strong></p>
-    <a class="link small" style="display:inline-block;padding:0 0 16px" routerLink="/help">New here? How to play</a>
+    <div class="welcome fade-in">
+      <div><p class="hi">{{ greeting() }}, <strong>{{ auth.user()?.username }}</strong></p><h1>Make your next move.</h1><p class="text-2">A quick match now, or a rivalry that lasts all week.</p></div>
+      <a class="welcome-help" routerLink="/help" aria-label="How to play">How to play <span aria-hidden="true">↗</span></a>
+    </div>
+
+    <app-chess-discovery class="chess-discovery" />
+    <app-chess-activity class="chess-activity" [limit]="3" [activeOnly]="true" [compact]="true" />
 
     <!-- A match in progress is shown by the bar at the top of every screen, so it is not repeated here. -->
 
@@ -35,7 +40,7 @@
         <app-pitch-art class="hero-art" />
         <div class="hero-body">
           <div class="hero-title">
-            <h1>Penalty Shootout</h1>
+            <div><span class="mode-label">Play live · About two minutes</span><h2>Penalty Shootout</h2></div>
           </div>
           <p class="hero-note">
             @if ((main()?.waiting ?? 0) > 0) {
@@ -135,7 +140,7 @@
         <div class="card card-flush">
           <div class="list">
             @for (m of data()!.recentMatches.slice(0, 3); track m.id) {
-              <a class="list-item" [routerLink]="['/matches', m.code]">
+              <a class="list-item" [routerLink]="m.game.slug === 'chess' ? ['/chess', m.code] : ['/matches', m.code]">
                 <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="36" />
                 <div class="grow">
                   <div class="li-title">{{ m.football ? m.football.homeTeam + ' vs ' + m.football.awayTeam : m.game.name }} <span class="muted small">vs {{ m.opponent?.username }}</span></div>

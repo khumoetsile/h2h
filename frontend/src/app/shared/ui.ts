@@ -177,5 +177,6 @@ export class GameIcon {
     'memory-battle': 'grid_view',
     'aim-challenge': 'my_location',
     'football': 'sports_soccer',
+    'chess': 'grid_view',
   } as Record<string, string>)[this.slug()] ?? 'sports_esports');
 }

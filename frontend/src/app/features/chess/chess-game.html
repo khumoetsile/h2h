@@ -1,0 +1,119 @@
+<div class="chess-game page">
+  <div class="page-top"><a routerLink="/chess" class="back-link"><span aria-hidden="true">←</span> Chess</a><span class="game-code">{{ code() }}</span></div>
+  @if (loadError()) { <app-load-error [message]="loadError()" (retry)="load()" /> }
+  @else if (loading()) { <app-spinner /> }
+  @else if (game(); as g) {
+    @if (refreshError()) { <div class="connection-note" role="status"><span>{{ refreshError() }} The server's move deadline continues. Refresh before making a move.</span><button class="btn btn-sm" (click)="load(false)">Refresh game</button></div> }
+    @if (error() && !action() && !draft()) { <div class="form-error" role="alert">{{ error() }}</div> }
+    @if (g.status === 'PENDING') {
+      <section class="invitation">
+        <div class="invite-copy">
+          <span class="eyebrow">CHESS · PLAY AT YOUR PACE</span>
+          <div class="inviter"><app-avatar [name]="g.white.username" [color]="g.white.avatarColor" [size]="48" /><span>{{ mine() ? 'Your invitation is ready' : g.white.username + ' invites you to play' }}</span></div>
+          <h1>{{ mine() ? 'Make your next rivalry.' : 'One friend. One board.' }}</h1>
+          <p>You play {{ mine() ? 'White' : 'Black' }}. Take up to {{ g.turnSeconds / 3600 }} hours for each move, and return whenever you like before your deadline.</p>
+          <dl class="invite-money"><div><dt>Each demo entry</dt><dd>{{ money(g.stake) }}</dd></div><div><dt>Winner receives</dt><dd class="gold">{{ money(g.prize) }}</dd></div><div><dt>Platform fee on a win</dt><dd>{{ money(g.fee) }} ({{ g.feePercent }}%)</dd></div></dl>
+          <p class="disclosure"><strong>No funds are held yet.</strong> Both players' entries lock when the invitation is accepted. Missing a move deadline or resigning loses your entry; the winner receives {{ money(g.prize) }} and the platform receives {{ money(g.fee) }}. Draws refund both entries with no fee.</p>
+          @if (mine()) {
+            <button class="btn btn-primary btn-block" (click)="copyLink()">{{ copied() ? 'Link copied ✓' : 'Copy invitation link' }}</button>
+            <label class="share-label" for="chess-share">Invitation link</label><input #shareField id="chess-share" class="share-field" [value]="shareUrl()" readonly (focus)="shareField.select()" />
+            @if (g.canCancel) { <button class="cancel-invite" [disabled]="busy()" (click)="ask('cancel')">Cancel invitation · no fee</button> }
+          } @else if (g.canAccept || (!auth.isLoggedIn() && !g.opponentId)) {
+            <button class="btn btn-primary btn-block" [disabled]="busy() || !!refreshError()" (click)="ask('accept')">Review &amp; join · {{ money(g.stake) }} demo</button>
+            @if (g.canDecline) { <button class="cancel-invite" [disabled]="busy()" (click)="ask('decline')">Decline invitation · no fee</button> }
+            @if (!auth.isLoggedIn()) { <div class="account-options"><a routerLink="/login" [queryParams]="{next:'/chess/'+g.code}">Sign in</a><span>or</span><a routerLink="/register" [queryParams]="{next:'/chess/'+g.code}">Create an account</a></div><p class="small text-2">A saved account lets you return on any device. You can also try as a guest and save it here.</p> }
+          } @else { <p class="notice">This invitation is for {{ g.black?.username || 'another player' }}.</p>@if (!auth.isLoggedIn()) { <a class="btn btn-primary btn-block" routerLink="/login" [queryParams]="{next:'/chess/'+g.code}">Sign in to join</a> } @else { <p class="small text-2">You are signed in as {{ auth.user()?.username }}. Open your profile to sign out, then return to this link and sign in as {{ g.black?.username }}. Save a guest account before switching.</p><a class="btn btn-block" routerLink="/profile">Open my profile</a><a routerLink="/chess" class="account-link">Start your own game →</a> } }
+          <p class="expiry">Invitation expires in {{ inviteCountdown() }} @if (g.inviteExpiresAt) { <span>· {{ g.inviteExpiresAt | date:'MMM d, h:mm a' }}</span> }</p>
+        </div>
+        <div class="preview-board" aria-label="Starting chess position">
+          @for (square of squares(); track square.name) { <div [class.dark]="square.dark"><app-chess-piece [piece]="square.piece" /></div> }
+        </div>
+      </section>
+      <app-save-account />
+    } @else if (g.status === 'ACTIVE' || g.status === 'COMPLETED') {
+      @if (!g.fen) {
+        <section class="private-game"><h1>A private chess game</h1><p>This board is available to its two players.</p>@if (auth.isLoggedIn()) { <p>You are signed in as {{ auth.user()?.username }}. Open your profile to sign out, then return to this invitation and sign in to the account you used to join. Save a guest account before switching.</p><a class="btn btn-primary" routerLink="/profile">Open my profile</a> } @else { <a class="btn btn-primary" routerLink="/login" [queryParams]="{next:'/chess/'+g.code}">Sign in to resume</a> }<a class="btn" routerLink="/chess">Start your own game</a></section>
+      } @else {
+        @if (auth.user()?.isGuest && g.status === 'ACTIVE') { <app-save-account /> }
+        @if (g.status === 'COMPLETED') {
+          <section class="result-banner" [class.won]="g.myOutcome === 'WIN'"><span class="eyebrow">GAME COMPLETE</span><h1>{{ resultTitle() }}</h1><p>{{ resultDescription() }}</p><div class="result-money"><span>{{ !g.viewerColor ? g.isDraw ? 'Each entry refunded' : 'Winner received' : g.isDraw ? 'Your entry refunded' : g.myOutcome === 'WIN' ? 'Your payout' : 'Your demo entry' }}</span><strong>{{ money(!g.viewerColor ? g.isDraw ? g.stake : g.prize : g.isDraw || g.myOutcome === 'WIN' ? g.myPayout : g.stake) }}</strong></div><p class="small">Platform fee: {{ money(g.isDraw ? 0 : g.fee) }}. @if (g.viewerColor) { <a routerLink="/wallet/transactions">View wallet activity →</a> }</p></section>
+        }
+        <div class="play-layout">
+          <section class="board-section" aria-labelledby="chess-board-title">
+            @if (g.status === 'ACTIVE') { <div class="mobile-deadline" [class.your-turn]="g.isYourTurn"><div><strong>{{ g.isYourTurn ? 'Your turn' : g.viewerColor ? 'Opponent’s turn' : (g.turn === 'w' ? 'White' : 'Black')+' to move' }}</strong><span>Due {{ g.turnDeadline | date:'MMM d, h:mm a' }}</span></div><span class="time">{{ remaining() > 0 ? countdown() : 'Checking…' }}</span></div> }
+            <div class="player-line">
+              @if (opponent(); as rival) { <app-avatar [name]="rival.username" [color]="rival.avatarColor" [size]="36" /><div><strong>{{ rival.username }}</strong><span>{{ g.viewerColor === 'b' ? 'White' : 'Black' }}</span></div> }
+              <span class="player-turn" [class.active]="g.status === 'ACTIVE' && g.turn === (g.viewerColor === 'b' ? 'w' : 'b')">{{ g.status === 'ACTIVE' && g.turn === (g.viewerColor === 'b' ? 'w' : 'b') ? g.viewerColor ? 'Their turn' : 'To move' : '' }}</span>
+            </div>
+            <h2 id="chess-board-title" class="sr-only">Chess board. {{ g.viewerColor ? 'You play '+myColor() : 'Read only. White pieces are at the bottom' }}.</h2>
+            <div class="board-frame">
+              <div class="board" role="group" aria-label="Chess board. Arrow keys move between squares; Enter selects a piece or destination." [class.locked]="!canMove()">
+                @for (square of squares(); track square.name; let i = $index) {
+                  <button type="button" class="square" [id]="'chess-square-'+square.name" [class.dark]="square.dark" [class.selected]="selected() === square.name" [class.last-move]="lastMove(square.name)" [class.destination]="destinations().has(square.name)" [class.check]="checked(square)" [attr.aria-label]="squareLabel(square)" [attr.aria-pressed]="selected() === square.name" [tabIndex]="focused() === square.name ? 0 : -1" (focus)="focused.set(square.name)" (click)="selectSquare(square)" (keydown)="keyboard($event,square.name)">
+                    <app-chess-piece [piece]="square.piece" />
+                    @if (i % 8 === 0) { <span class="rank" aria-hidden="true">{{ square.rank }}</span> }
+                    @if (i >= 56) { <span class="file" aria-hidden="true">{{ square.file }}</span> }
+                    @if (destinations().has(square.name)) { <span class="legal-dot" [class.capture]="!!square.piece" aria-hidden="true"></span> }
+                  </button>
+                }
+              </div>
+            </div>
+            <div class="player-line me"><app-avatar [name]="bottomPlayer()?.username || 'White'" [color]="bottomPlayer()?.avatarColor || '#d9c891'" [size]="36" /><div><strong>{{ bottomPlayer()?.username }} @if (g.viewerColor) { <span class="you-tag">You</span> }</strong><span>{{ myColor() }}</span></div><span class="player-turn" [class.active]="g.status === 'ACTIVE' && g.turn === (g.viewerColor === 'b' ? 'b' : 'w')">{{ g.status === 'ACTIVE' && g.turn === (g.viewerColor === 'b' ? 'b' : 'w') ? g.viewerColor ? 'Your turn' : 'To move' : '' }}</span></div>
+            @if (g.status === 'ACTIVE') {
+              <p class="board-instructions" aria-live="polite">{{ !g.viewerColor ? 'Read-only board. Only the two players can make moves.' : busy() ? 'Saving with the server…' : g.inCheck && g.isYourTurn ? 'You are in check. Choose a legal move to protect your king.' : selected() ? 'Choose a marked destination, then review your move.' : g.isYourTurn ? 'Select your piece, then a marked destination. Review before you move.' : 'Your position is saved. Come back when it is your turn.' }}</p>
+              <details class="move-access"><summary>Choose a move from a list</summary><p>Use this alternative to the board, or use arrow keys and Enter on the squares.</p><label for="chess-move-choice">Legal move</label><select id="chess-move-choice" [(ngModel)]="moveChoice" [disabled]="!canMove()"><option value="">Choose a move</option>@for (move of legal(); track moveValue(move)) { <option [value]="moveValue(move)">{{ move.san }} · {{ move.from }} to {{ move.to }}{{ move.promotion ? ' · promote to '+pieceLabel(move.promotion).replace('Black ','') : '' }}</option> }</select><button class="btn btn-block" [disabled]="!moveChoice || !canMove()" (click)="chooseFromList()">Review selected move</button></details>
+            }
+          </section>
+          <aside class="game-panel">
+            @if (g.status === 'ACTIVE') {
+              <section class="turn-panel" [class.your-turn]="g.isYourTurn"><span class="eyebrow">{{ !g.viewerColor ? 'CURRENT TURN' : g.isYourTurn ? 'YOUR NEXT MOVE' : 'WAITING FOR YOUR RIVAL' }}</span><h2>{{ !g.viewerColor ? (g.turn === 'w' ? 'White' : 'Black')+' to move.' : g.isYourTurn ? 'Your move.' : 'Their move.' }}</h2><div class="deadline-value" [class.urgent]="remaining() < 3600000">{{ remaining() > 0 ? countdown() : 'Checking result…' }}</div><p>{{ !g.viewerColor ? 'Current player must move before' : g.isYourTurn ? 'Make your move before' : 'Your opponent must move before' }} <strong>{{ g.turnDeadline | date:'MMM d, h:mm a' }}</strong>.</p><p class="deadline-warning">Missing a deadline forfeits the game. The opponent wins {{ money(g.prize) }}; the platform fee is {{ money(g.fee) }}.</p></section>
+              @if (g.drawOfferedBy) {
+                <div class="draw-notice" role="status">
+                  @if (!g.viewerColor) { <strong>{{ g.drawOfferedBy === g.white.id ? g.white.username : g.black?.username }} offered a draw</strong><p>The other player can accept or decline. The move deadline continues.</p> }
+                  @else if (g.drawOfferedBy === auth.user()?.id) { <strong>Draw offered</strong><p>Your opponent can accept or decline. The move deadline continues.</p> }
+                  @else { <strong>Your opponent offers a draw</strong><p>Accept to end the game and refund both entries in full. The move deadline continues.</p><button class="btn btn-block" [disabled]="busy()" (click)="ask('draw-accept')">Review draw</button><button class="btn btn-block" [disabled]="busy()" (click)="declineDraw()">Decline &amp; keep playing</button> }
+                </div>
+              }
+            }
+            <section class="stake-panel"><div><span>{{ g.isDraw ? 'Each entry refunded' : g.status === 'ACTIVE' ? 'Each locked entry' : 'Each entry' }}</span><strong>{{ money(g.stake) }}</strong></div>@if (g.isDraw) { <div><span>Platform fee</span><strong class="gold">{{ money(0) }}</strong></div><p>Both players received their entries back in full. All funds are simulated.</p> } @else { <div><span>{{ g.status === 'COMPLETED' ? 'Winner received' : 'Winner receives' }}</span><strong class="gold">{{ money(g.prize) }}</strong></div><p>{{ money(g.pool) }} combined entries − {{ money(g.fee) }} platform fee ({{ g.feePercent }}%). All funds are simulated.</p> }</section>
+            <section class="history-panel"><div class="history-heading"><h2>Moves</h2><span>{{ g.moves?.length || 0 }} played</span></div>@if (!movePairs().length) { <p class="no-moves">White opens the game.</p> } @else { <div class="move-history" role="log" aria-label="Confirmed move history"><div class="history-labels"><span>Move</span><span>White</span><span>Black</span></div>@for (pair of movePairs(); track pair.number) { <div><span>{{ pair.number }}.</span><strong>{{ pair.white }}</strong><strong>{{ pair.black || '—' }}</strong></div> }</div> }</section>
+            @if (g.status === 'ACTIVE' && g.viewerColor) { <div class="game-actions"><button class="btn" [disabled]="busy() || !!g.drawOfferedBy" (click)="ask('draw-offer')">Offer a draw</button><button class="btn resign" [disabled]="busy()" (click)="ask('resign')">Resign</button></div> }
+            @if (g.status === 'COMPLETED') { <a routerLink="/chess" class="btn btn-primary btn-block">Start another chess game</a> }
+          </aside>
+        </div>
+        @if (!auth.user()?.isGuest || g.status !== 'ACTIVE') { <app-save-account /> }
+      }
+    } @else {
+      <section class="private-game"><span class="eyebrow">CHESS {{ g.matchId ? 'GAME' : 'INVITATION' }}</span><h1>{{ status(g) }}</h1><p>{{ resultDescription() }}</p>@if (g.matchId && g.viewerColor) { <div class="result-money"><span>Your entry refunded</span><strong>{{ money(g.myPayout) }}</strong></div><a routerLink="/wallet/transactions" class="btn">View wallet activity</a> }<a routerLink="/chess" class="btn btn-primary">Start a new chess game</a></section>
+    }
+  }
+</div>
+
+@if (draft() && game(); as g) {
+  <div class="chess-backdrop" (click)="closeMove()" (keydown.escape)="closeMove()">
+    <section class="chess-dialog" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" role="dialog" aria-modal="true" aria-labelledby="chess-move-title" (click)="$event.stopPropagation()">
+      <span class="eyebrow">REVIEW YOUR MOVE</span><h2 id="chess-move-title">{{ draft()![0].from }} <span aria-hidden="true">→</span> {{ draft()![0].to }}</h2>
+      @if (promotions().length) { <fieldset class="promotions"><legend>Promote your pawn to</legend><div>@for (p of promotions(); track p) { <button [class.selected]="promotion() === p" [attr.aria-pressed]="promotion() === p" [attr.aria-label]="pieceLabel(p).replace('Black ','')" (click)="promotion.set(p)"><app-chess-piece [piece]="g.viewerColor === 'w' ? p.toUpperCase() : p" /><span>{{ pieceLabel(p).replace('Black ','') }}</span></button> }</div></fieldset> }
+      <p class="move-notation">{{ chosenMove()?.san }}</p><p>The move is final once the server confirms it. @if (chosenMove()?.san?.endsWith('#')) { This is checkmate. Once confirmed, the game ends and you receive {{ money(g.prize) }}. The platform fee is {{ money(g.fee) }}. } @else { If the game continues, your opponent then has {{ g.turnSeconds / 3600 }} hours to respond. }</p>
+      @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+      <button class="btn btn-primary btn-block" [disabled]="busy() || !canMove()" (click)="confirmMove()">{{ busy() ? 'Confirming move…' : 'Confirm move' }}</button><button class="btn btn-block" [disabled]="busy()" (click)="closeMove()">Choose a different move</button>
+    </section>
+  </div>
+}
+@if (action() && game(); as g) {
+  <div class="chess-backdrop" (click)="closeAction()" (keydown.escape)="closeAction()">
+    <section class="chess-dialog" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" role="dialog" aria-modal="true" aria-labelledby="chess-action-title" (click)="$event.stopPropagation()">
+      <span class="eyebrow">CHESS · DEMO FUNDS</span>
+      @switch (action()) {
+        @case ('accept') { <h2 id="chess-action-title">Join this chess game?</h2><p>You play Black. White moves first. Both entries lock together when you join.</p><dl class="money-review"><div><dt>Your demo entry</dt><dd>{{ money(g.stake) }}</dd></div><div><dt>Platform fee on a win</dt><dd>{{ money(g.fee) }}</dd></div><div><dt>Winner receives</dt><dd class="gold">{{ money(g.prize) }}</dd></div></dl><p class="notice">You have <strong>{{ g.turnSeconds / 3600 }} hours for every move</strong>. If you miss the deadline or resign, your opponent wins and the platform fee applies. Draws refund both entries with no fee.</p>@if (!auth.isLoggedIn()) { <p class="small">We'll create a guest account. Save it with a password so you can return on another device.</p> } }
+        @case ('cancel') { <h2 id="chess-action-title">Cancel your invitation?</h2><p>No entries have been held. No fee is charged. This link will stop accepting players.</p> }
+        @case ('decline') { <h2 id="chess-action-title">Decline this invitation?</h2><p>No demo funds have been held. No fee is charged. Your friend will be told that you declined.</p> }
+        @case ('resign') { <h2 id="chess-action-title">Resign this game?</h2><p>You will lose your {{ money(g.stake) }} demo entry. {{ opponent()?.username || 'Your opponent' }} wins {{ money(g.prize) }} and the platform receives {{ money(g.fee) }}. This decision cannot be undone.</p> }
+        @case ('draw-offer') { <h2 id="chess-action-title">Offer a draw?</h2><p>If your opponent accepts, both players receive their {{ money(g.stake) }} entry back in full. No platform fee is charged.</p><p class="notice">Offering a draw does not pause or extend your move deadline.</p> }
+        @case ('draw-accept') { <h2 id="chess-action-title">Accept the draw?</h2><p>This ends the game. Both players receive their {{ money(g.stake) }} demo entry back in full. No platform fee is charged.</p> }
+      }
+      @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+      <button class="btn btn-block" [class.btn-primary]="action() !== 'resign'" [class.btn-danger]="action() === 'resign'" [disabled]="busy()" (click)="confirmAction()">{{ busy() ? 'Confirming…' : action() === 'accept' ? 'Join · lock '+money(g.stake)+' demo' : action() === 'resign' ? 'Resign & lose '+money(g.stake) : action() === 'cancel' ? 'Cancel invitation · no fee' : action() === 'decline' ? 'Decline invitation · no fee' : action() === 'draw-offer' ? 'Send draw offer' : 'Accept draw & refund entries' }}</button><button class="btn btn-block" [disabled]="busy()" (click)="closeAction()">{{ action() === 'resign' ? 'Keep playing' : 'Go back' }}</button>
+    </section>
+  </div>
+}

@@ -6,6 +6,7 @@ import { filter, interval, merge } from 'rxjs';
 import { Api } from '../core/api.service';
 import { AuthService } from '../core/auth.service';
 import { Challenge, MatchSummary, MatchView, Paged } from '../core/models';
+import { ChessGame } from '../core/chess';
 import { RealtimeService } from '../core/realtime.service';
 
 interface Row {
@@ -75,6 +76,7 @@ export class ActiveMatchBar implements OnInit {
 
   private rows = signal<Row[]>([]);
   private challenges = signal<Challenge[]>([]);
+  private chess = signal<ChessGame[]>([]);
   /** Challenges the player has waved away this session; they stay on the Challenges page. */
   private dismissed = signal<number[]>(readDismissed());
   private url = signal(this.router.url);
@@ -96,6 +98,8 @@ export class ActiveMatchBar implements OnInit {
     }
     const search = rows.find((r) => r.status === 'WAITING');
     if (search) return { text: `Looking for an opponent: ${search.game}`, cta: 'Open', hot: false, link: ['/match', search.code] };
+    const turn = this.chess().find((g) => g.status === 'ACTIVE' && g.isYourTurn);
+    if (turn && !this.url().startsWith('/chess/')) return {text:`Your chess move vs ${turn.viewerColor === 'w' ? turn.black?.username ?? 'your friend' : turn.white.username}`,cta:'Continue',hot:false,link:['/chess',turn.code]};
     return null;
   });
 
@@ -107,7 +111,7 @@ export class ActiveMatchBar implements OnInit {
       if (wasInMatch && !e.urlAfterRedirects.startsWith('/match/')) void this.load();
     });
     this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((m) => {
-      if (m.category === 'FOOTBALL') return;
+      if (m.category !== 'SKILL_GAME') return;
       const done = ['COMPLETED', 'CANCELLED', 'VOID'].includes(m.status);
       this.rows.update((l) => {
         const rest = l.filter((r) => r.code !== m.code);
@@ -115,6 +119,7 @@ export class ActiveMatchBar implements OnInit {
       });
     });
     this.realtime.challenge$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.load());
+    this.realtime.chess$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.load());
     merge(this.realtime.reconnected$, interval(30000)).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => void this.load());
   }
 
@@ -128,6 +133,7 @@ export class ActiveMatchBar implements OnInit {
       const c = await this.api.get<{ challenges: Challenge[] }>('/challenges', { box: 'incoming', status: 'active' });
       this.challenges.set(c.challenges.filter((x) => x.status === 'PENDING'));
     } catch { /* same */ }
+    try { this.chess.set((await this.api.get<{items:ChessGame[]}>('/chess', {status:'active'})).items); } catch { /* keep last known state until the next refresh */ }
   }
 
   private dismiss(id: number) {

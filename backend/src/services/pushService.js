@@ -19,13 +19,15 @@ const CATEGORY = {
   MATCH_STARTING: 'challenges',
   CHALLENGE_RECEIVED: 'challenges',
   CHALLENGE_ACCEPTED: 'challenges',
+  CHESS_TURN: 'challenges',
+  CHESS_DRAW_OFFER: 'challenges',
   WAITING_PLAYER: 'waiting',
 };
 export const PUSH_TYPES = new Set(Object.keys(CATEGORY).filter((t) => t !== 'WAITING_PLAYER'));
 
 /** These can wait until morning. A friend joining the invite you are looking at cannot. */
-const QUIET_TYPES = new Set(['CHALLENGE_RECEIVED', 'WAITING_PLAYER']);
-const MIN_GAP_MS = { CHALLENGE_RECEIVED: 2 * 60 * 1000, MATCH_FOUND: 20 * 1000, MATCH_STARTING: 20 * 1000, CHALLENGE_ACCEPTED: 20 * 1000 };
+const QUIET_TYPES = new Set(['CHALLENGE_RECEIVED', 'WAITING_PLAYER', 'CHESS_TURN', 'CHESS_DRAW_OFFER']);
+const MIN_GAP_MS = { CHALLENGE_RECEIVED: 2 * 60 * 1000, MATCH_FOUND: 20 * 1000, MATCH_STARTING: 20 * 1000, CHALLENGE_ACCEPTED: 20 * 1000, CHESS_TURN: 60 * 1000, CHESS_DRAW_OFFER: 2 * 60 * 1000 };
 const WAITING_GAP_MS = 3 * 60 * 60 * 1000;
 const WAITING_MAX_RECIPIENTS = 25;
 

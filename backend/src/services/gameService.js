@@ -8,6 +8,7 @@ export function mapGame(g) {
   return {
     id: g.id,
     slug: g.slug,
+    kind: g.kind,
     name: g.name,
     tagline: g.tagline,
     description: g.description,

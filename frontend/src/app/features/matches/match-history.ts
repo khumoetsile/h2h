@@ -45,7 +45,7 @@ type Filter = 'all' | 'active' | 'wins' | 'losses' | 'draws' | 'void' | 'timed_o
         } @else {
           <div class="list">
             @for (m of data()!.items; track m.id) {
-              <a class="list-item row-item" [routerLink]="isActive(m) ? ['/match', m.code] : ['/matches', m.code]">
+              <a class="list-item row-item" [routerLink]="matchLink(m)">
                 <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="36" />
                 <div class="grow">
                   @if (m.football) {
@@ -138,12 +138,15 @@ export class MatchHistoryPage implements OnInit {
   }
 
   label(m: MatchSummary) {
+    if (m.category === 'CHESS' && this.isActive(m)) return { label: m.chess?.isYourTurn ? 'Your turn' : 'Waiting for opponent', chip: m.chess?.isYourTurn ? 'chip chip-accent' : 'chip' };
     if (m.displayState === 'LOCKING_IN' && m.lockedIn === false) return { label: 'Your turn: lock in', chip: 'chip chip-accent' };
     return DISPLAY_STATE[m.displayState];
   }
   isActive(m: MatchSummary) { return ACTIVE_STATES.includes(m.displayState); }
+  matchLink(m: MatchSummary) { return m.category === 'CHESS' ? ['/chess', m.chess?.code ?? m.code] : this.isActive(m) ? ['/match', m.code] : ['/matches', m.code]; }
 
   deadline(m: MatchSummary) {
+    if (m.category === 'CHESS' && this.isActive(m)) return m.chess?.turnDeadline ?? null;
     const t = m.timers;
     if (!t || !this.isActive(m)) return null;
     if (m.displayState === 'WAITING_FOR_OPPONENT') return t.acceptanceDeadline;

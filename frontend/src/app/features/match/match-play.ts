@@ -117,6 +117,7 @@ export class MatchPlayPage implements OnInit {
     this.toast.dismiss();
     try {
       const view = await this.api.get<{ match: MatchView }>(`/matches/${this.code()}`);
+      if (view.match.category === 'CHESS') { await this.router.navigate(['/chess', view.match.chess?.code ?? view.match.code], {replaceUrl:true}); return; }
       this.match.set(view.match);
       if (view.match.game.slug === 'penalty-shootout') {
         // Live game: nothing to start here; the shootout screen joins the pitch itself.

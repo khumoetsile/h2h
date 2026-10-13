@@ -73,7 +73,7 @@ export interface Game {
 }
 
 export type MatchStatus = 'WAITING' | 'MATCHED' | 'READY' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED' | 'VOID';
-export type MatchCategory = 'SKILL_GAME' | 'FOOTBALL';
+export type MatchCategory = 'SKILL_GAME' | 'FOOTBALL' | 'CHESS';
 
 /** Why an active challenge ended other than by a normal result. */
 export type EndReason = 'NO_OPPONENT' | 'LOCK_IN_TIMEOUT' | 'ACTION_TIMEOUT' | 'GAME_TIMEOUT' | 'RESULT_TIMEOUT' | 'ABANDONED' | 'PLAYER_CANCELLED' | 'FIXTURE' | null;
@@ -160,6 +160,7 @@ export interface MatchView {
   status: MatchStatus;
   source: 'MATCHMAKING' | 'CHALLENGE' | 'DIRECT';
   category: MatchCategory;
+  chess?: { code: string; turnDeadline: string | null; isYourTurn: boolean } | null;
   football: FootballMatchInfo | null;
   game: { id: number; slug: string; name: string; accentColor: string };
   stake: number;
@@ -194,6 +195,7 @@ export interface MatchSummary {
   abandonedBy: number | null;
   source: string;
   category: MatchCategory;
+  chess?: { code: string; turnDeadline: string | null; isYourTurn: boolean } | null;
   football: {
     fixtureId: number | null; competition: string; homeTeam: string; awayTeam: string; questionName: string;
     challengeTypeSlug: string | null; question: string | null; kickoffAt: string | null; fixtureStatus: FixtureStatus | null; minute: number | null;

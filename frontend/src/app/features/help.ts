@@ -43,6 +43,14 @@ import { ConfigStore } from '../core/config.store';
       </p>
     </section>
     <section class="card stack">
+      <h2>Chess across days</h2>
+      <p>Invite a friend by username or share a chess link. Creating an invitation holds no funds. On acceptance, both demo entries are held and White moves first.</p>
+      <p>Each turn has the deadline shown before you accept. Choose a piece, choose a legal destination, then confirm. Your progress is saved after each confirmed move, so you can leave and return from Challenges.</p>
+      <p><strong>Missing your move deadline or resigning loses the game.</strong> The opponent receives the combined pool minus the disclosed platform fee. Waiting on a draw offer does not pause your deadline. Checkmate wins; agreed draws and automatic board draws refund both entries with no fee.</p>
+      <p>Save your guest account before relying on another device. Reminders are helpful, but the displayed deadline applies even if a notification is not delivered.</p>
+      <a class="btn" routerLink="/chess">Open chess</a>
+    </section>
+    <section class="card stack">
       <h2>Football</h2>
       <p>
         Browse fixtures and results without an account. A football challenge is between two players

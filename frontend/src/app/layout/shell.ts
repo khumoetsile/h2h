@@ -1,5 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { Router, RouterLink, RouterOutlet } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatMenuModule } from '@angular/material/menu';
 import { MatTooltipModule } from '@angular/material/tooltip';
@@ -40,11 +40,11 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Settings', icon: 'tune', link: '/admin/settings' },
 ];
 const ADMIN_BOTTOM = ['/admin', '/admin/users', '/admin/matches', '/admin/transactions', '/admin/settings'];
-const PUBLIC_NAV: NavItem[] = [{ label: 'Football', icon: 'sports_soccer', link: '/football' }];
+const PUBLIC_NAV: NavItem[] = [{ label: 'Chess', icon: 'grid_view', link: '/chess' }, { label: 'Football', icon: 'sports_soccer', link: '/football' }];
 
 @Component({
   selector: 'app-shell',
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, MatIconModule, MatMenuModule, MatTooltipModule, Avatar, MoneyPipe, AgoPipe, ActiveMatchBar, AdsConsent],
+  imports: [RouterOutlet, RouterLink, MatIconModule, MatMenuModule, MatTooltipModule, Avatar, MoneyPipe, AgoPipe, ActiveMatchBar, AdsConsent],
   templateUrl: './shell.html',
   styleUrl: './shell.scss',
 })
@@ -53,7 +53,7 @@ export class Shell {
   protected realtime = inject(RealtimeService);
   protected pwa = inject(PwaService);
   private api = inject(Api);
-  private router = inject(Router);
+  protected router = inject(Router);
   protected brand = BRAND;
 
   protected nav = computed(() => !this.auth.isLoggedIn() ? PUBLIC_NAV : (this.auth.isAdmin() ? ADMIN_NAV : PLAYER_NAV));
@@ -62,6 +62,10 @@ export class Shell {
     const keys = this.auth.isAdmin() ? ADMIN_BOTTOM : PLAYER_BOTTOM;
     return this.nav().filter((n) => keys.includes(n.link));
   });
+  protected navIsActive(item: NavItem) {
+    if (item.link === '/dashboard' && /^\/(dashboard|games|chess)(\/|\?|$)/.test(this.router.url)) return true;
+    return this.router.isActive(item.link, { paths: item.exact ? 'exact' : 'subset', queryParams: 'ignored', matrixParams: 'ignored', fragment: 'ignored' });
+  }
 
   protected notifications = signal<AppNotification[]>([]);
   protected loadingNotifications = signal(false);

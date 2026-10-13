@@ -8,6 +8,7 @@ import { Game } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { MoneyPipe } from '../../shared/pipes';
 import { EmptyState, GameIcon, LoadError } from '../../shared/ui';
+import { ChessDiscovery } from '../../shared/chess-discovery';
 
 /**
  * "Play" tab. Each game is one simple visual card: name, one plain-language
@@ -17,15 +18,18 @@ import { EmptyState, GameIcon, LoadError } from '../../shared/ui';
  */
 @Component({
   selector: 'app-games',
-  imports: [RouterLink, MatIconModule, MoneyPipe, EmptyState, GameIcon, LoadError],
+  imports: [RouterLink, MatIconModule, MoneyPipe, EmptyState, GameIcon, LoadError, ChessDiscovery],
   template: `
     <div class="page">
       <div class="page-head">
         <div>
           <h1>Play</h1>
-          <p class="sub">Pick a category to challenge someone.</p>
+          <p class="sub">Find your game. Start a rivalry.</p>
         </div>
       </div>
+
+      <app-chess-discovery class="chess-discovery" />
+      <div class="live-heading"><div><span class="mode-label">Play live</span><h2>Quick games, real opponents.</h2></div><p class="muted small">Be online together for these matches.</p></div>
 
       <div class="segmented tabs play-tabs">
         <button class="active"><mat-icon inline>sports_esports</mat-icon> Games</button>
@@ -64,10 +68,12 @@ import { EmptyState, GameIcon, LoadError } from '../../shared/ui';
   `,
   styles: [`
     .play-tabs { margin-bottom: 16px; }
+    .chess-discovery { margin-bottom:28px; }
+    .live-heading {display:flex;justify-content:space-between;gap:16px;align-items:flex-end;flex-wrap:wrap;margin-bottom:16px;} .live-heading h2 {font-size:26px;} .mode-label {color:var(--accent);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;}
     .games-grid { display: grid; gap: 14px; grid-template-columns: 1fr; }
     @media (min-width: 560px) { .games-grid { grid-template-columns: repeat(2, 1fr); } }
     @media (min-width: 960px) { .games-grid { grid-template-columns: repeat(3, 1fr); } }
-    .game-card { display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden; padding: 20px; }
+    .game-card { display: flex; flex-direction: column; gap: 8px; position: relative; overflow: hidden; padding: 24px; background:linear-gradient(150deg,var(--surface-2),var(--surface)); }
     .game-card::before { content: ''; position: absolute; left: 0; top: 0; right: 0; height: 3px; background: var(--gc); opacity: .8; }
     .gc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 4px; }
     .desc { font-size: 15px; line-height: 1.4; min-height: 42px; }

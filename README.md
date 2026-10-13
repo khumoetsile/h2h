@@ -2,6 +2,8 @@
 
 Usability updates, password-recovery setup and the proposed friends-league feature are documented in [UX readiness](docs/UX-READINESS.md).
 
+Correspondence chess, its per-move deadlines, settlement rules and configuration are documented in [Chess](docs/CHESS.md).
+
 > ⚠️ **DEMO MODE — ALL MONEY IS SIMULATED.**
 > Deposits, stakes, winnings, fees and withdrawals use **demo funds only**. No payment
 > provider (DPO, Orange Money, MyZaka, Mascom, FNB, Visa, Mastercard, PayPal, Stripe or any
@@ -12,10 +14,11 @@ Usability updates, password-recovery setup and the proposed friends-league featu
 
 Head2Head is a 1v1 competitive gaming platform: two players stake (demo) money, compete —
 never against the platform itself, always against each other — and the winner receives the
-pool minus a configurable platform fee. There are two competition categories:
+pool minus a configurable platform fee. There are three competition categories:
 
 - **Head2Head Games** — five playable skill games with server-side scoring (see
   [How the games work](#how-the-games-work)).
+- **Head2Head Chess** — saved turn-based games with a 24-hour deadline per move by default. Missing a deadline or resigning loses the match; the opponent receives the pool less the normal platform fee. Draws refund both entries. No entry is held before invitation acceptance.
 - **Head2Head Football** — challenge another player on a real football fixture ("Who will
   win?", "Will both teams score?", …); Head2Head does not create the match, it retrieves
   fixture data from an external provider and settles the challenge once the real match is

@@ -14,6 +14,12 @@ function positive(name, fallback) {
   return n;
 }
 
+function wholeSeconds(name, fallback) {
+  const value = positive(name, fallback);
+  if (!Number.isSafeInteger(value) || value > 31536000) throw new Error(`Env var ${name} must be a whole number of seconds between 1 and 31536000`);
+  return value;
+}
+
 const env = process.env.NODE_ENV || 'development';
 
 export const config = {
@@ -47,6 +53,10 @@ export const config = {
   currencyCode: process.env.CURRENCY_CODE || 'BWP',
   demoBotsEnabled: (process.env.DEMO_BOTS_ENABLED || 'true') === 'true',
   sweeperIntervalSeconds: num('SWEEPER_INTERVAL_SECONDS', 5),
+  chess: {
+    turnSeconds: wholeSeconds('CHESS_TURN_TIMEOUT_SECONDS', 86400),
+    inviteSeconds: wholeSeconds('CHESS_INVITE_TIMEOUT_SECONDS', 604800),
+  },
   // Every PvP timer lives here and only here. The server stamps absolute
   // deadlines onto the match/challenge row at each state transition using
   // these durations; clients only ever render the remaining time against

@@ -108,7 +108,7 @@ function passwordsMatch(group: AbstractControl): ValidationErrors | null {
           </button>
           <p class="muted tiny" style="margin-top:12px;text-align:center">DEMO prototype: deposits, stakes and winnings use simulated funds only.</p>
         </form>
-        <p class="foot">Already have an account? <a class="link" routerLink="/login">Sign in</a></p>
+        <p class="foot">Already have an account? <a class="link" routerLink="/login" [queryParams]="{ next: route.snapshot.queryParamMap.get('next') }">Sign in</a></p>
       </div>
     </section>
   `,
@@ -117,7 +117,7 @@ export class RegisterPage {
   private fb = inject(FormBuilder);
   private auth = inject(AuthService);
   private router = inject(Router);
-  private route = inject(ActivatedRoute);
+  protected route = inject(ActivatedRoute);
   private toast = inject(Toast);
   private configStore = inject(ConfigStore);
   protected brand = BRAND;

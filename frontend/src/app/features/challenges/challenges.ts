@@ -14,6 +14,7 @@ import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
 import { Avatar, EmptyState, GameIcon, LoadError, SkeletonList } from '../../shared/ui';
+import { ChessActivity } from '../chess/chess-activity';
 
 type Tab = 'incoming' | 'outgoing' | 'history';
 
@@ -24,7 +25,7 @@ type Tab = 'incoming' | 'outgoing' | 'history';
  */
 @Component({
   selector: 'app-challenges',
-  imports: [A11yModule, RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, SkeletonList, Countdown],
+  imports: [A11yModule, RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, SkeletonList, Countdown, ChessActivity],
   templateUrl: './challenges.html',
   styleUrl: './challenges.scss',
 })

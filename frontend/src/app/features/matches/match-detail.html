@@ -6,6 +6,7 @@
     <app-spinner />
   } @else {
     @let m = match()!;
+    @if (m.category === 'CHESS') { <a class="btn" [routerLink]="['/chess',m.chess?.code ?? m.code]">Open chess board</a> }
     <!-- Result banner -->
     <section class="banner card fade-in"
       [class.won]="isPlayer() && me()?.outcome === 'WIN'"

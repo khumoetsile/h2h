@@ -212,6 +212,7 @@ export class MatchResultPage implements OnInit {
     this.error.set('');
     try {
       const { match } = await this.api.get<{ match: MatchView }>(`/matches/${this.code()}`);
+      if (match.category === 'CHESS') { await this.router.navigate(['/chess', match.chess?.code ?? match.code], {replaceUrl:true}); return; }
       if (match.status !== 'COMPLETED' && match.status !== 'CANCELLED' && match.status !== 'VOID') {
         this.router.navigate(['/match', match.code], { replaceUrl: true });
         return;

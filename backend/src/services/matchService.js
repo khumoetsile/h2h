@@ -60,13 +60,14 @@ async function requireEnabledGame(tx, gameId) {
   const game = await loadGame(tx.q, gameId);
   if (!game) throw notFound('Game not found.');
   if (!game.is_enabled) throw badRequest('GAME_DISABLED', `${game.name} is currently unavailable.`);
+  if (game.kind === 'CHESS') throw badRequest('CHESS_MODE_REQUIRED', 'Use Play anytime → Chess to invite a friend.');
   return game;
 }
 
 async function assertActiveLimit(tx, userId) {
   const [{ n }] = await tx.q(
     `SELECT COUNT(*) AS n FROM match_players mp JOIN matches m ON m.id = mp.match_id
-     WHERE mp.user_id = ? AND m.status IN ('WAITING','MATCHED','READY','IN_PROGRESS')`,
+     WHERE mp.user_id = ? AND m.category <> 'CHESS' AND m.status IN ('WAITING','MATCHED','READY','IN_PROGRESS')`,
     [userId],
   );
   if (n >= MAX_ACTIVE_MATCHES) {
@@ -343,6 +344,7 @@ async function lockMatchForPlayer(tx, userId, matchIdOrCode) {
   );
   const me = players.find((p) => p.user_id === userId);
   if (!me) throw forbidden('You are not a player in this match.');
+  if (m.category === 'CHESS') throw conflict('CHESS_MODE_REQUIRED', 'Open this chess game to move, offer a draw or resign.');
   return { m, players, me, opp: players.find((p) => p.user_id !== userId) || null };
 }
 
@@ -499,7 +501,7 @@ export async function submitResult(userId, matchIdOrCode, body) {
  * Decide the winner from stored server-side scores and move the money.
  * Safe to call more than once: only the first call settles.
  */
-export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason = null, endReason = null } = {}) {
+export async function finalizeMatch(tx, matchId, { forfeitUserId = null, winnerUserId = null, draw = false, reason = null, endReason = null } = {}) {
   const m = await tx.one(
     'SELECT m.*, g.name AS game_name FROM matches m JOIN games g ON g.id = m.game_id WHERE m.id = ? FOR UPDATE',
     [matchId],
@@ -511,7 +513,12 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
   const [a, b] = players;
   let winner = null;
   let resultReason = reason;
-  if (forfeitUserId) {
+  if (winnerUserId != null) {
+    winner = players.find(p => p.user_id === winnerUserId);
+    if (!winner || players.length !== 2) throw conflict('INVALID_SETTLEMENT', 'The winner must be a player in this match.');
+  } else if (draw) {
+    if (players.length !== 2) throw conflict('INVALID_SETTLEMENT', 'A draw requires two players.');
+  } else if (forfeitUserId) {
     winner = players.find((p) => p.user_id !== forfeitUserId);
   } else {
     const ra = byUser[a.user_id];
@@ -546,7 +553,7 @@ export async function finalizeMatch(tx, matchId, { forfeitUserId = null, reason 
       feeAmount: winner ? Number(m.fee_amount) : 0, prize: winner ? Number(m.prize) : 0, winnerId: winner ? winner.user_id : null,
     },
   });
-  const link = `/matches/${m.code}`;
+  const link = m.category === 'CHESS' ? `/chess/${m.code}` : `/matches/${m.code}`;
   if (!winner) {
     for (const p of players) {
       await refundStake(tx, p.user_id, m, 'match drawn');
@@ -585,6 +592,13 @@ export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true, toSta
     [toStatus, reason, endReason, abandonedBy, m.id],
   );
   if (upd.affectedRows !== 1) return false;
+  if (m.category === 'CHESS') {
+    await tx.q("UPDATE chess_games SET status = 'CANCELLED', completed_at = NOW(3), turn_deadline = NULL, turn_user_id = NULL, draw_offered_by = NULL, version = version + 1 WHERE match_id = ? AND status = 'ACTIVE'", [m.id]);
+    tx.afterCommit(async () => {
+      const chessPlayers = await query('SELECT user_id FROM match_players WHERE match_id = ?', [m.id]);
+      for (const { user_id: id } of chessPlayers) emitToUser(id, 'chess:update', { code: m.code });
+    });
+  }
   const game = await tx.one('SELECT name FROM games WHERE id = ?', [m.game_id]);
   const players = await tx.q('SELECT mp.*, u.is_bot FROM match_players mp JOIN users u ON u.id = mp.user_id WHERE match_id = ?', [m.id]);
   const isVoid = toStatus === 'VOID';
@@ -601,7 +615,7 @@ export async function cancelMatchTx(tx, m, reason, { notifyPlayers = true, toSta
         type: isVoid ? 'MATCH_VOID' : 'MATCH_CANCELLED',
         title: isVoid ? 'Challenge voided' : 'Match cancelled',
         message: `Your ${game.name} ${isVoid ? 'challenge could not be fairly completed' : 'match was cancelled'} (${reason}). ${formatMoney(m.stake)} DEMO was returned to your balance. No fee was charged.`,
-        link: `/matches/${m.code}`,
+        link: m.category === 'CHESS' ? `/chess/${m.code}` : `/matches/${m.code}`,
       });
     }
   }
@@ -872,22 +886,29 @@ export async function heartbeat(now = new Date()) {
  * real match and are deliberately not extended. Returns seconds extended.
  */
 export async function compensateDowntime({ now = new Date(), thresholdMs = 30000 } = {}) {
-  const row = await queryOne(`SELECT beat_at FROM system_heartbeats WHERE name = 'sweeper'`);
-  if (!row) return 0;
-  const since = new Date(row.beat_at);
-  const gapMs = now.getTime() - since.getTime();
-  if (gapMs <= thresholdMs) return 0;
-  const gap = Math.round(gapMs / 1000);
-  await query(`UPDATE matches SET acceptance_deadline = acceptance_deadline + INTERVAL ? SECOND WHERE status = 'WAITING' AND acceptance_deadline > ?`, [gap, since]);
-  await query(`UPDATE matches SET lock_in_deadline = lock_in_deadline + INTERVAL ? SECOND WHERE status = 'MATCHED' AND lock_in_deadline > ?`, [gap, since]);
-  await query(`UPDATE matches SET player_action_deadline = player_action_deadline + INTERVAL ? SECOND WHERE status IN ('MATCHED','READY','IN_PROGRESS') AND player_action_deadline > ?`, [gap, since]);
-  await query(`UPDATE matches SET completion_deadline = completion_deadline + INTERVAL ? SECOND WHERE category = 'SKILL_GAME' AND status IN ('READY','IN_PROGRESS') AND completion_deadline > ?`, [gap, since]);
-  await query(`UPDATE shootout_rounds SET starts_at = starts_at + INTERVAL ? SECOND, deadline = deadline + INTERVAL ? SECOND WHERE resolved_at IS NULL AND deadline > ?`, [gap, gap, since]);
-  await query(`UPDATE match_players mp JOIN matches m ON m.id = mp.match_id SET mp.reconnect_deadline = mp.reconnect_deadline + INTERVAL ? SECOND
-               WHERE m.status IN ('MATCHED','READY','IN_PROGRESS') AND mp.reconnect_deadline > ?`, [gap, since]);
-  await query(`UPDATE challenges SET expires_at = expires_at + INTERVAL ? SECOND WHERE status = 'PENDING' AND expires_at > ?`, [gap, since]);
-  await recordAudit(null, { actorType: 'SYSTEM', action: 'TIMERS_EXTENDED_AFTER_DOWNTIME', entityType: 'SYSTEM', entityId: 'sweeper', metadata: { downtimeSeconds: gap, lastHeartbeat: since } }).catch(() => {});
-  return gap;
+  return withTransaction(async tx => {
+    // A single heartbeat lock makes restart compensation exact-once even when
+    // two application workers boot together. Deadline updates commit atomically.
+    const row = await tx.one(`SELECT beat_at FROM system_heartbeats WHERE name = 'sweeper' FOR UPDATE`);
+    if (!row) return 0;
+    const since = new Date(row.beat_at);
+    const gapMs = now.getTime() - since.getTime();
+    if (gapMs <= thresholdMs) return 0;
+    const gap = Math.round(gapMs / 1000);
+    await tx.q(`UPDATE matches SET acceptance_deadline = acceptance_deadline + INTERVAL ? SECOND WHERE status = 'WAITING' AND acceptance_deadline > ?`, [gap, since]);
+    await tx.q(`UPDATE matches SET lock_in_deadline = lock_in_deadline + INTERVAL ? SECOND WHERE status = 'MATCHED' AND lock_in_deadline > ?`, [gap, since]);
+    await tx.q(`UPDATE matches SET player_action_deadline = player_action_deadline + INTERVAL ? SECOND WHERE status IN ('MATCHED','READY','IN_PROGRESS') AND player_action_deadline > ?`, [gap, since]);
+    await tx.q(`UPDATE matches SET completion_deadline = completion_deadline + INTERVAL ? SECOND WHERE category = 'SKILL_GAME' AND status IN ('READY','IN_PROGRESS') AND completion_deadline > ?`, [gap, since]);
+    await tx.q(`UPDATE shootout_rounds SET starts_at = starts_at + INTERVAL ? SECOND, deadline = deadline + INTERVAL ? SECOND WHERE resolved_at IS NULL AND deadline > ?`, [gap, gap, since]);
+    await tx.q(`UPDATE match_players mp JOIN matches m ON m.id = mp.match_id SET mp.reconnect_deadline = mp.reconnect_deadline + INTERVAL ? SECOND
+                 WHERE m.status IN ('MATCHED','READY','IN_PROGRESS') AND mp.reconnect_deadline > ?`, [gap, since]);
+    await tx.q(`UPDATE challenges SET expires_at = expires_at + INTERVAL ? SECOND WHERE status = 'PENDING' AND expires_at > ?`, [gap, since]);
+    await tx.q(`UPDATE chess_games SET turn_deadline = turn_deadline + INTERVAL ? SECOND WHERE status = 'ACTIVE' AND turn_deadline > ?`, [gap, since]);
+    await tx.q(`UPDATE chess_games SET invite_expires_at = invite_expires_at + INTERVAL ? SECOND WHERE status = 'PENDING' AND invite_expires_at > ?`, [gap, since]);
+    await tx.q("UPDATE system_heartbeats SET beat_at = ? WHERE name = 'sweeper'", [now]);
+    await recordAudit(tx, { actorType: 'SYSTEM', action: 'TIMERS_EXTENDED_AFTER_DOWNTIME', entityType: 'SYSTEM', entityId: 'sweeper', metadata: { downtimeSeconds: gap, lastHeartbeat: since } });
+    return gap;
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -962,6 +983,7 @@ export async function getMatchView(matchIdOrCode, viewerId, { admin = false } = 
   const results = showResults ? await query('SELECT * FROM game_results WHERE match_id = ?', [m.id]) : [];
   const byUser = Object.fromEntries(results.map((r) => [r.user_id, r]));
   const football = m.category === 'FOOTBALL' ? await loadFootballSummary(m.id) : null;
+  const chessRow = m.category === 'CHESS' ? await queryOne('SELECT code, turn_deadline, turn_user_id, version FROM chess_games WHERE match_id = ?', [m.id]) : null;
   const kickoffAt = football?.kickoffAt ?? null;
   const active = ACTIVE_STATUSES.includes(m.status);
   const viewer = players.find((p) => p.user_id === viewerId) ?? null;
@@ -972,6 +994,7 @@ export async function getMatchView(matchIdOrCode, viewerId, { admin = false } = 
     source: m.source,
     category: m.category,
     football,
+    chess: chessRow ? { code: chessRow.code, turnDeadline: chessRow.turn_deadline, isYourTurn: active && chessRow.turn_user_id === viewerId, version: chessRow.version } : null,
     game: { id: m.game_id, slug: m.game_slug, name: m.game_name, accentColor: m.accent_color },
     stake: Number(m.stake),
     pool: Number(m.pool),
@@ -1003,7 +1026,7 @@ export async function getMatchView(matchIdOrCode, viewerId, { admin = false } = 
       playerActionDeadline: active ? m.player_action_deadline : null,
       completionDeadline: active && m.status !== 'WAITING' && m.status !== 'MATCHED' ? m.completion_deadline : null,
       kickoffAt,
-      myDeadline: active && viewer ? playerDeadline(m, viewer, kickoffAt) : null,
+      myDeadline: active && viewer ? (chessRow ? chessRow.turn_user_id === viewerId ? chessRow.turn_deadline : null : playerDeadline(m, viewer, kickoffAt)) : null,
     },
     viewerId,
     players: players.map((p) => {
@@ -1019,8 +1042,8 @@ export async function getMatchView(matchIdOrCode, viewerId, { admin = false } = 
         lockedIn: !!p.ready_at,
         started: !!p.started_at,
         submitted: !!p.submitted_at,
-        owesAction: active && owesAction(m, p),
-        deadline: active ? playerDeadline(m, p, kickoffAt) : null,
+        owesAction: active && (chessRow ? chessRow.turn_user_id === p.user_id : owesAction(m, p)),
+        deadline: active ? (chessRow ? chessRow.turn_user_id === p.user_id ? chessRow.turn_deadline : null : playerDeadline(m, p, kickoffAt)) : null,
         connected: p.is_bot ? true : isUserOnline(p.user_id),
         // Only while they're actually offline with a window still running.
         reconnectDeadline: active && !p.is_bot && !isUserOnline(p.user_id) && p.reconnect_deadline && new Date(p.reconnect_deadline) > new Date() ? p.reconnect_deadline : null,
@@ -1042,13 +1065,13 @@ export async function getMatchView(matchIdOrCode, viewerId, { admin = false } = 
 export async function listMatchesForUser(userId, { filter = 'all', page = 1, pageSize = 20, active = false, category = null } = {}) {
   const where = ['mp.user_id = ?'];
   const params = [userId];
-  if (category === 'FOOTBALL' || category === 'SKILL_GAME') { where.push('m.category = ?'); params.push(category); }
+  if (['FOOTBALL', 'SKILL_GAME', 'CHESS'].includes(category)) { where.push('m.category = ?'); params.push(category); }
   if (active) where.push(`m.status IN ('WAITING','MATCHED','READY','IN_PROGRESS')`);
   else if (filter === 'wins') where.push(`mp.outcome = 'WIN'`);
   else if (filter === 'losses') where.push(`mp.outcome = 'LOSS'`);
   else if (filter === 'draws') where.push(`m.status = 'COMPLETED' AND m.is_draw = 1`);
   else if (filter === 'void') where.push(`m.status = 'VOID'`);
-  else if (filter === 'timed_out') where.push(`m.end_reason IN ('NO_OPPONENT','LOCK_IN_TIMEOUT','ACTION_TIMEOUT','GAME_TIMEOUT','RESULT_TIMEOUT')`);
+  else if (filter === 'timed_out') where.push(`m.end_reason IN ('NO_OPPONENT','LOCK_IN_TIMEOUT','ACTION_TIMEOUT','GAME_TIMEOUT','RESULT_TIMEOUT','CHESS_TIMEOUT')`);
   else if (filter === 'cancelled') where.push(`m.status IN ('CANCELLED','VOID')`);
   else if (filter === 'completed') where.push(`m.status = 'COMPLETED'`);
   else if (filter === 'ended') where.push(`m.status IN ('COMPLETED','CANCELLED','VOID')`);
@@ -1063,7 +1086,8 @@ export async function listMatchesForUser(userId, { filter = 'all', page = 1, pag
             gr.score AS my_score, ogr.score AS opp_score,
             comp.name AS fx_competition, ht.short_name AS fx_home, at.short_name AS fx_away, ct.name AS fx_type_name,
             ct.slug AS fx_type_slug, ct.question_template AS fx_question, fc.creator_pick AS fx_creator_pick, fc.opponent_pick AS fx_opponent_pick,
-            fx.id AS fx_id, fx.kickoff_at AS fx_kickoff, fx.status AS fx_status, fx.minute AS fx_minute, fx.home_score AS fx_home_score, fx.away_score AS fx_away_score
+            fx.id AS fx_id, fx.kickoff_at AS fx_kickoff, fx.status AS fx_status, fx.minute AS fx_minute, fx.home_score AS fx_home_score, fx.away_score AS fx_away_score,
+            cg.code AS chess_code, cg.turn_deadline AS chess_deadline, cg.turn_user_id AS chess_turn_user, cg.version AS chess_version
      FROM match_players mp
      JOIN matches m ON m.id = mp.match_id
      JOIN games g ON g.id = m.game_id
@@ -1077,6 +1101,7 @@ export async function listMatchesForUser(userId, { filter = 'all', page = 1, pag
      LEFT JOIN football_teams ht ON ht.id = fx.home_team_id
      LEFT JOIN football_teams at ON at.id = fx.away_team_id
      LEFT JOIN football_challenge_types ct ON ct.id = fc.challenge_type_id
+     LEFT JOIN chess_games cg ON cg.match_id = m.id
      WHERE ${whereSql}
      ORDER BY COALESCE(m.completed_at, m.cancelled_at, m.created_at) DESC, m.id DESC LIMIT ? OFFSET ?`,
     [...params, size, (pg - 1) * size],
@@ -1118,6 +1143,7 @@ export function mapMatchRow(r) {
     abandonedBy: r.abandoned_by ?? null,
     source: r.source,
     category: r.category,
+    chess: r.category === 'CHESS' ? { code: r.chess_code || r.code, turnDeadline: r.chess_deadline || null, isYourTurn: active && r.me_id === r.chess_turn_user, version: r.chess_version ?? 0 } : null,
     football: r.category === 'FOOTBALL' ? {
       fixtureId: r.fx_id ?? null,
       competition: r.fx_competition, homeTeam: r.fx_home, awayTeam: r.fx_away, questionName: r.fx_type_name,
@@ -1133,7 +1159,7 @@ export function mapMatchRow(r) {
       lockInDeadline: r.status === 'MATCHED' ? earliest(r.lock_in_deadline, r.fx_kickoff) : null,
       playerActionDeadline: r.player_action_deadline ?? null,
       completionDeadline: r.status === 'READY' || r.status === 'IN_PROGRESS' ? r.completion_deadline : null,
-      myDeadline: r.me_id != null ? playerDeadline(r, { ready_at: r.me_ready, submitted_at: r.me_submitted, disconnected_at: r.me_disconnected, reconnect_deadline: r.me_reconnect }, r.fx_kickoff ?? null) : null,
+      myDeadline: r.me_id != null ? (r.category === 'CHESS' ? r.me_id === r.chess_turn_user ? r.chess_deadline : null : playerDeadline(r, { ready_at: r.me_ready, submitted_at: r.me_submitted, disconnected_at: r.me_disconnected, reconnect_deadline: r.me_reconnect }, r.fx_kickoff ?? null)) : null,
     } : null,
     lockedIn: r.me_id != null ? !!r.me_ready : null,
     submitted: r.me_id != null ? !!r.me_submitted : null,

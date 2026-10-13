@@ -182,6 +182,7 @@ export class GameDetailPage implements OnInit {
   }
 
   async load() {
+    if (this.slug() === 'chess') { await this.router.navigate(['/chess'], {replaceUrl:true}); return; }
     this.error.set('');
     try {
       const { game } = await this.api.get<{ game: Game }>(`/games/${this.slug()}`);

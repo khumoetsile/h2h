@@ -1,0 +1,71 @@
+<div class="chess-home page">
+  <a class="back-link" routerLink="/games"><span aria-hidden="true">←</span> All games</a>
+  <section class="chess-hero">
+    <div class="hero-copy">
+      <span class="eyebrow">A RIVALRY WORTH COMING BACK TO</span>
+      <h1>Your move.<br /><span>Your moment.</span></h1>
+      <p>Chess with a friend, one thoughtful move at a time. Leave the board, live your day, come back and play.</p>
+      <div class="hero-tags"><span>♟ Play at your pace</span><span>{{ turnHours() }} hours per move</span><span>Demo funds only</span></div>
+    </div>
+    <div class="hero-board" aria-hidden="true">
+      @for (piece of ['r','n','','q','','p','P','','','','N','','','P','','K']; track $index) {
+        <div [class.dark]="($index + Math.floor($index / 4)) % 2 === 1"><app-chess-piece [piece]="piece || null" /></div>
+      }
+      <span class="board-caption">The next move is yours.</span>
+    </div>
+  </section>
+
+  <div class="home-layout">
+    <section class="setup-card" aria-labelledby="new-chess-title">
+      <div class="section-heading"><span class="step">01</span><div><h2 id="new-chess-title">Start a chess game</h2><p>Send a link or invite a player.</p></div></div>
+      @if (loadError()) { <app-load-error [message]="loadError()" (retry)="load()" /> }
+      @else if (!config()) { <app-spinner /> }
+      @else if (config()!.isEnabled === false) { <p class="notice">New chess games are currently unavailable. You can still return to your existing games below.</p> }
+      @else {
+        <form (ngSubmit)="openReview()">
+          <label class="field-label" for="chess-opponent">Opponent <span>optional</span></label>
+          <input id="chess-opponent" class="field" name="opponent" [(ngModel)]="opponent" maxlength="20" autocomplete="off" autocapitalize="none" placeholder="Your friend's username" />
+          <p class="field-hint">Leave this empty to get a link you can share.</p>
+          <fieldset><legend>Demo entry per player</legend><div class="stake-options">
+            @for (amount of config()!.stakeAmounts; track amount) { <button type="button" [class.selected]="stake() === amount" [attr.aria-pressed]="stake() === amount" (click)="stake.set(amount)">{{ money(amount) }}</button> }
+          </div></fieldset>
+          @if (option(); as o) {
+            <div class="prize-panel"><span>Winner receives <small>includes their entry</small></span><strong>{{ money(o.prize) }}</strong></div>
+            <p class="fee-note">{{ money(o.pool) }} combined entries − {{ money(o.fee) }} platform fee ({{ config()!.platformFeePercent }}%).</p>
+          }
+          <button type="submit" class="btn btn-primary btn-block create-btn" [disabled]="!option()">Review invitation <span aria-hidden="true">→</span></button>
+          <p class="no-hold">No funds held when you send an invitation.</p>
+          @if (!auth.isLoggedIn()) { <a class="account-link" routerLink="/login" [queryParams]="{next:'/chess'}">Already have an account? Sign in</a> }
+        </form>
+      }
+    </section>
+    <aside class="rules-card">
+      <span class="eyebrow">THE RULES, UP FRONT</span><h2>A fair game,<br />at your pace.</h2>
+      <ol>
+        <li><strong>Invite your rival</strong><span>You play White. Your friend plays Black. Invitations stay open for {{ inviteDays() }} days.</span></li>
+        <li><strong>Entries lock when they join</strong><span>Both demo entries are held together. Review the fee and prize before accepting.</span></li>
+        <li><strong>Make a move within {{ turnHours() }} hours</strong><span>Every turn gets a fresh deadline. If a player runs out of time or resigns, their opponent wins and the normal platform fee applies.</span></li>
+        <li><strong>Draws return both entries</strong><span>Agreed draws, stalemate and automatic chess draws give full refunds with no platform fee.</span></li>
+      </ol>
+      <p class="rules-foot">Checkmate wins. Stalemate, insufficient material, threefold repetition and the fifty-move rule end automatically in a draw. A missed deadline always awards the opponent a win. Your position is saved after every confirmed move. A draw offer keeps the move deadline running.</p>
+      <a routerLink="/help" class="help-link">Need help? <span aria-hidden="true">↗</span></a>
+    </aside>
+  </div>
+  <app-save-account />
+  <app-chess-activity [limit]="100" />
+</div>
+
+@if (review() && option(); as o) {
+  <div class="chess-backdrop" (click)="closeReview()" (keydown.escape)="closeReview()">
+    <section class="chess-dialog" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" role="dialog" aria-modal="true" aria-labelledby="chess-review-title" (click)="$event.stopPropagation()">
+      <span class="eyebrow">BEFORE YOU INVITE</span><h2 id="chess-review-title">Ready for a rivalry?</h2>
+      <p>{{ opponent.trim() ? 'Invite @' + opponent.trim().replace('@','') : 'Create a shareable chess invitation' }}. You play White and move first once your opponent accepts.</p>
+      <dl class="money-review"><div><dt>Each player's demo entry</dt><dd>{{ money(o.stake) }}</dd></div><div><dt>Platform fee on a win</dt><dd>{{ money(o.fee) }}</dd></div><div class="prize"><dt>Winner receives</dt><dd>{{ money(o.prize) }}</dd></div></dl>
+      <p class="notice">Both entries lock only when the invitation is accepted. Each player has <strong>{{ turnHours() }} hours to make each move</strong>. Missing your deadline or resigning loses your entry. A draw refunds both entries in full.</p>
+      @if (!auth.isLoggedIn()) { <p class="text-2 small">We'll create a guest account with demo funds. Save it with a password to return on another device.</p> }
+      @if (error()) { <p class="form-error" role="alert">{{ error() }}</p> }
+      <button class="btn btn-primary btn-block" [disabled]="busy()" (click)="create()">{{ busy() ? 'Creating invitation…' : 'Create invitation · no funds held' }}</button>
+      <button class="btn btn-block" [disabled]="busy()" (click)="closeReview()">Back to setup</button>
+    </section>
+  </div>
+}

@@ -10,6 +10,7 @@ import { AgoPipe } from '../../shared/pipes';
 import { EmptyState, LoadError, SkeletonList } from '../../shared/ui';
 
 const ICONS: Record<string, string> = {
+  CHESS_TURN: 'grid_view', CHESS_DRAW_OFFER: 'balance',
   CHALLENGE_RECEIVED: 'swords', CHALLENGE_ACCEPTED: 'handshake', CHALLENGE_DECLINED: 'block', CHALLENGE_EXPIRED: 'schedule',
   MATCH_FOUND: 'person_search', MATCH_STARTING: 'play_circle', MATCH_WON: 'emoji_events', MATCH_LOST: 'sentiment_dissatisfied',
   MATCH_DRAW: 'balance', MATCH_CANCELLED: 'cancel', DEPOSIT: 'savings', WITHDRAWAL: 'payments', WELCOME: 'waving_hand', ADMIN: 'campaign',

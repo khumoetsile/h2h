@@ -9,6 +9,7 @@ import { authenticateToken } from './middleware/auth.js';
 import { compensateDowntime, heartbeat, markPresence, sweepMatches } from './services/matchService.js';
 import { expireChallenges } from './services/challengeService.js';
 import { sweepLiveShootouts } from './services/liveShootoutService.js';
+import { sweepChess } from './services/chessService.js';
 import { startFootballSync } from './football/footballSyncService.js';
 
 export function createServer() {
@@ -44,23 +45,21 @@ export function createServer() {
   return { app, server, io };
 }
 
-export function startSweeper() {
+export async function startSweeper() {
   let running = false;
-  let booted = false;
+  // Complete downtime compensation before accepting HTTP or socket actions.
+  // A chess read may settle an overdue turn, so listening first could unfairly
+  // forfeit it before the stored deadline receives the platform outage back.
+  const extended = await compensateDowntime({ thresholdMs: Math.max(30000, config.sweeperIntervalSeconds * 3000) });
+  if (extended) console.log(`  Server was down ~${extended}s. Extended running challenge timers by that amount.`);
   const tick = async () => {
     if (running) return;
     running = true;
     try {
-      if (!booted) {
-        // Anything that was running while this server was down gets the
-        // outage added back before it can be judged as timed out.
-        const extended = await compensateDowntime({ thresholdMs: Math.max(30000, config.sweeperIntervalSeconds * 3000) });
-        if (extended) console.log(`  Server was down ~${extended}s. Extended running challenge timers by that amount.`);
-        booted = true;
-      }
       await expireChallenges();
       await sweepMatches();
       await sweepLiveShootouts();
+      await sweepChess();
       await heartbeat();
     } catch (err) {
       console.error('Sweeper error', err);
@@ -69,7 +68,7 @@ export function startSweeper() {
     }
   };
   const handle = setInterval(tick, config.sweeperIntervalSeconds * 1000);
-  tick();
+  await tick();
   return handle;
 }
 
@@ -83,7 +82,7 @@ export async function start() {
     console.error(`\n  Could not connect to MySQL at ${config.db.host}:${config.db.port}/${config.db.database}: ${err.message}\n  Check DB_* in backend/.env and run "npm run db:reset".\n`);
     process.exit(1);
   }
-  startSweeper();
+  await startSweeper();
   startFootballSync(config.football.syncIntervalSeconds);
   server.listen(config.port, () => {
     console.log(`\n  ${config.appName} API (DEMO MODE: simulated funds only)`);

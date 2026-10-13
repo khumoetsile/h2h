@@ -122,6 +122,7 @@ export async function createChallenge(challengerId, { opponent, gameId, stake, m
     if (opp.role !== 'PLAYER') throw conflict('OPPONENT_UNAVAILABLE', `@${opp.username} cannot be challenged.`);
     const game = await tx.one('SELECT * FROM games WHERE id = ?', [gameId]);
     if (!game) throw notFound('Game not found.');
+    if (game.kind === 'CHESS') throw badRequest('CHESS_MODE_REQUIRED', 'Use Play anytime → Chess to invite this player.');
     if (!game.is_enabled) throw badRequest('GAME_DISABLED', `${game.name} is currently unavailable.`);
     const wallet = await tx.one('SELECT available_balance FROM wallets WHERE user_id = ?', [challengerId]);
     if (toCents(wallet.available_balance) < toCents(stake)) {

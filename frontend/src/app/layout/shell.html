@@ -9,7 +9,7 @@
 
     <nav class="desktop-nav hide-mobile" aria-label="Main">
       @for (item of nav(); track item.link) {
-        <a [routerLink]="item.link" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: !!item.exact }">{{ item.label }}</a>
+        <a [routerLink]="item.link" [class.active]="navIsActive(item)" [attr.aria-current]="navIsActive(item) ? 'page' : null">{{ item.label }}</a>
       }
     </nav>
 
@@ -28,8 +28,8 @@
         @if (auth.unread() > 0) { <span class="badge">{{ auth.unread() > 99 ? '99+' : auth.unread() }}</span> }
       </button>
     } @else {
-      <a class="btn btn-ghost btn-sm" routerLink="/login">Sign in</a>
-      <a class="btn btn-primary btn-sm" routerLink="/register">Join</a>
+      <a class="btn btn-ghost btn-sm" routerLink="/login" [queryParams]="{next:router.url}">Sign in</a>
+      <a class="btn btn-primary btn-sm" routerLink="/register" [queryParams]="{next:router.url}">Join</a>
     }
 
     @if (auth.user(); as u) {
@@ -107,7 +107,7 @@
 
 <nav class="bottom-nav hide-desktop" aria-label="Main">
   @for (item of bottomNav(); track item.link) {
-    <a [routerLink]="item.link" routerLinkActive="active" ariaCurrentWhenActive="page" [routerLinkActiveOptions]="{ exact: !!item.exact }">
+    <a [routerLink]="item.link" [class.active]="navIsActive(item)" [attr.aria-current]="navIsActive(item) ? 'page' : null">
       <mat-icon>{{ item.icon }}</mat-icon>
       <span>{{ item.label }}</span>
     </a>

@@ -12,12 +12,13 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(authed).pipe(
     catchError((err: unknown) => {
       const isAuthCall = req.url.includes('/auth/login') || req.url.includes('/auth/register') || req.url.includes('/auth/logout');
-      if (err instanceof HttpErrorResponse && !isAuthCall && token) {
+      if (err instanceof HttpErrorResponse && !isAuthCall && token && token === auth.token()) {
         const code = err.error?.error?.code;
         // Expired/revoked session or disabled account -> back to login.
         if (err.status === 401 || (err.status === 403 && /disabled/i.test(err.error?.error?.message || '') && code === 'FORBIDDEN')) {
+          const next = router.url.startsWith('/login') ? undefined : router.url;
           auth.clear();
-          router.navigate(['/login'], { queryParams: { reason: err.status === 401 ? 'expired' : 'disabled' } });
+          router.navigate(['/login'], { queryParams: { reason: err.status === 401 ? 'expired' : 'disabled', ...(next ? {next} : {}) } });
         }
       }
       return throwError(() => err);

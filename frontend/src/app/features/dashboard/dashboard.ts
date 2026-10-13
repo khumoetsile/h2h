@@ -15,6 +15,8 @@ import { MAIN_GAME, QuickPlay } from '../../core/quick-play';
 import { AdSlot } from '../../shared/ad-slot';
 import { GetApp } from '../../shared/get-app';
 import { PitchArt } from '../../shared/pitch-art';
+import { ChessDiscovery } from '../../shared/chess-discovery';
+import { ChessActivity } from '../chess/chess-activity';
 import { SaveAccount } from '../../shared/save-account';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
 import { Avatar, EmptyState, GameIcon, LoadError, OutcomeChip } from '../../shared/ui';
@@ -36,7 +38,7 @@ interface Dashboard {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, AdSlot, GetApp, PitchArt, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
+  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, AdSlot, GetApp, PitchArt, ChessDiscovery, ChessActivity, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })

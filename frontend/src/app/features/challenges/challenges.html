@@ -1,12 +1,16 @@
 <div class="page">
   <div class="page-head">
-    <div><h1>Challenges</h1><p class="sub">Invites to and from specific players. Each one has a timer to accept.</p></div>
+    <div><h1>Keep the rivalry going.</h1><p class="sub">Your chess turns, friend invitations and live challenges.</p></div>
     <a class="btn btn-ghost btn-sm" routerLink="/matches"><mat-icon>history</mat-icon>My matches</a>
   </div>
 
-  <a class="btn btn-primary btn-lg btn-block new-btn" routerLink="/challenges/new">
-    <mat-icon>swords</mat-icon> New challenge
-  </a>
+  <div class="challenge-modes">
+    <a class="mode-choice chess-choice" routerLink="/chess"><span class="mode-symbol" aria-hidden="true">♞</span><span><strong>Play chess across days</strong><span>Save a turn. Return for the next.</span></span><span aria-hidden="true">↗</span></a>
+    <a class="mode-choice" routerLink="/challenges/new"><mat-icon>swords</mat-icon><span><strong>Start a live challenge</strong><span>A quick game while you're both online.</span></span><span aria-hidden="true">↗</span></a>
+  </div>
+  <app-chess-activity class="chess-activity" [limit]="6" />
+  <h2 class="live-title">Live invitations</h2>
+  <p class="muted small live-sub">Review the entry and acceptance timer before joining.</p>
 
   <div class="segmented tabs">
     <button [class.active]="tab() === 'incoming'" [attr.aria-pressed]="tab() === 'incoming'" (click)="tab.set('incoming')">Incoming @if (incoming().length) { <span class="count">{{ incoming().length }}</span> }</button>

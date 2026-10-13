@@ -77,6 +77,7 @@ export class MatchLobbyPage implements OnInit {
   private autoStarted = false;
 
   private apply(m: MatchView) {
+    if (m.category === 'CHESS') { void this.router.navigate(['/chess', m.chess?.code ?? m.code], { replaceUrl: true }); return; }
     const prev = this.match();
     this.match.set(m);
     const skill = m.category !== 'FOOTBALL';
