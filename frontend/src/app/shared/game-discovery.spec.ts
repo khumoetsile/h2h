@@ -34,11 +34,14 @@ describe('featured game rotation',()=>{
 
 describe('featured carousel controls',()=>{
   let play:ReturnType<typeof vi.fn>;
+  let mediaDescriptor:PropertyDescriptor|undefined;
   beforeEach(()=>{
     play=vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(window,'matchMedia',{configurable:true,value:()=>({matches:true})});
+    mediaDescriptor=Object.getOwnPropertyDescriptor(window,'matchMedia');
+    Object.defineProperty(window,'matchMedia',{configurable:true,value:(query:string)=>({matches:true,media:query,onchange:null,addListener:vi.fn(),removeListener:vi.fn(),addEventListener:vi.fn(),removeEventListener:vi.fn(),dispatchEvent:vi.fn().mockReturnValue(true)})});
     TestBed.configureTestingModule({imports:[GameDiscovery],providers:[provideRouter([]),{provide:GameCatalogue,useValue:{load:vi.fn().mockResolvedValue(pool)}},{provide:QuickPlay,useValue:{playNow:play}}]});
   });
+  afterEach(()=>{TestBed.resetTestingModule();if(mediaDescriptor)Object.defineProperty(window,'matchMedia',mediaDescriptor);else Reflect.deleteProperty(window,'matchMedia');});
   async function page(){const fixture=TestBed.createComponent(GameDiscovery);fixture.componentRef.setInput('gamePool',pool);fixture.componentRef.setInput('loadFromApi',false);fixture.detectChanges();await fixture.whenStable();fixture.detectChanges();return fixture;}
   it('always retains chess alongside two games and exposes only the visible action to keyboard focus',async()=>{
     const fixture=await page();const host:HTMLElement=fixture.nativeElement;
