@@ -216,6 +216,7 @@ export class FootballFixturePage implements OnInit,OnChanges {
         ? !!res.fixture.followed
         : readGuestFollowedFixtures().includes(res.fixture.id));
       this.fixture.set(res.fixture);
+      if(first) void this.loadResearch();
       if (latestNewEvent) this.activeEventId.set(latestNewEvent.id);
       else if (first && res.fixture.events?.length) this.activeEventId.set(res.fixture.events[res.fixture.events.length - 1].id);
       this.error.set('');

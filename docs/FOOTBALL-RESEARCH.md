@@ -47,3 +47,10 @@ A paid adapter can implement the same contract, declare its permitted license/us
 ## Related discovery
 
 Featured games retain permanent Chess plus two random enabled live games, swipe/keyboard controls and reduced-motion support. Notifications retain server search, unread/category filters, paging and shared read-state recovery.
+
+
+### Simpler fixture browsing (14 October 2026)
+
+The football list now uses one search field and compact match rows. Competition/date dropdowns and day filter controls are removed from this page. Past results retain their own section. Opening a fixture automatically loads the stored head-to-head history on that same page, defaulting to past meetings. Recent form and goal trends are available beside it without navigating to a separate research page. The comparison tool remains available for arbitrary pairs of teams.
+
+Fixture history uses all available meetings and the last ten team results. Missing historical coverage is stated explicitly. The new user-supplied token was rejected as invalid by football-data.org and was not saved to source control or installed over the working server configuration; provider confirmation is required before connecting it.

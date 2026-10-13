@@ -11,4 +11,10 @@ describe('football analysis',()=>{
   const research=vi.fn().mockResolvedValue({...base,headToHead:{...base.headToHead,page:2,hasMore:false,matches:[]}});TestBed.configureTestingModule({imports:[FootballResearchResults],providers:[provideRouter([]),{provide:FootballResearchStore,useValue:{research}}]});const f=TestBed.createComponent(FootballResearchResults);f.componentRef.setInput('data',base);f.detectChanges();const change=vi.fn();f.componentInstance.sampleChange.subscribe(change);f.nativeElement.querySelectorAll('.sample-controls button')[0].click();expect(change).toHaveBeenCalledWith({meetings:'5'});await(f.componentInstance as any).more();expect(research).toHaveBeenCalledWith({...base.filters,page:2});expect(f.componentInstance.data().headToHead.summary.played).toBe(3);
  });
  it('date-only trend labels retain the supplied calendar day',()=>{TestBed.configureTestingModule({imports:[GoalTrendChart]});const f=TestBed.createComponent(GoalTrendChart);f.componentRef.setInput('points',[{date:'2024-01-01',goalsFor:2,goalsAgainst:1}]);f.detectChanges();expect(f.nativeElement.textContent).toContain('1 Jan');expect(f.nativeElement.textContent).not.toContain('31 Dec');});
+ it('fixture history opens past meetings directly without sample filters or another research link',()=>{
+  TestBed.configureTestingModule({imports:[FootballResearchResults],providers:[provideRouter([]),{provide:FootballResearchStore,useValue:{research:vi.fn()}}]});
+  const f=TestBed.createComponent(FootballResearchResults);f.componentRef.setInput('data',base);f.componentRef.setInput('inlineHistory',true);f.detectChanges();
+  expect(f.nativeElement.querySelector('.meetings')).toBeTruthy();expect(f.nativeElement.querySelector('.sample-controls')).toBeNull();expect(f.nativeElement.querySelector('.research-link')).toBeNull();expect(f.nativeElement.querySelectorAll('.result-tabs button')).toHaveLength(3);
+ });
+
 });

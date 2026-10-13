@@ -47,14 +47,10 @@
           @if (refreshError()) { <p class="refresh-error" role="status">{{ refreshError() }}</p> }
         </div>
 
-        <section class="fixture-research" aria-label="Matchup research">
-          <div class="research-preview"><div><strong>Head-to-head &amp; form</strong><span>Past scores. Goals. Your next rivalry.</span></div><button class="btn btn-ghost btn-sm" [attr.aria-expanded]="researchOpen()" (click)="toggleResearch()">{{researchOpen()?'Hide':'Explore'}} <span aria-hidden="true">{{researchOpen()?'−':'+'}}</span></button></div>
-          @if(researchOpen()){
-            @if(researchError()){<app-load-error [message]="researchError()" (retry)="loadResearch(true)"/>}
-            @else if(researchLoading()){<div class="insights-skeleton" role="status" aria-label="Loading matchup history"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
-            @else if(researchData();as data){<app-football-research-results [data]="data" [compact]="true"/>}
-          }
-          <a class="research-open" routerLink="/football/research" [queryParams]="{teamA:f.homeTeam.id,teamB:f.awayTeam.id}">Open football research <span aria-hidden="true">↗</span></a>
+        <section class="fixture-research" aria-label="Past meetings and recent form">
+          @if(researchError()){<app-load-error [message]="researchError()" (retry)="loadResearch(true)"/>}
+          @else if(researchLoading()){<div class="insights-skeleton" role="status" aria-label="Loading past meetings"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
+          @else if(researchData();as data){<app-football-research-results [data]="data" [inlineHistory]="true"/>}
         </section>
         @if (f.status === 'LIVE' || f.status === 'FINISHED') {
           <section class="card pulse-card" aria-labelledby="pulse-title">

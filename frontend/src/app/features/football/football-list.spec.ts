@@ -52,7 +52,7 @@ describe('football fixture search and filter state',()=>{
     const result={id:9,competition:{id:1,name:'League'},homeTeam:{id:1,name:'Arsenal',shortName:'Arsenal'},awayTeam:{id:2,name:'Chelsea',shortName:'Chelsea'},kickoffAt:'2026-10-01T12:00:00Z',status:'FINISHED',homeScore:2,awayScore:0,isSimulated:false,openChallenges:0};
     get.mockImplementation((path:string,params:{status?:string}={})=>Promise.resolve(path==='/football/competitions'?{competitions:[]}:{fixtures:params.status?[result]:[],total:params.status?1:0,lastUpdatedAt:null}));
     const fixture=TestBed.createComponent(FootballListPage);fixture.detectChanges();await fixture.componentInstance.load();fixture.detectChanges();
-    expect(fixture.nativeElement.textContent).toContain('No fixtures match these filters');expect(fixture.nativeElement.textContent).toContain('Clear filters');
+    expect(fixture.nativeElement.textContent).toContain('No matches found');expect(fixture.nativeElement.textContent).toContain('Clear filters');
     expect(fixture.nativeElement.textContent).toContain('Arsenal');expect(fixture.nativeElement.textContent).not.toContain('Football data is not available yet');
     const navigate=vi.spyOn(TestBed.inject(Router),'navigate').mockResolvedValue(true);fixture.componentInstance.clearFilters();
     expect(navigate).toHaveBeenCalledWith([],expect.objectContaining({queryParams:expect.objectContaining({q:null,competitionId:null,dateFrom:null,dateTo:null,day:'all'})}));

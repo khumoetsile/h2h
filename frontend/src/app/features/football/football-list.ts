@@ -41,14 +41,14 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
 
       <header class="hero">
         <div class="grow">
-          <h1>Football fixtures &amp; results</h1>
-          <p class="sub">Fixtures, scores and rivalries. Find your match.</p>
+          <h1>Football</h1>
+          <p class="sub">Find a match. See past scores.</p>
         </div>
         <button class="btn btn-ghost btn-lg" (click)="scrollToResults()"><mat-icon>history</mat-icon>Past results</button>
         <button class="btn btn-primary btn-lg create" (click)="scrollToFixtures()"><mat-icon>{{ auth.isLoggedIn() ? 'swords' : 'sports_soccer' }}</mat-icon> {{ auth.isLoggedIn() ? 'Create challenge' : 'Browse fixtures' }}</button>
       </header>
 
-      <div class="football-search-row"><label class="fixture-search"><mat-icon aria-hidden="true">search</mat-icon><input type="search" [ngModel]="searchText" (ngModelChange)="onSearch($event)" maxlength="80" aria-label="Search available fixtures and results by team or competition" placeholder="Search teams or competitions…"/>@if(searchText){<button type="button" (click)="onSearch('')" aria-label="Clear fixture search">×</button>}</label><a class="research-entry" routerLink="/football/research">Football research <span aria-hidden="true">↗</span></a></div>
+      <div class="football-search-row"><label class="fixture-search"><mat-icon aria-hidden="true">search</mat-icon><input type="search" [ngModel]="searchText" (ngModelChange)="onSearch($event)" maxlength="80" aria-label="Search available fixtures and results by team or competition" placeholder="Search a team, e.g. Liverpool"/>@if(searchText){<button type="button" (click)="onSearch('')" aria-label="Clear fixture search">×</button>}</label><a class="research-entry" routerLink="/football/research">Compare teams <span aria-hidden="true">↗</span></a></div>
 
       @if (!auth.isLoggedIn()) {
         <div class="card public-join">
@@ -87,7 +87,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
 
       @if (auth.isLoggedIn()) {
       <!-- Open challenges -->
-      <section>
+      <details class="player-challenges"><summary>Player challenges</summary><section>
         <div class="section-title">
           <div><h2>Open challenges</h2><p class="sub">Players looking for an opponent</p></div>
           @if (visibleOpen().length > 3) {
@@ -110,7 +110,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
             }
           </div>
         }
-      </section>
+      </section></details>
       }
 
       <!-- My challenges (active) -->
@@ -147,45 +147,24 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
       <!-- Fixtures -->
       <section id="fixtures" tabindex="-1" aria-labelledby="fixtures-title" [attr.aria-busy]="fixtures() === null && !error()">
         <div class="section-title">
-          <div><h2 id="fixtures-title">Fixtures &amp; live scores</h2><p class="sub">{{searchQuery()?'Matches in available football data':'Choose a day. Open a match.'}}</p></div><button class="btn btn-ghost btn-sm" (click)="load()">Refresh</button>
-        </div>
-        <div class="football-filters">
-          <label>Competition
-            <input type="search" [ngModel]="competitionSearch()" (ngModelChange)="competitionSearch.set($event)" aria-label="Search competition filters" placeholder="Find a competition…"/>
-            <select #competition [value]="competitionId()??''" (change)="selectCompetition(competition.value)">
-              <option value="">All competitions</option>
-              @for (c of filteredCompetitions(); track c.id) { <option [value]="c.id">{{ c.name }}</option> }
-            </select>
-          </label>
-          <label>From <input #fromInput type="date" [value]="dateFrom()" aria-label="Filter fixtures and results from this date" (change)="selectDates(fromInput.value, toInput.value)" /></label>
-          <label>To <input #toInput type="date" [value]="dateTo()" aria-label="Filter fixtures and results through this date" (change)="selectDates(fromInput.value, toInput.value)" /></label>
-        </div>
-        @if (competitionError()) { <p class="muted small">{{ competitionError() }}</p> }
-        @if(filterError()){<p class="form-error" role="alert">{{filterError()}}</p>}
-        <div class="segmented tabs day-tabs">
-          @for (t of dayTabs; track t.key) {
-            <button [class.active]="day() === t.key" [attr.aria-pressed]="day() === t.key" (click)="selectDay(t.key)">
-              @if (t.key === 'live') { <span class="live-dot live-red"></span> }
-              {{ t.label }} @if (fixtures()) { <span class="count-muted">{{ byDay()[t.key].length }}</span> }
-            </button>
-          }
+          <div><h2 id="fixtures-title">Fixtures &amp; live scores</h2><p class="sub">{{searchQuery()?'Matches in available football data':'Open a match to see past meetings.'}}</p></div><button class="btn btn-ghost btn-sm" (click)="load()">Refresh</button>
         </div>
         @if (error()) {
           <app-load-error [message]="error()" (retry)="load()" />
         } @else if (!fixtures()) {
           <div class="card-grid">@for (i of [1,2,3]; track i) { <div class="card sk"><div class="skeleton" style="height:90px"></div></div> }</div>
-        } @else if (byDay()[day()].length === 0) {
-          <app-empty icon="sports_soccer" [title]="emptyTitle()" text="Try All, another competition or a different search.">@if(hasFilters()){<button class="btn btn-ghost" (click)="clearFilters()">Clear filters</button>}</app-empty>
+        } @else if (byDay().all.length === 0) {
+          <app-empty icon="sports_soccer" title="No matches found" text="Search for another team.">@if(hasFilters()){<button class="btn btn-ghost" (click)="clearFilters()">Clear filters</button>}</app-empty>
         } @else {
           <div class="card-grid">
-            @for (f of byDay()[day()]; track f.id) {
+            @for (f of byDay().all; track f.id) {
               <a class="card fixture card-interactive fade-in" [routerLink]="['/football', f.id]">
                 <div class="fx-top">
                   <span class="muted tiny ellip">{{ f.competition.name }}</span>
                   @if (f.status === 'LIVE') {
                     <span class="chip chip-win"><span class="live-dot"></span> LIVE @if (f.minute) { {{ f.minute }}' }</span>
                   } @else {
-                    <span class="small kick">{{ f.kickoffAt | date: 'EEE HH:mm' }}</span>
+                    <span class="small kick">{{ f.kickoffAt | date: 'd MMM, HH:mm' }}</span>
                   }
                 </div>
                 <div class="teams-line">
@@ -195,10 +174,10 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
                 </div>
                 <div class="fx-foot">
                   @if (f.status === 'SCHEDULED') {
-                    <span class="small muted">Kickoff in <app-countdown [deadline]="f.kickoffAt" [icon]="false" /></span>
-                    <span class="btn btn-sm btn-primary">{{ auth.isLoggedIn() ? 'Challenge' : 'View match' }}<mat-icon>chevron_right</mat-icon></span>
+                    @if(clock.remainingMs(f.kickoffAt)>0){<span class="small muted">Starts in <app-countdown [deadline]="f.kickoffAt" [icon]="false" /></span>}@else{<span class="small muted">Awaiting match update</span>}
+                    <span class="btn btn-sm btn-primary">Past meetings<mat-icon>chevron_right</mat-icon></span>
                   } @else {
-                    <span class="small muted">Challenges closed at kickoff</span>
+                    <span class="small muted">View score &amp; past meetings →</span>
                   }
                 </div>
                 @if (f.openChallenges > 0 && f.status === 'SCHEDULED') {
@@ -218,7 +197,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
         <div class="section-title">
           <div>
             <h2 id="results-title">Past match results</h2>
-            <p class="sub">Available scores. Search and filters apply here too.</p>
+            <p class="sub">Final scores. Open a match to see past meetings.</p>
           </div>
           @if (resultsTotal() > 0) { <span class="muted small">{{ results()?.length ?? 0 }} of {{ resultsTotal() }} matches</span> }
         </div>
@@ -234,7 +213,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
               <a class="card fixture card-interactive" [routerLink]="['/football', f.id]">
                 <div class="fx-top"><span class="muted tiny ellip">{{ f.competition.name }}</span><span class="small kick">{{ f.kickoffAt | date: 'EEE d MMM' }}</span></div>
                 <div class="teams-line"><span class="team">{{ f.homeTeam.name }}</span><span class="score">{{ f.homeScore }}–{{ f.awayScore }}</span><span class="team">{{ f.awayTeam.name }}</span></div>
-                <div class="fx-foot"><span class="small muted">Final score</span><span class="btn btn-sm btn-ghost">Match centre<mat-icon>chevron_right</mat-icon></span></div>
+                <div class="fx-foot"><span class="small muted">Final score</span><span class="btn btn-sm btn-ghost">Past meetings<mat-icon>chevron_right</mat-icon></span></div>
               </a>
             }
           </div>
@@ -283,6 +262,14 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
     }
   `,
   styles: [`
+    #fixtures > .card-grid{display:grid;grid-template-columns:1fr;gap:1px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
+    #fixtures .fixture{border:0;border-radius:0;padding:14px 18px;gap:8px}
+    #fixtures .fx-foot{border:0;padding-top:0}
+    #fixtures .fx-foot .btn{background:transparent;color:var(--accent);padding:0;min-height:44px}
+    #fixtures .teams-line{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:12px}
+    #fixtures .teams-line .team:last-child{text-align:right}
+    .hero h1{font-size:32px}.hero .create{display:none}.hero .btn-lg{min-height:44px;font-size:14px}
+    .player-challenges{margin:16px 0}.player-challenges>summary{min-height:44px;padding:12px 0;cursor:pointer;font-weight:600}
     .play-tabs { margin-bottom: 16px; }
     .football-search-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-block:20px}.fixture-search{display:flex;align-items:center;gap:10px;flex:1;min-width:210px;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;padding:0 14px}.fixture-search:focus-within{outline:2px solid var(--accent);outline-offset:2px}.fixture-search>mat-icon{color:var(--muted);flex-shrink:0}.fixture-search input{width:100%;min-width:0;min-height:52px;border:0;background:transparent;color:var(--text);font:inherit;outline:none!important}.fixture-search button{width:44px;height:44px;color:var(--text-2);font-size:26px;flex-shrink:0}.research-entry{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 14px;border:1px solid #8f875155;border-radius:9px;font-size:13px;color:#e3d19e;background:#d9c8910c}
     .hero { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;
@@ -338,7 +325,7 @@ export class FootballListPage implements OnInit {
   private router = inject(Router);
   private route=inject(ActivatedRoute);
   private realtime = inject(RealtimeService);
-  private clock = inject(ServerClock);
+  protected clock = inject(ServerClock);
   private destroyRef = inject(DestroyRef);
   protected rematch = inject(RematchService);
 
@@ -401,9 +388,9 @@ export class FootballListPage implements OnInit {
     for (const f of this.fixtures() ?? []) {
       const k = new Date(f.kickoffAt).getTime();
       if (f.status === 'LIVE') out.live.push(f);
-      else if (k < startTomorrow) out.today.push(f);
-      else if (k < startLater) out.tomorrow.push(f);
-      else out.later.push(f);
+      else if (k >= startToday && k < startTomorrow) out.today.push(f);
+      else if (k >= startTomorrow && k < startLater) out.tomorrow.push(f);
+      else if(k >= startLater) out.later.push(f);
     }
     return out;
   });
