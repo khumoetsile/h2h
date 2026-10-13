@@ -7,6 +7,7 @@ import { MatIconModule } from '@angular/material/icon';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { AuthService } from '../../core/auth.service';
+import { ConfigStore } from '../../core/config.store';
 import { apiError } from '../../core/api-error';
 import { BRAND } from '../../core/brand';
 import { DemoBadge } from '../../shared/ui';
@@ -64,14 +65,17 @@ const DEMO_PLAYER_PASSWORD = 'Player123!';
             @if (loading()) { <mat-spinner diameter="20" /> Signing in… } @else { Sign in }
           </button>
         </form>
+        <p class="foot"><a class="link" routerLink="/forgot-password">Forgot your password?</a> · <a class="link" routerLink="/help">Get help</a></p>
         <p class="foot">New here? <a class="link" routerLink="/register" [queryParams]="{ next: route.snapshot.queryParamMap.get('next') }">Create an account</a></p>
 
+        @if (config.config()?.demoAccountsEnabled) {
         <div class="dev-creds">
           <div class="row-between"><strong>Demo accounts</strong><app-demo-badge label="Demo data" /></div>
           <div class="row-between"><span>Player</span><button class="btn btn-ghost btn-sm" type="button" [disabled]="loading()" (click)="quickLogin('player@example.com')"><code>player&#64;example.com</code></button></div>
           <div class="row-between"><span>Opponent</span><button class="btn btn-ghost btn-sm" type="button" [disabled]="loading()" (click)="quickLogin('kabelo@example.com')"><code>kabelo&#64;example.com</code></button></div>
           <div class="row-between"><span>Admin</span><button class="btn btn-ghost btn-sm" type="button" (click)="pickAdmin(pwInput)"><code>admin&#64;example.com</code></button></div>
         </div>
+        }
       </div>
     </section>
   `,
@@ -81,6 +85,7 @@ export class LoginPage {
   private auth = inject(AuthService);
   private router = inject(Router);
   protected route = inject(ActivatedRoute);
+  protected config = inject(ConfigStore);
   protected brand = BRAND;
 
   protected form = this.fb.nonNullable.group({
@@ -119,7 +124,7 @@ export class LoginPage {
       const { identifier, password, remember } = this.form.getRawValue();
       await this.auth.login(identifier, password, remember);
       const next = this.route.snapshot.queryParamMap.get('next');
-      await this.router.navigateByUrl(next && !this.auth.isAdmin() ? next : this.auth.homeUrl());
+      await this.router.navigateByUrl(next?.startsWith('/') && !next.startsWith('//') && !this.auth.isAdmin() ? next : this.auth.homeUrl());
     } catch (err) {
       this.error.set(apiError(err).message);
     } finally {

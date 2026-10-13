@@ -1,6 +1,6 @@
 import { Component, computed, DestroyRef, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Api } from '../../core/api.service';
@@ -50,7 +50,8 @@ const DEFAULT_STAKE = 10;
         </div>
 
         <section class="entry card">
-          <h2>Pick your stake</h2>
+          <h2>{{ inviteMode ? 'Invite a friend: choose an entry' : 'Choose your demo entry' }}</h2>
+          <p class="muted small">Review the amount before starting. All funds are simulated.</p>
           <div class="tiles stake-tiles">
             @for (s of g.stakes ?? []; track s.stake) {
               <button class="tile" [class.selected]="stake()?.stake === s.stake" [attr.aria-pressed]="stake()?.stake === s.stake" [disabled]="s.stake > available()" (click)="choose(s)">
@@ -62,6 +63,7 @@ const DEFAULT_STAKE = 10;
 
           @if (stake(); as s) {
             <p class="prize">Win <strong class="money accent">{{ s.prize | money }}</strong><span class="muted"> for a {{ s.stake | money }} entry</span></p>
+            <p class="muted small">The prize includes your entry. Platform fee: {{ s.fee | money }} from the combined pool.</p>
             @if (waitingFor(s.stake) > 0) { <p class="win small instant"><mat-icon inline>bolt</mat-icon> Someone is ready to play now. You will be matched straight away.</p> }
           }
 
@@ -75,11 +77,11 @@ const DEFAULT_STAKE = 10;
               <a class="btn btn-primary btn-play btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add money to play</a>
             } @else {
               <button class="btn btn-primary btn-play btn-block" [disabled]="!stake() || busy() || !g.isEnabled || stake()!.stake > available()" (click)="find()">
-                @if (busy() === 'find') { <mat-spinner diameter="22" /> Finding an opponent } @else { Play {{ stake() ? '· ' + (stake()!.stake | money) : '' }} }
+                @if (busy() === 'find') { <mat-spinner diameter="22" /> Finding an opponent } @else { Find opponent {{ stake() ? '· ' + (stake()!.stake | money) + ' demo' : '' }} }
               </button>
               @if (config.config()?.demoBotsEnabled) {
                 <button class="btn btn-block" [disabled]="!stake() || busy() || !g.isEnabled || stake()!.stake > available()" (click)="practice()">
-                  @if (busy() === 'practice') { <mat-spinner diameter="20" /> Setting up } @else { <mat-icon>smart_toy</mat-icon> Practice now, no waiting }
+                  @if (busy() === 'practice') { <mat-spinner diameter="20" /> Setting up } @else { <mat-icon>smart_toy</mat-icon> Practice with a bot }
                 </button>
               }
             }
@@ -87,10 +89,10 @@ const DEFAULT_STAKE = 10;
               @if (busy() === 'invite') { <mat-spinner diameter="20" /> } @else { <mat-icon>share</mat-icon> Invite a friend }
             </button>
           </div>
-          <p class="muted tiny note">Your entry is held while you play and returned if nobody joins. Leaving a match after both players are ready costs {{ config.abandonmentFee() }}.</p>
+          <p class="muted small note">Practice uses the same demo entry and prize rules. Your entry is held while waiting; leave before both players are ready for a full refund. Leaving after both players are ready costs {{ config.abandonmentFee() }} in demo funds.</p>
         </section>
 
-        <details class="how card">
+        <details class="how card" open>
           <summary>How to play</summary>
           <p class="text-2">{{ g.howToPlay }}</p>
           <ul class="rules muted small">
@@ -98,11 +100,13 @@ const DEFAULT_STAKE = 10;
             <li>If it is an exact tie, you get your entry back.</li>
           </ul>
         </details>
+        <a class="link help-link" routerLink="/help">How matches work &amp; get help</a>
       }
     </div>
   `,
   styles: [`
     .back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 14px; min-height: 36px; mat-icon { font-size: 18px; width: 18px; height: 18px; } &:hover { color: var(--text); } }
+    .help-link {display:inline-block;padding:16px 0;}
     .head { display: flex; gap: 14px; align-items: center; h1 { font-size: 34px; } }
     .meta { display: flex; gap: 6px; flex-wrap: wrap; margin: 12px 0 16px; }
     .entry { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
@@ -124,6 +128,7 @@ const DEFAULT_STAKE = 10;
   `],
 })
 export class GameDetailPage implements OnInit {
+  protected inviteMode=inject(ActivatedRoute).snapshot.queryParamMap.get('mode') === 'invite';
   readonly slug = input.required<string>();
   private api = inject(Api);
   private auth = inject(AuthService);

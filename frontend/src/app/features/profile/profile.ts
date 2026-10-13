@@ -48,7 +48,7 @@ const COLORS = ['#3B82F6', '#22D3EE', '#A855F7', '#F97316', '#10B981', '#EF4444'
               <div class="colors">
                 <span class="muted small">Avatar colour</span>
                 @for (c of colors; track c) {
-                  <button type="button" class="sw" [style.background]="c" [class.sel]="form.controls.avatarColor.value === c" (click)="form.controls.avatarColor.setValue(c)" [attr.aria-label]="c"></button>
+                  <button type="button" class="sw" [style.background]="c" [class.sel]="form.controls.avatarColor.value === c" [attr.aria-pressed]="form.controls.avatarColor.value === c" (click)="form.controls.avatarColor.setValue(c)" [attr.aria-label]="'Avatar colour ' + c"></button>
                 }
               </div>
               <p class="muted tiny">Username and email can't be changed in this prototype.</p>

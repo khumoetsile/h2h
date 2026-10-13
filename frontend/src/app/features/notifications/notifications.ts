@@ -25,8 +25,8 @@ const ICONS: Record<string, string> = {
         <div><h1>Notifications</h1><p class="sub">{{ auth.unread() }} unread</p></div>
         <div class="row">
           <div class="segmented">
-            <button [class.active]="!unreadOnly()" (click)="setUnread(false)">All</button>
-            <button [class.active]="unreadOnly()" (click)="setUnread(true)">Unread</button>
+            <button [class.active]="!unreadOnly()" [attr.aria-pressed]="!unreadOnly()" (click)="setUnread(false)">All</button>
+            <button [class.active]="unreadOnly()" [attr.aria-pressed]="unreadOnly()" (click)="setUnread(true)">Unread</button>
           </div>
           <button class="btn btn-sm" [disabled]="auth.unread() === 0" (click)="readAll()"><mat-icon>done_all</mat-icon>Mark all read</button>
         </div>
@@ -41,7 +41,7 @@ const ICONS: Record<string, string> = {
               <div class="list-item clickable" [class.unread]="!n.isRead" (click)="open(n)">
                 <span class="ic"><mat-icon>{{ icon(n.type) }}</mat-icon></span>
                 <div class="grow">
-                  <div class="t">{{ n.title }}</div>
+                  <button type="button" class="t" (click)="$event.stopPropagation(); open(n)">{{ n.title }}</button>
                   <div class="text-2 small">{{ n.message }}</div>
                   <div class="muted tiny">{{ n.createdAt | ago }}</div>
                 </div>

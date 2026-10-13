@@ -7,7 +7,7 @@ import { AuthService } from '../../core/auth.service';
 import { ConfigStore } from '../../core/config.store';
 import { formatMoney } from '../../core/format';
 import { QuickPlay } from '../../core/quick-play';
-import { Avatar, GameIcon, Spinner } from '../../shared/ui';
+import { Avatar, GameIcon, Spinner, LoadError } from '../../shared/ui';
 
 interface Invite {
   code: string;
@@ -24,11 +24,13 @@ interface Invite {
  */
 @Component({
   selector: 'app-invite',
-  imports: [RouterLink, MatProgressSpinnerModule, Avatar, GameIcon, Spinner],
+  imports: [RouterLink, MatProgressSpinnerModule, Avatar, GameIcon, Spinner, LoadError],
   template: `
     <main class="wrap">
       <div class="brand">Head2Head</div>
-      @if (loading()) {
+      @if (loadError()) {
+        <app-load-error [message]="loadError()" (retry)="load()" />
+      } @else if (loading()) {
         <app-spinner />
       } @else if (!invite()) {
         <section class="card box">
@@ -87,16 +89,19 @@ export class InvitePage implements OnInit {
 
   protected invite = signal<Invite | null>(null);
   protected loading = signal(true);
+  protected loadError = signal('');
   protected busy = signal(false);
   protected error = signal('');
   protected money = formatMoney;
   protected bonus = computed(() => formatMoney(this.config.config()?.signupBonus ?? 250));
   protected mine = computed(() => this.auth.user()?.username === this.invite()?.from.username);
 
-  async ngOnInit() {
+  ngOnInit() { return this.load(); }
+  async load() {
+    this.loading.set(true);this.loadError.set('');
     try {
       this.invite.set((await this.api.get<{ invite: Invite }>(`/invites/${this.code()}`)).invite);
-    } catch { this.invite.set(null); }
+    } catch (err) { if(apiError(err).status === 404) this.invite.set(null); else this.loadError.set(apiError(err).message); }
     this.loading.set(false);
   }
 

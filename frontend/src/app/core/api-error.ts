@@ -1,4 +1,5 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { TimeoutError } from 'rxjs';
 
 export interface ApiErrorInfo {
   status: number;
@@ -9,6 +10,7 @@ export interface ApiErrorInfo {
 
 /** Turn any HTTP failure into a user-facing message. */
 export function apiError(err: unknown): ApiErrorInfo {
+  if (err instanceof TimeoutError) return {status:0,code:'TIMEOUT',message:'This is taking longer than expected. Check your connection. If you started a match or changed your balance, check your activity before trying again.',fields:{}};
   if (err instanceof HttpErrorResponse) {
     if (err.status === 0) {
       return { status: 0, code: 'NETWORK', message: 'We could not connect. Check your internet connection and try again.', fields: {} };

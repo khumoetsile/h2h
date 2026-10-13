@@ -21,7 +21,7 @@ type AdminUser = User & { wallet: { available: number; locked: number }; played:
     <div class="page">
       <div class="page-head"><div><h1>Users</h1><p class="sub">{{ data()?.total ?? 0 }} accounts</p></div></div>
       <div class="filters">
-        <div class="search"><mat-icon>search</mat-icon><input [(ngModel)]="q" (ngModelChange)="search$.next($event)" placeholder="Search username, name, email or phone" /></div>
+        <div class="search"><mat-icon>search</mat-icon><input [(ngModel)]="q" (ngModelChange)="search$.next($event)" placeholder="Search username, name, email or phone" aria-label="Search users" /></div>
         <div class="segmented">
           <button [class.active]="status() === ''" (click)="setStatus('')">All</button>
           <button [class.active]="status() === 'ACTIVE'" (click)="setStatus('ACTIVE')">Enabled</button>
@@ -40,7 +40,7 @@ type AdminUser = User & { wallet: { available: number; locked: number }; played:
               <tbody>
                 @for (u of data()!.items; track u.id) {
                   <tr class="clickable" (click)="open(u)">
-                    <td><div class="row"><app-avatar [name]="u.username" [color]="u.avatarColor" [size]="28" /><div><strong>{{ u.username }}</strong><div class="muted tiny">{{ u.firstName }} {{ u.lastName }}</div></div>
+                    <td><div class="row"><app-avatar [name]="u.username" [color]="u.avatarColor" [size]="28" /><div><button type="button" class="link" (click)="$event.stopPropagation(); open(u)">{{ u.username }}</button><div class="muted tiny">{{ u.firstName }} {{ u.lastName }}</div></div>
                       @if (u.isDemoData) { <span class="chip chip-demo">demo</span> } @if (u.isBot) { <span class="chip">bot</span> }</div></td>
                     <td class="muted">{{ u.email }}</td>
                     <td><span class="chip" [class.chip-info]="u.role === 'ADMIN'">{{ u.role }}</span></td>

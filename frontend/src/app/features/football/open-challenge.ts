@@ -1,4 +1,5 @@
 import { Component, computed, inject, input, output, signal } from '@angular/core';
+import { A11yModule } from '@angular/cdk/a11y';
 import { Router } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
@@ -70,11 +71,11 @@ export class OpenChallengeCard {
  */
 @Component({
   selector: 'app-join-sheet',
-  imports: [MatIconModule, MatProgressSpinnerModule, MoneyPipe, Countdown],
+  imports: [A11yModule, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Countdown],
   template: `
     @let c = challenge();
-    <div class="confirm-backdrop" (click)="close()">
-      <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="join-title" (click)="$event.stopPropagation()">
+    <div class="confirm-backdrop" (click)="close()" (keydown.escape)="close()">
+      <div class="confirm-card" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" role="dialog" aria-modal="true" aria-labelledby="join-title" (click)="$event.stopPropagation()">
         <h2 id="join-title">Join this challenge?</h2>
         <p class="text-2">You are joining a <strong>1v1 challenge</strong> against {{ c.creator.username }}. Once both players lock in, the challenge will begin.</p>
         <div class="confirm-summary">

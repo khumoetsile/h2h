@@ -1,5 +1,6 @@
 import { Component, computed, DestroyRef, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { A11yModule } from '@angular/cdk/a11y';
 import { DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -24,12 +25,10 @@ import { SkillRoom } from './skill-room';
  * the server stamped; when one reaches zero the page simply asks the server
  * what happened — it never decides an outcome itself.
  */
-/** How long to look for a real opponent before a practice match steps in. */
-const AUTO_PRACTICE_MS = 5 * 60 * 1000;
 
 @Component({
   selector: 'app-match-lobby',
-  imports: [RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, Spinner, Countdown, SkillRoom],
+  imports: [A11yModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, Spinner, Countdown, SkillRoom],
   templateUrl: './match-lobby.html',
   styleUrl: './match-lobby.scss',
 })
@@ -47,8 +46,8 @@ export class MatchLobbyPage implements OnInit {
   protected error = signal('');
   protected busy = signal<string | null>(null);
   protected leaveOpen = signal(false);
-  /** Getting ready for the player failed once; show the button so they can do it themselves. */
-  protected manualReady = signal(false);
+  /** Players explicitly choose when they are ready; never act on their behalf. */
+  protected manualReady = signal(true);
 
   protected me = computed(() => this.match()?.players.find((p) => p.userId === this.match()?.viewerId) ?? null);
   protected opponent = computed(() => this.match()?.players.find((p) => p.userId !== this.match()?.viewerId) ?? null);
@@ -67,7 +66,6 @@ export class MatchLobbyPage implements OnInit {
 
   ngOnInit() {
     this.load();
-    this.destroyRef.onDestroy(() => { if (this.autoPractice) clearTimeout(this.autoPractice); });
     this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((m) => {
       if (m.code === this.code()) this.apply(m);
     });
@@ -76,39 +74,11 @@ export class MatchLobbyPage implements OnInit {
     interval(4000).pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
   }
 
-  private autoReadied = false;
   private autoStarted = false;
-  private autoPractice: ReturnType<typeof setTimeout> | null = null;
-  private autoPracticed = false;
-
-  /**
-   * Nobody should sit on a spinner. If a matchmaking game finds no human within a few seconds, a practice
-   * opponent steps in (clearly labelled) and the match starts. Friend invites are exempt: they wait for the friend.
-   */
-  private scheduleAutoPractice(m: MatchView) {
-    const eligible = m.status === 'WAITING' && m.category !== 'FOOTBALL' && m.source !== 'DIRECT' && !!this.config.config()?.demoBotsEnabled;
-    if (!eligible) {
-      if (this.autoPractice) { clearTimeout(this.autoPractice); this.autoPractice = null; }
-      return;
-    }
-    if (this.autoPractice || this.autoPracticed) return;
-    const waited = Math.max(0, this.clock.now() - new Date(m.createdAt).getTime());
-    this.autoPractice = setTimeout(async () => {
-      this.autoPractice = null;
-      await this.load(true);
-      const cur = this.match();
-      if (cur && cur.status === 'WAITING' && !this.busy() && !this.autoPracticed) {
-        this.autoPracticed = true;
-        this.toast.info('Nobody joined in 5 minutes, so you are playing a practice match.');
-        await this.practiceNow();
-      }
-    }, Math.max(0, AUTO_PRACTICE_MS - waited));
-  }
 
   private apply(m: MatchView) {
     const prev = this.match();
     this.match.set(m);
-    this.scheduleAutoPractice(m);
     const skill = m.category !== 'FOOTBALL';
     const opp = m.players.find((p) => p.userId !== m.viewerId);
     const me = m.players.find((p) => p.userId === m.viewerId);
@@ -117,11 +87,6 @@ export class MatchLobbyPage implements OnInit {
       else if (!opp?.isBot) { try { navigator.vibrate?.([120, 60, 120]); } catch { /* not supported */ } }
     }
     if (skill) {
-      // Nobody taps "ready" any more: when an opponent is found we get ready on the player's behalf.
-      if (m.status === 'MATCHED' && me?.owesAction && !this.autoReadied && !this.busy()) {
-        this.autoReadied = true;
-        void this.lockIn().then((ok) => { if (!ok) this.manualReady.set(true); });
-      }
       // Both ready: go straight into the game. Only when this page watched it happen, so coming back
       // from a game never throws the player back in.
       if (prev && prev.status !== m.status && ['READY', 'IN_PROGRESS'].includes(m.status) && !me?.submitted && !this.autoStarted) {

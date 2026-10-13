@@ -105,8 +105,8 @@
 </div>
 
 @if (acceptTarget(); as c) {
-  <div class="confirm-backdrop" (click)="closeAccept()">
-    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="acc-title" (click)="$event.stopPropagation()">
+  <div class="confirm-backdrop" (click)="closeAccept()" (keydown.escape)="closeAccept()">
+    <div class="confirm-card" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" role="dialog" aria-modal="true" aria-labelledby="acc-title" (click)="$event.stopPropagation()">
       <h2 id="acc-title">{{ c.challenger.username }} challenged you</h2>
       <p class="text-2">You are accepting a <strong>1v1 challenge</strong>. Accepting locks you in.</p>
       <div class="confirm-summary">

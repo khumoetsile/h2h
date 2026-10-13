@@ -27,7 +27,7 @@ const PLAYER_NAV: NavItem[] = [
   { label: 'Me', icon: 'person', link: '/profile' },
 ];
 // Four tabs on a phone, always with a word under the icon. Challenges and Rankings live in the desktop nav and the account menu.
-const PLAYER_BOTTOM = ['/dashboard', '/football', '/matches', '/profile'];
+const PLAYER_BOTTOM = ['/dashboard', '/football', '/challenges', '/matches', '/profile'];
 
 const ADMIN_NAV: NavItem[] = [
   { label: 'Overview', icon: 'monitoring', link: '/admin', exact: true },

@@ -61,9 +61,9 @@
             </div>
             @if (h2h.matches.length) {
               <nav class="h2h-tabs" aria-label="History sections">
-                <a href="#h2h-record">Record</a>
-                <a href="#h2h-stats">Stats</a>
-                <a href="#team-form">Team form</a>
+                <a [routerLink]="[]" fragment="h2h-record" queryParamsHandling="preserve">Record</a>
+                <a [routerLink]="[]" fragment="h2h-stats" queryParamsHandling="preserve">Stats</a>
+                <a [routerLink]="[]" fragment="team-form" queryParamsHandling="preserve">Team form</a>
               </nav>
             }
             @if (h2h.matches.length) {
@@ -382,6 +382,9 @@
                       <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" autocomplete="off" aria-label="Search for a player" />
                       @if (searching()) { <mat-spinner diameter="18" /> }
                     </div>
+                    @if (searchError()) { <app-load-error [message]="searchError()" (retry)="retrySearch()" /> }
+                    @else if (searching()) { <p class="muted small" role="status">Searching for players…</p> }
+                    @else if (query.trim() && !opponent() && results().length === 0) { <p class="muted small" role="status">No players found. Try another username.</p> }
                     @if (results().length > 0) {
                       <div class="result-list">
                         @for (u of results(); track u.id) {
@@ -426,8 +429,8 @@
 
 @if (reviewOpen() && fixture() && type()) {
   @let f = fixture()!;
-  <div class="confirm-backdrop" (click)="closeReview()">
-    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="lock-title" (click)="$event.stopPropagation()">
+  <div class="confirm-backdrop" (click)="closeReview()" (keydown.escape)="closeReview()">
+    <div class="confirm-card" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" role="dialog" aria-modal="true" aria-labelledby="lock-title" (click)="$event.stopPropagation()">
       <p class="muted small eyebrow">{{ mode() === 'direct' ? 'Challenge someone' : 'Find an opponent' }}</p>
       <h2 id="lock-title">You're locking in</h2>
       <div class="lock-teams"><span>{{ f.homeTeam.name }}</span><small>vs</small><span>{{ f.awayTeam.name }}</span></div>

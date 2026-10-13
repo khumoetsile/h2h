@@ -43,6 +43,7 @@
   "delete",
   "description",
   "details",
+  "devices",
   "distance",
   "done_all",
   "download",
@@ -196,6 +197,7 @@
   "style",
   "subject",
   "subscript",
+  "support",
   "switch",
   "swords",
   "sync",
@@ -237,5 +239,6 @@
   "web",
   "weight",
   "wifi_off",
-  "window"
+  "window",
+  "work"
 ]

@@ -22,7 +22,7 @@ type Period = 'daily' | 'weekly' | 'all';
       </div>
       <div class="controls">
         <div class="segmented">
-          @for (p of periods; track p.key) { <button [class.active]="period() === p.key" (click)="setPeriod(p.key)">{{ p.label }}</button> }
+          @for (p of periods; track p.key) { <button [class.active]="period() === p.key" [attr.aria-pressed]="period() === p.key" (click)="setPeriod(p.key)">{{ p.label }}</button> }
         </div>
         <select class="game-select" [value]="gameId() ?? ''" (change)="setGame($any($event.target).value)" aria-label="Filter by game">
           <option value="">All games</option>

@@ -6,6 +6,9 @@ import { validate } from '../middleware/validate.js';
 import { requireAuth } from '../middleware/auth.js';
 import { claimSchema, loginSchema, quickSignupSchema, registerSchema } from './schemas.js';
 import * as auth from '../services/authService.js';
+import { z } from 'zod';
+import { password } from './schemas.js';
+import { requestPasswordReset, resetPassword } from '../services/passwordRecoveryService.js';
 
 const router = Router();
 const limiter = rateLimit({
@@ -17,6 +20,18 @@ const limiter = rateLimit({
 });
 
 const meta = (req) => ({ userAgent: req.headers['user-agent'], ip: req.ip });
+
+const recoveryLimiter = rateLimit({windowMs: 60 * 60 * 1000, limit: config.isTest ? 10000 : 10, standardHeaders:true, legacyHeaders:false,
+  handler: (_req,res) => res.status(429).json({error:{code:'RATE_LIMITED',message:'Too many recovery attempts. Please try again later.'}})});
+router.post('/forgot-password', recoveryLimiter, validate(z.object({email:z.string().trim().toLowerCase().email().max(190)})), ah(async (req,res) => {
+  await Promise.all([requestPasswordReset(req.body.email),new Promise(resolve=>setTimeout(resolve,300))]);
+  res.json({message:'If this email belongs to an eligible account, a recovery link will arrive shortly. Check your spam folder too.'});
+}));
+router.post('/reset-password', recoveryLimiter, validate(z.object({token:z.string().regex(/^[a-f0-9]{64}$/), password, confirmPassword:z.string()})
+  .refine(d=>d.password === d.confirmPassword,{path:['confirmPassword'],message:'Passwords do not match.'})), ah(async (req,res) => {
+  await resetPassword(req.body.token,req.body.password);
+  res.json({ok:true});
+}));
 
 router.post('/register', limiter, validate(registerSchema), ah(async (req, res) => {
   res.status(201).json(await auth.register(req.body, meta(req)));

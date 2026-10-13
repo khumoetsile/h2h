@@ -48,7 +48,7 @@ import { EmptyState, GameIcon, LoadError } from '../../shared/ui';
             <a class="card game-card card-interactive fade-in" [routerLink]="['/games', g.slug]" [style.--gc]="g.accentColor">
               <div class="gc-top">
                 <app-game-icon [slug]="g.slug" [color]="g.accentColor" [size]="52" />
-                @if ((g.waiting ?? 0) > 0) { <span class="chip chip-win"><span class="live-dot"></span>{{ g.waiting }} playing now</span> }
+                @if ((g.waiting ?? 0) > 0) { <span class="chip chip-win"><span class="live-dot"></span>{{ g.waiting }} waiting</span> }
               </div>
               <h2>{{ g.name }}</h2>
               <p class="text-2 desc">{{ g.tagline }}</p>

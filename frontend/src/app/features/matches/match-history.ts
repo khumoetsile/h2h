@@ -79,7 +79,8 @@ type Filter = 'all' | 'active' | 'wins' | 'losses' | 'draws' | 'void' | 'timed_o
     </div>
   `,
   styles: [`
-    .filters { margin-bottom: 16px; }
+    .filters { margin-bottom: 16px; flex-wrap:wrap; overflow:visible; }
+    .filters button {flex:1 0 auto;}
     .row-item { align-items: flex-start; }
     .grow { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
     .t { font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

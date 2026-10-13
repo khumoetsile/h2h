@@ -186,9 +186,9 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
                   }
                 </div>
                 <div class="teams-line">
-                  <span class="team">{{ f.homeTeam.name }}</span>
+                  <span class="team" [title]="f.homeTeam.name">{{ f.homeTeam.name }}</span>
                   @if (f.status === 'LIVE') { <span class="score">{{ f.homeScore }} - {{ f.awayScore }}</span> } @else { <span class="vs">vs</span> }
-                  <span class="team">{{ f.awayTeam.name }}</span>
+                  <span class="team" [title]="f.awayTeam.name">{{ f.awayTeam.name }}</span>
                 </div>
                 <div class="fx-foot">
                   @if (f.status === 'SCHEDULED') {
@@ -305,6 +305,7 @@ type DayTab = 'live' | 'today' | 'tomorrow' | 'later';
     .count-muted { color: var(--muted); font-weight: 500; font-size: 12px; }
     .live-red { color: var(--loss); margin-right: 2px; }
     .fixture { display: flex; flex-direction: column; gap: 10px; padding: 16px; min-width: 0; text-decoration: none; color: inherit; }
+    .fixture .teams-line .team {white-space:normal;overflow:visible;text-overflow:clip;overflow-wrap:anywhere;line-height:1.25;}
     .fx-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
     .kick { font-weight: 600; flex-shrink: 0; }
     .fx-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); }

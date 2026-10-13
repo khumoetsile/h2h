@@ -24,7 +24,7 @@ interface AdminMatch {
     <div class="page">
       <div class="page-head"><div><h1>Matches</h1><p class="sub">{{ data()?.total ?? 0 }} matches · amounts are DEMO</p></div></div>
       <div class="filters">
-        <div class="search"><mat-icon>search</mat-icon><input [(ngModel)]="search" (ngModelChange)="search$.next($event)" placeholder="Match ID or username" /></div>
+        <div class="search"><mat-icon>search</mat-icon><input [(ngModel)]="search" (ngModelChange)="search$.next($event)" placeholder="Match ID or username" aria-label="Search matches" /></div>
         <div class="segmented">
           @for (s of statuses; track s.key) { <button [class.active]="status() === s.key" (click)="setStatus(s.key)">{{ s.label }}</button> }
         </div>
@@ -39,7 +39,7 @@ interface AdminMatch {
             <tbody>
               @for (m of data()!.items; track m.id) {
                 <tr class="clickable" (click)="router.navigate(['/matches', m.code])">
-                  <td class="small">{{ m.code }}@if (m.source === 'CHALLENGE') { <span class="chip">challenge</span> }</td>
+                  <td class="small"><button type="button" class="link" (click)="$event.stopPropagation(); router.navigate(['/matches',m.code])">{{ m.code }}</button>@if (m.source === 'CHALLENGE') { <span class="chip">challenge</span> }</td>
                   <td><div class="row"><app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="24" />{{ m.game.name }}</div></td>
                   <td>{{ m.players.join(' vs ') }}</td>
                   <td><app-match-status [status]="m.status" /></td>

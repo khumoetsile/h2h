@@ -13,6 +13,7 @@ const { pool, query, queryOne } = await import('../src/db.js');
 const { sweepMatches } = await import('../src/services/matchService.js');
 const { expireChallenges } = await import('../src/services/challengeService.js');
 const { invalidateSettings } = await import('../src/services/settingsService.js');
+const { recoveryTestInbox } = await import('../src/services/passwordRecoveryService.js');
 const request = (await import('supertest')).default;
 
 const app = createApp();
@@ -53,6 +54,48 @@ const gameId = async (slug) => (await queryOne('SELECT id FROM games WHERE slug 
 before(async () => {
   await migrate({ fresh: true, log: quiet });
   await seed({ log: quiet });
+});
+
+describe('password recovery', () => {
+  test('concurrent requests send only one recovery link per account cooldown',async()=>{
+    const player=await newPlayer('cooldown');
+    await Promise.all([api().post('/api/auth/forgot-password').send({email:player.user.email}),api().post('/api/auth/forgot-password').send({email:player.user.email})]);
+    assert.equal(recoveryTestInbox.filter(m=>m.to===player.user.email).length,1);
+  });
+  test('does not reveal whether an email is registered', async () => {
+    const known = await api().post('/api/auth/forgot-password').send({email:'player@example.com'});
+    const unknown = await api().post('/api/auth/forgot-password').send({email:'absent-recovery@example.com'});
+    assert.equal(known.status,200);
+    assert.deepEqual(known.body,unknown.body);
+    assert.ok(!JSON.stringify(known.body).includes('token'));
+  });
+
+  test('single-use link resets only its owner and revokes their sessions', async () => {
+    const player=await newPlayer('recover');
+    const response=await api().post('/api/auth/forgot-password').send({email:player.user.email});
+    assert.equal(response.status,200);
+    const mail=recoveryTestInbox.findLast(m=>m.to===player.user.email);
+    assert.ok(mail?.token);
+    const stored=await queryOne('SELECT token_hash FROM password_reset_tokens WHERE user_id=?',[player.user.id]);
+    assert.notEqual(stored.token_hash,mail.token);
+    const invalid=await api().post('/api/auth/reset-password').send({token:mail.token,password:'NewSecret123',confirmPassword:'Different123'});
+    assert.equal(invalid.status,400);
+    const reset=await api().post('/api/auth/reset-password').send({token:mail.token,password:'NewSecret123',confirmPassword:'NewSecret123'});
+    assert.equal(reset.status,200);
+    assert.equal((await api().get('/api/me').set(auth(player.token))).status,401);
+    assert.equal((await api().post('/api/auth/login').send({identifier:player.user.email,password:'Secret123'})).status,401);
+    assert.equal((await api().post('/api/auth/login').send({identifier:player.user.email,password:'NewSecret123'})).status,200);
+    assert.equal((await api().post('/api/auth/reset-password').send({token:mail.token,password:'OtherSecret123',confirmPassword:'OtherSecret123'})).status,400);
+  });
+
+  test('expired recovery links cannot change a password', async () => {
+    const player=await newPlayer('expired');
+    await api().post('/api/auth/forgot-password').send({email:player.user.email});
+    const mail=recoveryTestInbox.findLast(m=>m.to===player.user.email);
+    await query('UPDATE password_reset_tokens SET expires_at=DATE_SUB(NOW(),INTERVAL 1 MINUTE) WHERE user_id=?',[player.user.id]);
+    assert.equal((await api().post('/api/auth/reset-password').send({token:mail.token,password:'NewSecret123',confirmPassword:'NewSecret123'})).status,400);
+    assert.equal((await api().post('/api/auth/login').send({identifier:player.user.email,password:'Secret123'})).status,200);
+  });
 });
 
 after(async () => {

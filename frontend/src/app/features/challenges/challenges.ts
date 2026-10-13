@@ -1,5 +1,6 @@
 import { Component, computed, DestroyRef, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { A11yModule } from '@angular/cdk/a11y';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../core/api.service';
@@ -23,7 +24,7 @@ type Tab = 'incoming' | 'outgoing' | 'history';
  */
 @Component({
   selector: 'app-challenges',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, SkeletonList, Countdown],
+  imports: [A11yModule, RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, SkeletonList, Countdown],
   templateUrl: './challenges.html',
   styleUrl: './challenges.scss',
 })

@@ -1,6 +1,6 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, timeout } from 'rxjs';
 
 type Params = Record<string, string | number | boolean | null | undefined>;
 
@@ -16,9 +16,9 @@ export class Api {
     return hp;
   }
 
-  get<T>(path: string, params?: Params) { return firstValueFrom(this.http.get<T>(this.base + path, { params: this.params(params) })); }
-  post<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.post<T>(this.base + path, body)); }
-  put<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.put<T>(this.base + path, body)); }
-  delete<T>(path: string) { return firstValueFrom(this.http.delete<T>(this.base + path)); }
-  patch<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.patch<T>(this.base + path, body)); }
+  get<T>(path: string, params?: Params) { return firstValueFrom(this.http.get<T>(this.base + path, { params: this.params(params) }).pipe(timeout(20000))); }
+  post<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.post<T>(this.base + path, body).pipe(timeout(20000))); }
+  put<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.put<T>(this.base + path, body).pipe(timeout(20000))); }
+  delete<T>(path: string) { return firstValueFrom(this.http.delete<T>(this.base + path).pipe(timeout(20000))); }
+  patch<T>(path: string, body: unknown = {}) { return firstValueFrom(this.http.patch<T>(this.base + path, body).pipe(timeout(20000))); }
 }

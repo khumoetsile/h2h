@@ -480,6 +480,8 @@ export interface AppNotification {
 }
 
 export interface PublicConfig {
+  recovery?: { available: boolean; supportEmail: string };
+  demoAccountsEnabled?: boolean;
   appName: string;
   demoMode: boolean;
   demoNotice: string;

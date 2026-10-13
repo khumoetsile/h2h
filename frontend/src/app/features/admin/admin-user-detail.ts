@@ -56,8 +56,8 @@ interface Detail { user: User; wallet: Wallet; stats: UserStats; transactions: T
           </div>
           <div class="card">
             <h3>Send notification</h3>
-            <input class="inp" [(ngModel)]="nTitle" placeholder="Title" maxlength="120" />
-            <textarea class="inp" [(ngModel)]="nMsg" placeholder="Message" maxlength="255" rows="3"></textarea>
+            <input class="inp" [(ngModel)]="nTitle" placeholder="Title" aria-label="Notification title" maxlength="120" />
+            <textarea class="inp" [(ngModel)]="nMsg" placeholder="Message" aria-label="Notification message" maxlength="255" rows="3"></textarea>
             <button class="btn btn-sm" [disabled]="!nTitle || !nMsg" (click)="sendNote()"><mat-icon>send</mat-icon>Send</button>
           </div>
         </div>
@@ -76,7 +76,7 @@ interface Detail { user: User; wallet: Wallet; stats: UserStats; transactions: T
                     <td class="money">{{ m.stake | money }}</td>
                     <td><app-outcome [outcome]="m.outcome" [status]="m.status" /></td>
                     <td class="muted">{{ m.createdAt | date: 'd MMM, HH:mm' }}</td>
-                    <td class="muted small">{{ m.code }}</td>
+                    <td class="muted small"><a class="link" [routerLink]="['/matches',m.code]" (click)="$event.stopPropagation()">{{ m.code }}</a></td>
                   </tr>
                 }
               </tbody>

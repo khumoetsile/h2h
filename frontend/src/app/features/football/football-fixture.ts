@@ -1,11 +1,12 @@
 import { Component, DestroyRef, computed, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { A11yModule } from '@angular/cdk/a11y';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { interval, Subject, debounceTime, distinctUntilChanged } from 'rxjs';
+import { interval, Subject, debounceTime } from 'rxjs';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
 import { AuthService } from '../../core/auth.service';
@@ -30,7 +31,7 @@ import { readGuestFollowedFixtures, writeGuestFollowedFixtures } from './footbal
  */
 @Component({
   selector: 'app-football-fixture',
-  imports: [FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet],
+  imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet],
   templateUrl: './football-fixture.html',
   styleUrls: ['./football-fixture.scss', './football-fixture-insights.scss'],
 })
@@ -65,7 +66,9 @@ export class FootballFixturePage implements OnInit {
   protected query = '';
   protected results = signal<PlayerSearchResult[]>([]);
   protected searching = signal(false);
-  private search$ = new Subject<string>();
+  protected searchError=signal('');
+  private searchVersion=0;
+  private search$ = new Subject<{query:string;version:number}>();
 
   protected message = '';
   protected busy = signal(false);
@@ -160,7 +163,7 @@ export class FootballFixturePage implements OnInit {
   }
 
   ngOnInit() {
-    this.search$.pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe((q) => this.doSearch(q));
+    this.search$.pipe(debounceTime(250), takeUntilDestroyed(this.destroyRef)).subscribe(q => this.doSearch(q.query,q.version));
     const t = this.rematchSvc.consume();
     if (t) {
       this.target.set(t);
@@ -287,19 +290,25 @@ export class FootballFixturePage implements OnInit {
   onQuery(q: string) {
     if (this.opponent() && q === `@${this.opponent()!.username}`) return;
     this.opponent.set(null);
-    this.search$.next(q.trim());
+    this.results.set([]);this.searchError.set('');this.searching.set(!!q.trim());
+    this.search$.next({query:q.trim(),version:++this.searchVersion});
   }
 
-  private async doSearch(q: string) {
-    if (!q) { this.results.set([]); return; }
+  retrySearch() {return this.doSearch(this.query.trim(),++this.searchVersion);}
+  private async doSearch(q: string,version:number) {
+    if(version !== this.searchVersion) return;
+    if (!q) { this.results.set([]);this.searching.set(false); return; }
+    this.searchError.set('');
     this.searching.set(true);
     try {
-      this.results.set((await this.api.get<{ users: PlayerSearchResult[] }>('/users/search', { q })).users);
-    } catch { this.results.set([]); }
-    this.searching.set(false);
+      const r=await this.api.get<{users:PlayerSearchResult[]}>('/users/search',{q});
+      if(version === this.searchVersion) this.results.set(r.users);
+    } catch(e) {if(version === this.searchVersion) {this.results.set([]);this.searchError.set(apiError(e).message);}}
+    finally {if(version === this.searchVersion) this.searching.set(false);}
   }
 
   pickOpponent(u: PlayerSearchResult) {
+    ++this.searchVersion;this.searching.set(false);
     this.opponent.set(u);
     this.query = `@${u.username}`;
     this.results.set([]);

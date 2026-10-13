@@ -8,7 +8,7 @@ import { Toast } from '../core/toast.service';
   imports: [MatIconModule],
   template: `
     <div class="box">
-      <p class="lead">Send this link to a friend. They tap it, pick a name and play you straight away.</p>
+      <p class="lead">Send this link to a friend. They can join as a guest, review the entry and get ready to play you.</p>
       <a class="btn btn-primary btn-play btn-block" [href]="whatsapp()" target="_blank" rel="noopener">
         <mat-icon>send</mat-icon> Send on WhatsApp
       </a>

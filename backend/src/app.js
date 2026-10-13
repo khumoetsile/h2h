@@ -14,6 +14,7 @@ import { getSettings } from './services/settingsService.js';
 import { computePrize } from './utils/money.js';
 import { publicTimerConfig } from './timers.js';
 import authRoutes from './routes/auth.js';
+import { recoveryAvailable } from './services/passwordRecoveryService.js';
 import inviteRoutes from './routes/invites.js';
 import pushRoutes from './routes/push.js';
 import { pushStatus } from './services/pushService.js';
@@ -44,7 +45,9 @@ export function createApp() {
   app.use(helmet(webRoot ? { contentSecurityPolicy: false } : undefined));
   app.use(cors({ origin: config.corsOrigins, credentials: false }));
   app.use(express.json({ limit: '100kb' }));
-  if (!config.isTest) app.use(morgan('dev'));
+  // Recovery tokens must not enter access logs through a page's query string.
+  morgan.token('safe-url', req => (req.originalUrl || req.url).split('?')[0]);
+  if (!config.isTest) app.use(morgan(':method :safe-url :status :response-time ms'));
 
   app.get('/api/health', (_req, res) => res.json({ ok: true, app: config.appName, demoMode: true, push: pushStatus(), time: new Date().toISOString() }));
   // Server clock for countdown display. Clients estimate their offset from
@@ -90,6 +93,8 @@ export function createApp() {
     const s = await getSettings();
     res.json({
       appName: config.appName,
+      recovery: { available: recoveryAvailable(), supportEmail: config.supportEmail },
+      demoAccountsEnabled: config.env !== 'production' || process.env.SHOW_DEMO_ACCOUNTS === 'true',
       demoMode: true,
       demoNotice: 'DEMO MODE: all funds are simulated. No real money is deposited, staked, won or withdrawn.',
       currency: { symbol: config.currencySymbol, code: config.currencyCode },

@@ -3,6 +3,7 @@
     <app-load-error [message]="error()" (retry)="load()" />
   } @else {
     <p class="hi fade-in">Hi, <strong>{{ auth.user()?.username }}</strong></p>
+    <a class="link small" style="display:inline-block;padding:0 0 16px" routerLink="/help">New here? How to play</a>
 
     <!-- A match in progress is shown by the bar at the top of every screen, so it is not repeated here. -->
 
@@ -38,13 +39,13 @@
           </div>
           <p class="hero-note">
             @if ((main()?.waiting ?? 0) > 0) {
-              <span class="live-dot"></span>{{ main()!.waiting }} {{ main()!.waiting === 1 ? 'player is' : 'players are' }} playing now
+              <span class="live-dot"></span>{{ main()!.waiting }} {{ main()!.waiting === 1 ? 'player is' : 'players are' }} waiting for an opponent
             } @else {
               Take turns shooting and saving. About two minutes.
             }
           </p>
           <button class="btn btn-primary btn-play btn-block" [disabled]="!!heroBusy()" (click)="playNow()">
-            @if (heroBusy() === 'play') { <mat-spinner diameter="24" /> } @else { Play now }
+            @if (heroBusy() === 'play') { <mat-spinner diameter="24" /> } @else { Set up a match }
           </button>
           <button class="btn btn-block" [disabled]="!!heroBusy()" (click)="inviteFriend()">
             @if (heroBusy() === 'invite') { <mat-spinner diameter="20" /> } @else { <mat-icon>share</mat-icon> Challenge a friend }

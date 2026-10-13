@@ -33,8 +33,8 @@ const LABELS: Record<string, string> = {
             <h3>Platform fee</h3>
             <p class="muted small">{{ desc('platform_fee_percent') }}</p>
             <div class="fee-row">
-              <input type="range" min="0" max="50" step="0.5" [(ngModel)]="fee" (ngModelChange)="feeSig.set(+$event || 0)" />
-              <div class="num-in"><input type="number" min="0" max="50" step="0.5" [(ngModel)]="fee" (ngModelChange)="feeSig.set(+$event || 0)" /><span>%</span></div>
+              <input type="range" aria-label="Platform fee percentage" min="0" max="50" step="0.5" [(ngModel)]="fee" (ngModelChange)="feeSig.set(+$event || 0)" />
+              <div class="num-in"><input type="number" aria-label="Platform fee percentage" min="0" max="50" step="0.5" [(ngModel)]="fee" (ngModelChange)="feeSig.set(+$event || 0)" /><span>%</span></div>
             </div>
             <div class="preview">
               <div class="row-between muted small"><span>Example: two players stake P20</span></div>
@@ -51,14 +51,14 @@ const LABELS: Record<string, string> = {
             <div class="chips">
               @for (s of stakes; track s) { <span class="stake-chip money">{{ s | money }} <button (click)="removeStake(s)" aria-label="Remove">×</button></span> }
             </div>
-            <div class="add"><input type="number" min="1" [(ngModel)]="newStake" placeholder="Add amount" (keydown.enter)="addStake()" /><button class="btn btn-sm" (click)="addStake()">Add</button></div>
+            <div class="add"><input type="number" aria-label="New demo entry amount" min="1" [(ngModel)]="newStake" placeholder="Add amount" (keydown.enter)="addStake()" /><button class="btn btn-sm" (click)="addStake()">Add</button></div>
             <button class="btn btn-primary" [disabled]="saving() === 'stakes' || stakes.length === 0" (click)="save('stakes', { stake_amounts: stakes })">Save stakes</button>
           </section>
 
           <section class="card">
             <h3>Deposit presets</h3>
             <p class="muted small">{{ desc('deposit_presets') }}</p>
-            <input class="text-in" [(ngModel)]="presetsText" placeholder="10, 20, 50" />
+            <input class="text-in" aria-label="Demo deposit presets" [(ngModel)]="presetsText" placeholder="10, 20, 50" />
             <button class="btn btn-primary" [disabled]="saving() === 'presets'" (click)="savePresets()">Save presets</button>
           </section>
 

@@ -23,6 +23,16 @@ export const config = {
   port: num('PORT', 3000),
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:4200').split(',').map((s) => s.trim()).filter(Boolean),
   publicBaseUrl: process.env.PUBLIC_BASE_URL || '',
+  supportEmail: process.env.SUPPORT_EMAIL || '',
+  recovery: {
+    baseUrl: process.env.PUBLIC_BASE_URL || (process.env.CORS_ORIGINS || 'http://localhost:4200').split(',')[0].trim(),
+    host: process.env.SMTP_HOST || '',
+    port: num('SMTP_PORT', 587),
+    secure: process.env.SMTP_SECURE === 'true',
+    user: process.env.SMTP_USER || '',
+    password: process.env.SMTP_PASSWORD || '',
+    from: process.env.SMTP_FROM || '',
+  },
   db: {
     host: process.env.DB_HOST || '127.0.0.1',
     port: num('DB_PORT', 3306),

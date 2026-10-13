@@ -20,7 +20,11 @@
           <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" aria-label="Search for a player by username" autocomplete="off" autofocus />
           @if (searching()) { <mat-spinner diameter="20" /> }
         </div>
-        @if (query.trim().length > 0 && !searching() && results().length === 0) {
+        @if (searchError()) {
+          <app-load-error [message]="searchError()" (retry)="retrySearch()" />
+        } @else if (searching()) {
+          <p class="muted small" role="status">Searching for players…</p>
+        } @else if (query.trim().length > 0 && results().length === 0) {
           <app-empty icon="person_search" title="No players found" [text]="'No one matches &quot;' + query + '&quot;.'" />
         } @else {
           <div class="result-list">
@@ -47,8 +51,12 @@
       <div class="screen-body">
         <h1>Choose a game</h1>
         <p class="sub">Challenging {{ opponent()?.username }}</p>
-        @if (!games()) {
+        @if (gamesError()) {
+          <app-load-error [message]="gamesError()" (retry)="loadGames()" />
+        } @else if (!games()) {
           <app-spinner />
+        } @else if (games()!.length === 0) {
+          <app-empty icon="sports_esports" title="No games available" text="Try again in a little while." />
         } @else {
           <div class="game-list">
             @for (g of games(); track g.id) {

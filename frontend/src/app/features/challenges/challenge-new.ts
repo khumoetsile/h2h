@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { Subject, debounceTime, distinctUntilChanged } from 'rxjs';
+import { Subject, debounceTime } from 'rxjs';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
 import { AuthService } from '../../core/auth.service';
@@ -12,7 +12,7 @@ import { ConfigStore } from '../../core/config.store';
 import { Challenge, Game, PlayerSearchResult } from '../../core/models';
 import { Toast } from '../../core/toast.service';
 import { MoneyPipe } from '../../shared/pipes';
-import { Avatar, EmptyState, GameIcon, Spinner } from '../../shared/ui';
+import { Avatar, EmptyState, GameIcon, Spinner, LoadError } from '../../shared/ui';
 
 type Step = 'player' | 'game' | 'stake' | 'review';
 const ORDER: Step[] = ['player', 'game', 'stake', 'review'];
@@ -25,7 +25,7 @@ const ORDER: Step[] = ['player', 'game', 'stake', 'review'];
  */
 @Component({
   selector: 'app-challenge-new',
-  imports: [FormsModule, RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, EmptyState, GameIcon, Spinner],
+  imports: [FormsModule, RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, EmptyState, GameIcon, Spinner, LoadError],
   templateUrl: './challenge-new.html',
   styleUrl: './challenge-new.scss',
 })
@@ -50,7 +50,10 @@ export class ChallengeNewPage {
   protected searching = signal(false);
   protected sending = signal(false);
   protected formError = signal('');
-  private search$ = new Subject<string>();
+  protected searchError = signal('');
+  protected gamesError = signal('');
+  private searchVersion = 0;
+  private search$ = new Subject<{query:string;version:number}>();
 
   protected available = computed(() => this.auth.wallet()?.available ?? 0);
   protected stakes = computed(() => this.configStore.config()?.stakeBreakdown ?? []);
@@ -64,7 +67,7 @@ export class ChallengeNewPage {
     const stake = qp.get('stake') ? Number(qp.get('stake')) : null;
     const opponentName = qp.get('opponent');
 
-    this.search$.pipe(debounceTime(250), distinctUntilChanged(), takeUntilDestroyed(this.destroyRef)).subscribe((q) => this.doSearch(q));
+    this.search$.pipe(debounceTime(250), takeUntilDestroyed(this.destroyRef)).subscribe((q) => this.doSearch(q.query,q.version));
 
     (async () => {
       if (opponentName) {
@@ -72,13 +75,15 @@ export class ChallengeNewPage {
           const r = await this.api.get<{ users: PlayerSearchResult[] }>('/users/search', { q: opponentName });
           const exact = r.users.find((u) => u.username.toLowerCase() === opponentName.toLowerCase());
           if (exact) this.opponent.set(exact);
-        } catch { /* they can still search manually */ }
+        } catch (err) { this.searchError.set(apiError(err).message); }
       }
       if (gameId) {
-        const games = this.games() ?? (await this.api.get<{ games: Game[] }>('/games')).games;
-        this.games.set(games);
-        const g = games.find((x) => x.id === gameId);
-        if (g) this.game.set(g);
+        try {
+          const games = this.games() ?? (await this.api.get<{ games: Game[] }>('/games')).games;
+          this.games.set(games);
+          const g = games.find((x) => x.id === gameId);
+          if (g) this.game.set(g);
+        } catch (err) { this.gamesError.set(apiError(err).message); }
       }
       if (stake && this.stakes().some((s) => s.stake === stake)) this.stake.set(stake);
       this.advanceToFirstUnanswered();
@@ -93,29 +98,39 @@ export class ChallengeNewPage {
   }
 
   async loadGames() {
+    this.gamesError.set('');
     try {
       const games = await this.api.get<{ games: Game[] }>('/games');
       this.games.set(games.games);
-    } catch { /* game step shows its own retry via empty state */ }
+    } catch (err) { this.gamesError.set(apiError(err).message); }
   }
 
   // ---- Step 1: player --------------------------------------------------
   onQuery(q: string) {
     if (this.opponent() && q === `@${this.opponent()!.username}`) return;
     this.opponent.set(null);
-    this.search$.next(q.trim());
+    this.results.set([]);
+    this.searchError.set('');
+    this.searching.set(!!q.trim());
+    this.search$.next({query:q.trim(),version:++this.searchVersion});
   }
 
-  private async doSearch(q: string) {
-    if (!q) { this.results.set([]); return; }
+  retrySearch() { return this.doSearch(this.query.trim(),++this.searchVersion); }
+  private async doSearch(q: string, version:number) {
+    if(version !== this.searchVersion) return;
+    if (!q) { this.results.set([]); this.searching.set(false); return; }
+    this.searchError.set('');
     this.searching.set(true);
     try {
-      this.results.set((await this.api.get<{ users: PlayerSearchResult[] }>('/users/search', { q })).users);
-    } catch { this.results.set([]); }
-    this.searching.set(false);
+      const r=await this.api.get<{users:PlayerSearchResult[]}>('/users/search',{q});
+      if(version === this.searchVersion) this.results.set(r.users);
+    } catch(err) { if(version === this.searchVersion) {this.results.set([]);this.searchError.set(apiError(err).message);} }
+    finally { if(version === this.searchVersion) this.searching.set(false); }
   }
 
   pick(u: PlayerSearchResult) {
+    ++this.searchVersion;
+    this.searching.set(false);
     this.opponent.set(u);
     this.query = `@${u.username}`;
     this.results.set([]);

@@ -25,8 +25,8 @@ export const adminGuard: CanActivateFn = () => {
   return inject(Router).parseUrl(auth.isLoggedIn() ? '/dashboard' : '/login');
 };
 
-export const playerGuard: CanActivateFn = () => {
+export const playerGuard: CanActivateFn = (_route,state) => {
   const auth = inject(AuthService);
-  if (!auth.isLoggedIn()) return inject(Router).parseUrl('/login');
+  if (!auth.isLoggedIn()) return inject(Router).createUrlTree(['/login'],{queryParams:{next:state.url}});
   return auth.isAdmin() ? inject(Router).parseUrl('/admin') : true;
 };

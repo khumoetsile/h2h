@@ -40,7 +40,7 @@ export function roomPhase(m: MatchView): RoomPhase {
       <app-game-icon [slug]="m.game.slug" [color]="m.game.accentColor" [size]="48" />
       <div class="grow">
         <h1>{{ m.game.name }}</h1>
-        <p class="muted">Stake <span class="money">{{ m.stake | money }}</span> · Win <strong class="money accent">{{ m.prize | money }}</strong></p>
+        <p class="muted">Demo entry <span class="money">{{ m.stake | money }}</span> · Prize <strong class="money accent">{{ m.prize | money }}</strong></p>
       </div>
     </header>
 
@@ -55,7 +55,8 @@ export function roomPhase(m: MatchView): RoomPhase {
           } @else {
             <h2>Looking for an opponent</h2>
             <p class="elapsed" role="timer">{{ elapsedText() }}</p>
-            <p class="text-2">We will keep looking for up to 5 minutes. If nobody joins, you will play a practice match.</p>
+            <p class="text-2">Keep this room open. You can choose a bot below or leave for free. We will never switch you to a bot automatically.</p>
+            <p class="muted small">Time to find an opponent: <app-countdown [deadline]="m.timers.acceptanceDeadline" [icon]="false" (expired)="expired.emit()" /></p>
           }
           <app-get-app variant="waiting" [who]="m.source === 'DIRECT' ? 'your friend' : null" />
           @if (config.config()?.demoBotsEnabled) {
@@ -63,6 +64,7 @@ export function roomPhase(m: MatchView): RoomPhase {
               @if (busy() === 'bot') { <mat-spinner diameter="22" /> } @else { <mat-icon>smart_toy</mat-icon> }
               {{ offerPractice() ? 'No one yet? Play a practice match' : 'Play a practice match instead' }}
             </button>
+            <p class="muted small">Practice uses this demo entry and prize. Starting against a bot makes both players ready.</p>
           }
           <button class="btn btn-ghost btn-block" [disabled]="!!busy()" (click)="leave.emit()">Cancel</button>
           <p class="muted tiny">Your {{ m.stake | money }} is returned in full if nobody joins. Once a match has started, leaving it costs {{ config.abandonmentFee() }}.</p>
@@ -78,7 +80,7 @@ export function roomPhase(m: MatchView): RoomPhase {
           </div>
           <h2>{{ opponent()?.username }} is here</h2>
           @if (manualReady()) {
-            <p class="text-2">Tap ready to start.</p>
+            <p class="text-2">Tap ready when you are ready to play. After both players are ready, leaving costs {{ config.abandonmentFee() }} in demo funds.</p>
             <button class="btn btn-primary btn-play btn-block" [disabled]="!!busy()" (click)="ready.emit()">
               @if (busy() === 'lock') { <mat-spinner diameter="22" /> } @else { I'm ready }
             </button>

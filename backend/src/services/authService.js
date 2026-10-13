@@ -189,5 +189,6 @@ export async function changePassword(userId, currentPassword, newPassword) {
   const user = await queryOne('SELECT password_hash FROM users WHERE id = ?', [userId]);
   if (!(await bcrypt.compare(currentPassword, user.password_hash))) throw badRequest('INVALID_PASSWORD', 'Your current password is incorrect.', { fields: { currentPassword: 'Incorrect password.' } });
   await query('UPDATE users SET password_hash = ? WHERE id = ?', [await bcrypt.hash(newPassword, BCRYPT_ROUNDS), userId]);
+  await query('DELETE FROM password_reset_tokens WHERE user_id = ?', [userId]);
   await recordAudit(null, { actorType: 'PLAYER', actorUserId: userId, action: 'PASSWORD_CHANGED', entityType: 'USER', entityId: userId });
 }

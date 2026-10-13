@@ -1,7 +1,13 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { apiError } from './api-error';
+import { TimeoutError } from 'rxjs';
 
 describe('apiError', () => {
+  it('gives safe instructions after a timed-out action',()=>{
+    const error=apiError(new TimeoutError());
+    expect(error.code).toBe('TIMEOUT');
+    expect(error.message).toContain('check your activity before trying again');
+  });
   it('explains connection failures without asking players to troubleshoot the API', () => {
     const error = apiError(new HttpErrorResponse({ status: 0 }));
     expect(error.code).toBe('NETWORK');

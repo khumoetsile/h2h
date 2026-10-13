@@ -225,8 +225,8 @@
 </div>
 
 @if (leaveOpen() && match(); as m) {
-  <div class="confirm-backdrop" (click)="closeLeave()">
-    <div class="confirm-card" role="dialog" aria-modal="true" aria-labelledby="leave-title" (click)="$event.stopPropagation()">
+  <div class="confirm-backdrop" (click)="closeLeave()" (keydown.escape)="closeLeave()">
+    <div class="confirm-card" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" role="dialog" aria-modal="true" aria-labelledby="leave-title" (click)="$event.stopPropagation()">
       @if (isLocked()) {
         <h2 id="leave-title">Leave challenge?</h2>
         <p class="text-2">You are already locked into this 1v1 challenge.</p>

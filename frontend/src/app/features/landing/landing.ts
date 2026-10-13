@@ -29,8 +29,9 @@ import { PitchArt } from '../../shared/pitch-art';
           @if (busy()) { <mat-spinner diameter="24" /> } @else { Play now }
         </button>
         @if (error()) { <p class="form-error">{{ error() }}</p> }
-        <p class="muted small">No sign-up. You start with {{ bonus() }} in demo funds.</p>
+        <p class="muted small">No sign-up. Start with {{ bonus() }} in demo funds and review your entry before playing.</p>
         <a class="link" routerLink="/login">I already have an account</a>
+        <a class="link" routerLink="/help">How to play &amp; help</a>
       </div>
     </main>
   `,

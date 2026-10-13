@@ -1,5 +1,7 @@
 # Head2Head — peer-to-peer competitive gaming (prototype)
 
+Usability updates, password-recovery setup and the proposed friends-league feature are documented in [UX readiness](docs/UX-READINESS.md).
+
 > ⚠️ **DEMO MODE — ALL MONEY IS SIMULATED.**
 > Deposits, stakes, winnings, fees and withdrawals use **demo funds only**. No payment
 > provider (DPO, Orange Money, MyZaka, Mascom, FNB, Visa, Mastercard, PayPal, Stripe or any
