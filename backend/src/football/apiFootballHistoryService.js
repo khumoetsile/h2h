@@ -14,6 +14,14 @@ const reviewed={
   'AFC Bournemouth':['Bournemouth','England'],'Nottingham Forest FC':['Nottingham Forest','England'],
   'West Ham United FC':['West Ham','England'],'Wolverhampton Wanderers FC':['Wolves','England'],
   'Leicester City FC':['Leicester','England'],'Southampton FC':['Southampton','England'],
+  'Feyenoord Rotterdam':['Feyenoord','Netherlands'],'Como 1907':['Como','Italy'],
+  'FK Shakhtar Donetsk':['Shakhtar Donetsk','Ukraine'],'ŠK Slovan Bratislava':['Slovan Bratislava','Slovakia'],
+  'FC Bayern München':['Bayern München','Germany'],'Real Madrid CF':['Real Madrid','Spain'],
+  'FC Barcelona':['Barcelona','Spain'],'Club Atlético de Madrid':['Atletico Madrid','Spain'],
+  'FC Internazionale Milano':['Inter','Italy'],'Juventus FC':['Juventus','Italy'],
+  'Paris Saint-Germain FC':['Paris Saint Germain','France'],'Sporting Clube de Portugal':['Sporting CP','Portugal'],
+  'SL Benfica':['Benfica','Portugal'],'AFC Ajax':['Ajax','Netherlands'],
+  'GNK Dinamo Zagreb':['Dinamo Zagreb','Croatia'],'FC København':['FC Copenhagen','Denmark'],
 };
 export function selectApiFootballTeam(team,rows,country){
   const [name,expectedCountry]=reviewed[team.name]||[team.name,country];

@@ -77,3 +77,5 @@ Completed regulation-time (FT) matches are imported with original provider fixtu
 API-Football is a commercial API source, not CC0; source attribution says “API-Football terms”. Its terms allow application development but do not grant third-party competition publication rights and prohibit direct data resale: https://www.api-football.com/terms . Plan coverage and any applicable publication rights remain the operator's responsibility. No paid subscription or additional commercial rights were purchased.
 
 Shared cPanel hosting: set DB_POOL_CONNECTION_LIMIT below the account's MySQL connection cap. Production uses six app connections; excess idle connections expire after 30 seconds to leave room for research imports. CI also runs the backend suite with a six-connection pool.
+
+API-Football team search only permits ASCII alphanumeric text and spaces. Discovery queries strip diacritics/punctuation, but returned identities are still checked against the exact reviewed name and country. Expected search/plan coverage gaps are logged for review; exhausted quotas stop a run without erasing existing data. Authentication, network and database failures still fail the job.

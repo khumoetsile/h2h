@@ -15,17 +15,28 @@ export class ApiFootballProvider extends FootballDataProvider {
     const delay=this.lastRequest+this.intervalMs-Date.now();if(delay>0)await new Promise(r=>setTimeout(r,delay));
     await this.reserveRequest();this.lastRequest=Date.now();
     const response=await this.fetcher(url,{headers:{'x-apisports-key':this.apiKey},redirect:'error',signal:AbortSignal.timeout(15000)});
-    if(!response.ok)throw new Error(`API-Football HTTP ${response.status}; retry on the next scheduled import.`);
+    if(!response.ok){const error=new Error(`API-Football HTTP ${response.status}; retry on the next scheduled import.`);if(response.status===429)error.code='API_QUOTA';throw error;}
     const remaining=response.headers.get('x-ratelimit-requests-remaining');
     if(remaining!==null&&Number.isFinite(Number(remaining)))this.remainingDaily=Number(remaining);
     let size=0;const chunks=[];
     for await(const chunk of response.body){size+=chunk.length;if(size>2_000_000)throw new Error('API-Football response exceeds the size limit.');chunks.push(chunk);}
     const data=JSON.parse(Buffer.concat(chunks).toString('utf8'));
-    if(data.errors && Object.keys(data.errors).length)throw new Error('API-Football rejected this request (quota, subscription or parameters).');
+    if(data.errors && Object.keys(data.errors).length){
+      const fields=Object.keys(data.errors).map(k=>k.replace(/[^a-zA-Z0-9_-]/g,'').slice(0,30));
+      const error=new Error(`API-Football rejected this request (${fields.join(', ')}).`);
+      error.code=fields.some(k=>/requests|rateLimit/i.test(k))?'API_QUOTA':fields.includes('search')?'API_SEARCH_REJECTED':fields.some(k=>/plan|season|access/i.test(k))?'API_COVERAGE':'API_REJECTED';
+      throw error;
+    }
     if(!Array.isArray(data.response)||Number(data.paging?.total||1)>1)throw new Error('API-Football returned incomplete or invalid history.');
     return data.response;
   }
-  teams(name){return this.get('/teams',{search:name});}
+  teams(name){
+    // The API requires ASCII search text. This broadens discovery only;
+    // club identity still requires exact reviewed name/country verification.
+    const search=name.normalize('NFD').replace(/\p{M}/gu,'').replace(/[^a-zA-Z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+    if(search.length<3)throw new Error('No unique verified API-Football identity: search name is too short.');
+    return this.get('/teams',{search});
+  }
   headToHead(a,b){return this.get('/fixtures/headtohead',{h2h:`${a}-${b}`});}
   statistics(id){return this.get('/fixtures/statistics',{fixture:id});}
 }

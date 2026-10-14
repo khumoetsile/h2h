@@ -23,8 +23,8 @@ try{
       try{const result=await importApiFootballFixture(row.id,{force:options.force!==undefined,provider});console.log(JSON.stringify({fixture:row.id,...result}));if(!result.skipped)handled++;}
       catch(err){
         console.error(`Fixture ${row.id}: ${err.message}`);handled++;
-        if(err.message.includes('budget reached'))break;
-        if(!err.message.includes('unique verified')){failed=true;failures++;if(failures>=3)break;}
+        if(err.message.includes('budget reached')||err.code==='API_QUOTA')break;
+        if(!err.message.includes('unique verified')&&!['API_SEARCH_REJECTED','API_COVERAGE'].includes(err.code)){failed=true;failures++;if(failures>=3)break;}
       }
       if(handled>=limit)break;
     }

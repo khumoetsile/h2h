@@ -31,6 +31,12 @@ test('club matching keeps countries and youth/women clubs distinct; missing stat
   const stats=normalizeApiFootballStatistics([{team:{id:40},statistics:[{type:'Ball Possession',value:'64%'},{type:'Corner Kicks',value:0}]}],1026,40);
   assert.deepEqual(stats.possession,[null,64]);assert.deepEqual(stats.corners,[null,0]);assert.deepEqual(stats.shots,[null,null]);
 });
+test('ASCII discovery preserves exact accented club identity and distinguishes coverage/quota errors',async()=>{
+  let search;const p=new ApiFootballProvider({apiKey:'test-only',intervalMs:0,fetcher:async url=>{search=url.searchParams.get('search');return new Response(JSON.stringify({errors:[],response:[{team:{id:157,name:'Bayern München',country:'Germany'}}]}));}});
+  const rows=await p.teams('Bayern München');assert.equal(search,'Bayern Munchen');assert.equal(selectApiFootballTeam({name:'FC Bayern München'},rows,null).id,157);
+  p.fetcher=async()=>new Response(JSON.stringify({errors:{search:'Invalid characters'},response:[]}));await assert.rejects(()=>p.teams('Club'),e=>e.code==='API_SEARCH_REJECTED');
+  p.fetcher=async()=>new Response(JSON.stringify({errors:{requests:'Quota exhausted'},response:[]}));await assert.rejects(()=>p.headToHead(1,2),e=>e.code==='API_QUOTA');
+});
 test('history import reuses local clubs, handles cross-competition meetings, corrections, empty/outage responses and daily caching',async()=>{
   const c=await query("INSERT INTO football_competitions(provider,provider_competition_id,code,name,country) VALUES('football-data','api-test','CL','UEFA Champions League','Europe')");
   const h=await query("INSERT INTO football_teams(provider,provider_team_id,name) VALUES('football-data','api-test-lask','LASK Linz')");const a=await query("INSERT INTO football_teams(provider,provider_team_id,name) VALUES('football-data','api-test-liverpool','Liverpool FC')");
