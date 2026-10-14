@@ -4,7 +4,7 @@ This extends the existing Angular football pages, Express API, MySQL fixture lif
 
 ## User experience
 
-- `/football/research`: search two stable internal team IDs, swap them, and share the resulting URL. Compare teams without an upcoming fixture. Separate recent form and direct meetings, 5/10/20 samples, all available meetings, competition, season and venue filters. Changing filters retains the current analysis section.
+- `/football/research`: search two stable internal team IDs, swap them, and copy a shareable URL with the selected filters. Compare teams without an upcoming fixture. Separate recent form and direct meetings, 5/10/20 samples, all available meetings, competition, season and venue filters. Changing filters retains the current analysis section.
 - `/football/:id`: history, form, venue breakdowns and responsive goal charts remain on the match page. Meeting sample controls are collapsed. Upcoming real fixtures also show Statistical Model, up to four real observations under “Why this prediction?”, Community Picks and a model/community comparison. Charts show scored, conceded and total goals; readable values are available without interpreting bars.
 - `/football/predictions`: private personal history and separate public free-pick rankings. Guests can view analysis/community counts and sign in to save. Empty counts and rankings are real empty states.
 - `/football/predictions/methodology`: public method, coverage limitations and chronological validation reports.
@@ -34,6 +34,22 @@ Four seasons per league (2023–24 through available 2026–27), plus verified c
 | FL1 | 372 / 400 | 0.972730 / 1.026214 | 0.578631 / 0.619406 | 0.036708 | Passed | Both |
 
 Production training independently recalculates these gates from production records; its current reports are available on the methodology page. Brier here sums squared errors across three outcomes; binary market Brier uses the conventional single-event score. Calibration is pooled over all outcome classes, with bin counts retained for inspection. No statistical-significance claim is made. Model parameters and thresholds are fixed; this initial evaluation is not an independent prospective trial.
+
+### Production verification, 14 October 2026
+
+[Deployment](https://github.com/khumoetsile/h2h/actions/runs/38532993029) and the [first production validation job](https://github.com/khumoetsile/h2h/actions/runs/38533354573) succeeded. Migration 021 is installed. Five stored league runs produced **126 immutable upcoming forecasts**; the database contained **zero community picks** and no completed forward evaluations at verification. Live fixture 14 returned a real forecast with percentages summing to 100%; fixture 31 retained its imported LASK–Liverpool meetings and the unsupported-competition model state.
+
+Production evaluates a different canonical set of stored archive/provider records than the isolated local dataset. Each league attempted 400 fixtures, with 1,844 eligible evaluations in total:
+
+| League | Evaluated | Model / baseline log loss | Model / baseline Brier | Calibration error | Published goal markets |
+|---|---:|---:|---:|---:|---|
+| Premier League | 373 | 1.005493 / 1.064447 | 0.600712 / 0.644247 | 0.025748 | BTTS |
+| Bundesliga | 366 | 0.982244 / 1.074698 | 0.583013 / 0.651026 | 0.031118 | Over/under 2.5 |
+| La Liga | 363 | 0.960950 / 1.026605 | 0.568138 / 0.617106 | 0.035378 | Over/under 2.5 |
+| Serie A | 372 | 0.960760 / 1.052293 | 0.568883 / 0.637748 | 0.063102 | BTTS |
+| Ligue 1 | 370 | 0.973448 / 1.025378 | 0.579033 / 0.618668 | 0.040114 | Both |
+
+All core league gates passed. In particular, La Liga BTTS passes in the local dataset but fails in production and remains hidden there. Live reports always govern publication. No production vote or challenge was submitted for QA.
 
 Limitations: retrospectively corrected source records rather than historical feed vintages; incomplete seasons and conditional coverage; no injuries, lineups, player strength, low-score correlation correction or guaranteed results. New/promoted teams may abstain. A pre-match league fit expires after seven days. The independent Poisson baseline is not a reproduction of [Dixon–Coles](https://doi.org/10.1111/1467-9876.00065). Predictions are statistical estimates, not betting advice.
 
@@ -80,7 +96,7 @@ From `frontend`: `npm ci`, `npm start`, `npm test -- --watch=false`, `npm run bu
 
 Verified during implementation: 224 backend tests, 87 frontend tests and production build passed; new tests cover probability rounding, future/embargo leakage, sparse-team abstention, chronological metrics, public/private access, duplicate concurrent writes, changing picks, a request blocked until after kickoff, void/postponed results, accuracy/ranking minimums, snapshot immutability, user identity races and retaining the analysis section across filters. Existing PvP/wallet end-to-end tests remain included. Browser QA covers 320, 375, 390, 768 and 1440 px; search, swapping, season filters, twenty-match charts, real-model and unsupported-cup states, guest sign-in, saving/changing a local-only free pick, history and zero-rankings. No horizontal overflow; pick targets 70 px and sample controls at least 44 px. Warm local prediction responses measured 9–11 ms with a roughly 1.5 KB payload; production latency depends on hosting.
 
-Model training does not run in page requests. Forecast fits cache for 60 seconds; historical analysis reuses the existing research cache. Upcoming community counts refresh every 30 seconds only while visible. New pages load through existing lazy routes; no chart library, AI SDK or extra package was added.
+Model training does not run in page requests. Forecast fits cache for 60 seconds; an existing snapshot from the current validated run is reused without another write; historical analysis reuses the existing research cache. Upcoming community counts refresh every 30 seconds only while visible. New pages load through existing lazy routes; no chart library, AI SDK or extra package was added.
 
 ## Changed implementation files
 

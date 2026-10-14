@@ -163,6 +163,7 @@ export async function modelPredictionForFixture(id) {
     return unavailable("The league model needs a fresh calculation.");
   if (new Date(run.data_cutoff) >= new Date(f.kickoff_at))
     return unavailable("A suitable pre-match data cutoff is unavailable.");
+  if (existing?.model_run_id === run.id) return snapshotView(existing);
   const p = predictGoals(run.fit, f.home_team_id, f.away_team_id);
   if (p.status !== "READY") return unavailable(p.reason);
   const details = {

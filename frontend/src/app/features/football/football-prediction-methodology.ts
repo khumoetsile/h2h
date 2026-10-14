@@ -42,7 +42,7 @@ import { PredictionMethodology } from '../../core/football-predictions';
         @for (r of d.reports; track r.competition_code) {
           <article class="validation">
             <div>
-              <strong>{{ r.competition_code }}</strong
+              <strong>{{ leagueNames[r.competition_code] || r.competition_code }}</strong
               ><span>{{
                 r.evaluation.validated ? 'Validation passed' : 'Numerical estimates withheld'
               }}</span>
@@ -178,6 +178,7 @@ import { PredictionMethodology } from '../../core/football-predictions';
   ],
 })
 export class FootballPredictionMethodologyPage {
+  protected leagueNames: Record<string, string> = { PL: 'Premier League', BL1: 'Bundesliga', PD: 'La Liga', SA: 'Serie A', FL1: 'Ligue 1' };
   private api = inject(Api);
   protected data = signal<PredictionMethodology | null>(null);
   protected error = signal('');

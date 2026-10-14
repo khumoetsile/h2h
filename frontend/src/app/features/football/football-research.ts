@@ -21,11 +21,12 @@ export class FootballResearchPage {
   protected competitions=signal<FootballCompetition[]>([]);
   protected venue=signal<'all'|'home'|'away'>('all');protected competitionId=signal<number|null>(null);protected dateFrom=signal('');protected dateTo=signal('');
   protected seasons=signal<string[]>([]);protected season=signal('');
+  protected copied=signal(false);protected copyFallback=signal('');
   constructor(){this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroy)).subscribe(()=>void this.load());}
   async load(force=false){
     const version=++this.version;const query=this.route.snapshot.queryParamMap;const filters=researchFilters(query);
     this.venue.set(filters?.venue??'all');this.competitionId.set(filters?.competitionId??null);this.dateFrom.set(filters?.dateFrom??query.get('dateFrom')??'');this.dateTo.set(filters?.dateTo??query.get('dateTo')??'');
-    this.error.set('');this.season.set(filters?.season??'');
+    this.error.set('');this.copied.set(false);this.copyFallback.set('');this.season.set(filters?.season??'');
     const previous=this.data();
     if(!previous||previous.teamA.id!==filters?.teamA||previous.teamB.id!==filters?.teamB)this.data.set(null);
     const a=Number(query.get('teamA')),b=Number(query.get('teamB'));
@@ -45,6 +46,7 @@ export class FootballResearchPage {
   }
   pick(which:'A'|'B',team:ResearchTeam){if(which==='A')this.teamA.set(team);else this.teamB.set(team);this.persist();}
   protected swap(){const a=this.teamA();this.teamA.set(this.teamB());this.teamB.set(a);this.persist();}
+  protected async copyLink(){const link=new URL(this.router.url,window.location.origin).href;try{await navigator.clipboard.writeText(link);this.copied.set(true);}catch{this.copyFallback.set(link);}}
   protected changeVenue(venue:'all'|'home'|'away'){this.venue.set(venue);this.persist();}
   protected filterCompetition(value:string){this.competitionId.set(value?Number(value):null);this.persist();}
   protected filterSeason(value:string){this.season.set(value);this.persist();}
