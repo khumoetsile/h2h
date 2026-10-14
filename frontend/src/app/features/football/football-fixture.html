@@ -47,10 +47,11 @@
           @if (refreshError()) { <p class="refresh-error" role="status">{{ refreshError() }}</p> }
         </div>
 
+        <app-football-predictions [fixtureId]="f.id"/>
         <section class="fixture-research" aria-label="Past meetings and recent form">
           @if(researchError()){<app-load-error [message]="researchError()" (retry)="loadResearch(true)"/>}
-          @else if(researchLoading()){<div class="insights-skeleton" role="status" aria-label="Loading past meetings"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
-          @else if(researchData();as data){<app-football-research-results [data]="data" [inlineHistory]="true"/>}
+          @else if(researchLoading()&&!researchData()){<div class="insights-skeleton" role="status" aria-label="Loading past meetings"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
+          @else if(researchData();as data){<app-football-research-results [data]="data" [inlineHistory]="true" [busy]="researchLoading()" (sampleChange)="changeResearchSample($event)"/>}
         </section>
         @if (f.status === 'LIVE' || f.status === 'FINISHED') {
           <section class="card pulse-card" aria-labelledby="pulse-title">
@@ -170,7 +171,7 @@
           }
 
           @if (!auth.isLoggedIn()) {
-            <div class="card notice">
+            <div class="card notice" id="pvp-challenge" tabindex="-1">
               <mat-icon>person_outline</mat-icon>
               <div>
                 <strong>Want to challenge someone on this match?</strong>
@@ -181,7 +182,7 @@
             </div>
           } @else {
           <div class="card how">
-            <h3>Choose a question</h3>
+            <h3 id="pvp-challenge" tabindex="-1">Choose a question</h3>
             <div class="type-list">
               @for (t of f.challengeTypes ?? []; track t.id) {
                 <button class="type-row" [class.selected]="type()?.id === t.id" (click)="chooseType(t)">

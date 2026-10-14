@@ -1,3 +1,4 @@
+import { FootballPredictions } from './football-predictions';
 import { Component, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
@@ -11,7 +12,7 @@ import { FootballTeamPicker } from './football-team-picker';
 import { FootballResearchResults } from './football-research-results';
 
 @Component({
-  selector:'app-football-research',imports:[FormsModule,RouterLink,LoadError,FootballTeamPicker,FootballResearchResults],templateUrl:'./football-research.html',styleUrl:'./football-research.scss',
+  selector:'app-football-research',imports:[FormsModule,RouterLink,LoadError,FootballTeamPicker,FootballResearchResults,FootballPredictions],templateUrl:'./football-research.html',styleUrl:'./football-research.scss',
 })
 export class FootballResearchPage {
   private store=inject(FootballResearchStore);private route=inject(ActivatedRoute);private router=inject(Router);private destroy=inject(DestroyRef);private seo=inject(SeoService);private version=0;
@@ -26,7 +27,7 @@ export class FootballResearchPage {
     this.venue.set(filters?.venue??'all');this.competitionId.set(filters?.competitionId??null);this.dateFrom.set(filters?.dateFrom??query.get('dateFrom')??'');this.dateTo.set(filters?.dateTo??query.get('dateTo')??'');
     this.error.set('');this.season.set(filters?.season??'');
     const previous=this.data();
-    if(!previous||previous.teamA.id!==filters?.teamA||previous.teamB.id!==filters?.teamB||previous.filters.venue!==filters?.venue||previous.filters.competitionId!==filters?.competitionId||previous.filters.dateFrom!==filters?.dateFrom||previous.filters.dateTo!==filters?.dateTo||previous.filters.season!==filters?.season)this.data.set(null);
+    if(!previous||previous.teamA.id!==filters?.teamA||previous.teamB.id!==filters?.teamB)this.data.set(null);
     const a=Number(query.get('teamA')),b=Number(query.get('teamB'));
     if(this.teamA()?.id!==a)this.teamA.set(null);if(this.teamB()?.id!==b)this.teamB.set(null);
     this.loading.set(!!filters);
@@ -47,11 +48,11 @@ export class FootballResearchPage {
   protected changeVenue(venue:'all'|'home'|'away'){this.venue.set(venue);this.persist();}
   protected filterCompetition(value:string){this.competitionId.set(value?Number(value):null);this.persist();}
   protected filterSeason(value:string){this.season.set(value);this.persist();}
-  protected changeSample(sample:{meetings?:'5'|'10'|'all';form?:5|10}){void this.router.navigate([],{relativeTo:this.route,queryParams:sample,queryParamsHandling:'merge'});}
+  protected changeSample(sample:{meetings?:'5'|'10'|'20'|'all';form?:5|10|20}){void this.router.navigate([],{relativeTo:this.route,queryParams:sample,queryParamsHandling:'merge'});}
   protected filterDates(){if(this.dateFrom()&&this.dateTo()&&this.dateFrom()>this.dateTo()){this.formError.set('Choose an end date after the start date.');return;}this.formError.set('');this.persist();}
   protected clearFilters(){this.venue.set('all');this.competitionId.set(null);this.dateFrom.set('');this.dateTo.set('');this.season.set('');this.formError.set('');this.persist();}
   private persist(){
-    const version=++this.version;this.data.set(null);this.error.set('');
+    const version=++this.version;const previous=this.data();if(previous?.teamA.id!==this.teamA()?.id||previous?.teamB.id!==this.teamB()?.id)this.data.set(null);this.error.set('');
     void this.router.navigate([],{relativeTo:this.route,queryParams:{teamA:this.teamA()?.id??null,teamB:this.teamB()?.id??null,venue:this.venue()==='all'?null:this.venue(),competitionId:this.competitionId(),dateFrom:this.dateFrom()||null,dateTo:this.dateTo()||null,season:this.season()||null},queryParamsHandling:'merge'}).then(()=>{if(version===this.version)void this.load();});
   }
 }

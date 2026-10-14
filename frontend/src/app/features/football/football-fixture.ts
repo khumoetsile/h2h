@@ -1,3 +1,4 @@
+import { FootballPredictions } from './football-predictions';
 import { Component, DestroyRef, computed, inject, input, OnChanges, OnInit, SimpleChanges, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -33,7 +34,7 @@ import { FootballResearchResults } from './football-research-results';
  */
 @Component({
   selector: 'app-football-fixture',
-  imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet, FootballResearchResults],
+  imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet, FootballResearchResults, FootballPredictions],
   templateUrl: './football-fixture.html',
   styleUrls: ['./football-fixture.scss', './football-fixture-insights.scss'],
 })
@@ -191,11 +192,12 @@ export class FootballFixturePage implements OnInit,OnChanges {
     void this.load();
   }
 
+  protected changeResearchSample(sample:{meetings?:'5'|'10'|'20'|'all';form?:5|10|20}){void this.loadResearch(false,sample);}
   protected toggleResearch(){this.researchOpen.update(value=>!value);if(this.researchOpen()&&!this.researchData())void this.loadResearch();}
-  async loadResearch(force=false){
+  async loadResearch(force=false,sample:{meetings?:'5'|'10'|'20'|'all';form?:5|10|20}={}){
     const fixture=this.fixture();if(!fixture||this.researchLoading())return;
     this.researchLoading.set(true);this.researchError.set('');
-    try{const data=await this.researchStore.research({teamA:fixture.homeTeam.id,teamB:fixture.awayTeam.id,venue:'all'},force);if(this.fixture()?.id===fixture.id)this.researchData.set(data);}
+    try{const data=await this.researchStore.research({teamA:fixture.homeTeam.id,teamB:fixture.awayTeam.id,venue:'all',...this.researchData()?.filters,...sample},force);if(this.fixture()?.id===fixture.id)this.researchData.set(data);}
     catch(err){if(this.fixture()?.id===fixture.id)this.researchError.set(apiError(err).message);}
     finally{if(this.fixture()?.id===fixture.id)this.researchLoading.set(false);}
   }

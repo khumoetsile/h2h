@@ -13,8 +13,10 @@ import { listGames, mapGame } from '../services/gameService.js';
 import { notify } from '../services/notificationService.js';
 import { emitAll, emitToUser } from '../realtime.js';
 import { listAuditEvents, recordAudit } from '../services/auditService.js';
+import {modelAccuracyReport} from '../football/footballPredictionService.js';
 
 const router = Router();
+router.get('/football/predictions/evaluation',ah(async(_req,res)=>res.json(await modelAccuracyReport())));
 
 // Every privileged admin action is written to BOTH the original
 // `admin_audit_log` (kept for backward compatibility) AND the unified

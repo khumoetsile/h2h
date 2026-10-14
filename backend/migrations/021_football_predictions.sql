@@ -1,0 +1,50 @@
+CREATE TABLE football_prediction_model_runs (
+  id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  competition_code VARCHAR(10) NOT NULL,
+  model_version VARCHAR(40) NOT NULL,
+  data_hash CHAR(64) NOT NULL,
+  data_cutoff DATETIME NOT NULL,
+  fit JSON NOT NULL,
+  evaluation JSON NOT NULL,
+  created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_model_run(competition_code,model_version,data_hash),
+  KEY idx_model_latest(competition_code,model_version,created_at)
+) ENGINE=InnoDB;
+CREATE TABLE football_model_predictions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  fixture_id INT UNSIGNED NOT NULL,
+  model_run_id INT UNSIGNED NOT NULL,
+  model_version VARCHAR(40) NOT NULL,
+  predicted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  data_cutoff DATETIME NOT NULL,
+  kickoff_at DATETIME NOT NULL,
+  home_team_id INT UNSIGNED NOT NULL,
+  away_team_id INT UNSIGNED NOT NULL,
+  home_probability DECIMAL(12,10) NOT NULL,
+  draw_probability DECIMAL(12,10) NOT NULL,
+  away_probability DECIMAL(12,10) NOT NULL,
+  details JSON NOT NULL,
+  actual_result ENUM('HOME','DRAW','AWAY','VOID') NULL,
+  settled_at DATETIME NULL,
+  UNIQUE KEY uq_fixture_model_run(fixture_id,model_run_id,kickoff_at,home_team_id,away_team_id),
+  KEY idx_model_fixture_time(fixture_id,predicted_at),
+  FOREIGN KEY(fixture_id) REFERENCES football_fixtures(id),
+  FOREIGN KEY(model_run_id) REFERENCES football_prediction_model_runs(id)
+) ENGINE=InnoDB;
+CREATE TABLE football_community_predictions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id INT UNSIGNED NOT NULL,
+  fixture_id INT UNSIGNED NOT NULL,
+  pick ENUM('HOME','DRAW','AWAY') NOT NULL,
+  home_team_id INT UNSIGNED NOT NULL,
+  away_team_id INT UNSIGNED NOT NULL,
+  submitted_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  actual_result ENUM('HOME','DRAW','AWAY','VOID') NULL,
+  settled_at DATETIME NULL,
+  UNIQUE KEY uq_free_fixture_pick(user_id,fixture_id),
+  KEY idx_community_fixture(fixture_id),
+  KEY idx_community_history(user_id,updated_at),
+  FOREIGN KEY(user_id) REFERENCES users(id),
+  FOREIGN KEY(fixture_id) REFERENCES football_fixtures(id)
+) ENGINE=InnoDB;

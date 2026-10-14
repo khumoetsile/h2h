@@ -1,6 +1,6 @@
 <div class="page research-page">
   <a routerLink="/football" class="back-link"><span aria-hidden="true">←</span> Football</a>
-  <header class="research-hero"><span class="eyebrow">KNOW THE MATCHUP</span><h1>The history behind <span>your next rivalry.</span></h1><p>Compare teams. Explore scores, goals and recent form.</p></header>
+  <header class="research-hero"><span class="eyebrow">KNOW THE MATCHUP</span><h1>Compare teams. <span>Know the match.</span></h1><p>Compare teams. Explore scores, goals and recent form.</p></header>
   <section class="selector-card" aria-label="Choose teams to compare">
     <div class="selectors"><app-football-team-picker id="research-team-a" label="First team" [selected]="teamA()" [exclude]="teamB()?.id??null" (selectedChange)="pick('A',$event)"/><button class="swap" type="button" [disabled]="!teamA()&&!teamB()" (click)="swap()" aria-label="Swap first and second teams">⇄</button><app-football-team-picker id="research-team-b" label="Opponent" [selected]="teamB()" [exclude]="teamA()?.id??null" (selectedChange)="pick('B',$event)"/></div>
     @if(teamA()&&teamB()){
@@ -9,7 +9,7 @@
     @if(formError()){<p class="form-error" role="alert">{{formError()}}</p>}
   </section>
   @if(error()){<app-load-error [message]="error()" (retry)="load(true)"/>}
-  @else if(data();as result){<app-football-research-results [data]="result" [busy]="loading()" (sampleChange)="changeSample($event)"/>}
+  @else if(data();as result){<app-football-research-results [data]="result" [busy]="loading()" (sampleChange)="changeSample($event)"/>@if(result.nextFixture){<app-football-predictions [fixtureId]="result.nextFixture.id"/>}@else{<div class="choose-pair"><strong>Free picks open on upcoming fixtures.</strong><a class="btn btn-ghost" routerLink="/football">Find a match →</a></div>}}
   @else if(loading()) {<div class="research-skeleton" role="status" aria-label="Loading football research"><div class="skeleton heading"></div><div class="skeleton-grid">@for(i of [1,2,3];track i){<div class="skeleton"></div>}</div><div class="skeleton result-row"></div><div class="skeleton result-row"></div></div>}
 
   @else {<section class="choose-pair"><span class="pair-icon" aria-hidden="true">⚽</span><h2>Pick two teams to begin.</h2><p>Search the teams available in our football data.</p></section>}

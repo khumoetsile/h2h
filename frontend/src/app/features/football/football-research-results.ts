@@ -1,4 +1,4 @@
-import { DatePipe } from '@angular/common';
+import { DatePipe, NgTemplateOutlet } from '@angular/common';
 import { Component, computed, effect, inject, input, output, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { FootballResearch, FootballResearchStore, ResearchMeeting, ResearchSummary, researchMetric } from '../../core/football-research';
@@ -6,11 +6,11 @@ import { GoalTrendChart } from './goal-trend';
 import { apiError } from '../../core/api-error';
 
 @Component({
-  selector:'app-football-research-results',imports:[DatePipe,RouterLink,GoalTrendChart],templateUrl:'./football-research-results.html',styleUrl:'./football-research-results.scss',
+  selector:'app-football-research-results',imports:[DatePipe,NgTemplateOutlet,RouterLink,GoalTrendChart],templateUrl:'./football-research-results.html',styleUrl:'./football-research-results.scss',
 })
 export class FootballResearchResults {
   readonly data=input.required<FootballResearch>();readonly compact=input(false);readonly inlineHistory=input(false);
-  readonly busy=input(false);readonly sampleChange=output<{meetings?:'5'|'10'|'all';form?:5|10}>();
+  readonly busy=input(false);readonly sampleChange=output<{meetings?:'5'|'10'|'20'|'all';form?:5|10|20}>();
   private store=inject(FootballResearchStore);private version=0;
   protected metric=researchMetric;protected tab=signal<'overview'|'meetings'|'form'|'venues'|'goals'>('overview');protected matches=signal<ResearchMeeting[]>([]);
   protected moreBusy=signal(false);protected moreError=signal('');protected hasMore=signal(false);private page=1;

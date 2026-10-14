@@ -27,6 +27,8 @@ export const routes: Routes = [
       { path: 'football', title: 'Football', loadComponent: () => import('./features/football/football-list').then((m) => m.FootballListPage) },
       { path: 'football/research', title: 'Football research', loadComponent: () => import('./features/football/football-research').then((m) => m.FootballResearchPage) },
       { path: 'football/teams/:teamId', title: 'Team fixtures and results', loadComponent: () => import('./features/football/football-team').then((m) => m.FootballTeamPage) },
+      { path: 'football/predictions/methodology', title:'How football estimates work', loadComponent:()=>import('./features/football/football-prediction-methodology').then(m=>m.FootballPredictionMethodologyPage) },
+      { path: 'football/predictions', title:'Free football picks', loadComponent:()=>import('./features/football/football-prediction-history').then(m=>m.FootballPredictionHistoryPage) },
       { path: 'football/:fixtureId', title: 'Fixture', loadComponent: () => import('./features/football/football-fixture').then((m) => m.FootballFixturePage) },
       { path: 'match/:code', canActivate: [playerGuard], title: 'Match', loadComponent: () => import('./features/match/match-lobby').then((m) => m.MatchLobbyPage) },
       { path: 'matches', canActivate: [playerGuard], title: 'My matches', loadComponent: () => import('./features/matches/match-history').then((m) => m.MatchHistoryPage) },

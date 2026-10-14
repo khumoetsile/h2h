@@ -39,6 +39,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
         <button class="active" aria-pressed="true"><mat-icon inline>sports_soccer</mat-icon> Football</button>
       </div>
 
+      <div class="football-pick-nav"><a routerLink="/football/predictions">My free picks &amp; accuracy →</a></div>
       <header class="hero">
         <div class="grow">
           <h1>Football</h1>
@@ -270,6 +271,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
     #fixtures .teams-line .team:last-child{text-align:right}
     .hero h1{font-size:32px}.hero .create{display:none}.hero .btn-lg{min-height:44px;font-size:14px}
     .player-challenges{margin:16px 0}.player-challenges>summary{min-height:44px;padding:12px 0;cursor:pointer;font-weight:600}
+    .football-pick-nav{display:flex;justify-content:flex-end;margin-bottom:12px}.football-pick-nav a{min-height:44px;display:flex;align-items:center;font-size:14px;color:var(--accent)}
     .play-tabs { margin-bottom: 16px; }
     .football-search-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-block:20px}.fixture-search{display:flex;align-items:center;gap:10px;flex:1;min-width:210px;background:var(--surface);border:1px solid var(--border-strong);border-radius:10px;padding:0 14px}.fixture-search:focus-within{outline:2px solid var(--accent);outline-offset:2px}.fixture-search>mat-icon{color:var(--muted);flex-shrink:0}.fixture-search input{width:100%;min-width:0;min-height:52px;border:0;background:transparent;color:var(--text);font:inherit;outline:none!important}.fixture-search button{width:44px;height:44px;color:var(--text-2);font-size:26px;flex-shrink:0}.research-entry{display:flex;align-items:center;gap:10px;min-height:48px;padding:0 14px;border:1px solid #8f875155;border-radius:9px;font-size:13px;color:#e3d19e;background:#d9c8910c}
     .hero { display: flex; align-items: flex-end; gap: 12px; flex-wrap: wrap; margin-bottom: 4px;

@@ -9,6 +9,8 @@ import * as svc from '../football/footballChallengeService.js';
 import { getMatchView } from '../services/matchService.js';
 import * as research from '../football/footballResearchService.js';
 import { validIsoDate } from '../utils/search.js';
+import * as predictions from '../football/footballPredictionService.js';
+import * as community from '../football/communityPredictionService.js';
 
 const router = Router();
 
@@ -42,7 +44,7 @@ const researchQuery = z.object({
   dateFrom: z.string().refine(validIsoDate, 'Choose a valid start date.').optional(),
   dateTo: z.string().refine(validIsoDate, 'Choose a valid end date.').optional(),
   season: z.string().regex(/^\d{4}(?:-\d{2})?$/).optional(),
-  meetings: z.enum(['5', '10', 'all']).default('all'), form: z.coerce.number().pipe(z.union([z.literal(5), z.literal(10)])).default(10), page: z.coerce.number().int().min(1).max(500).default(1),
+  meetings: z.enum(['5', '10', '20', 'all']).default('all'), form: z.coerce.number().pipe(z.union([z.literal(5), z.literal(10), z.literal(20)])).default(10), page: z.coerce.number().int().min(1).max(500).default(1),
 }).refine(q => q.teamA !== q.teamB, { message: 'Choose two different teams.', path: ['teamB'] })
   .refine(q => !q.dateFrom || !q.dateTo || q.dateFrom <= q.dateTo, { message: 'The end date must be on or after the start date.', path: ['dateTo'] })
   .refine(q => !q.dateFrom || !q.dateTo || (Date.parse(q.dateTo) - Date.parse(q.dateFrom)) / 86400000 <= 3660, { message: 'Choose a date range of no more than ten years.', path: ['dateTo'] });
@@ -73,6 +75,21 @@ router.get('/research', researchLimit, validate(researchQuery, 'query'), ah(asyn
 
 router.get('/fixtures', validate(fixturesQuery, 'query'), ah(async (req, res) => {
   res.json(await svc.listFixtures(req.validatedQuery));
+}));
+
+router.get('/prediction-methodology', ah(async (_req,res)=>res.json(await predictions.modelMethodology())));
+router.get('/predictions/rankings', ah(async (_req,res)=>res.json(await community.freePredictionRankings())));
+router.get('/predictions/mine',requireAuth,validate(z.object({page:z.coerce.number().int().min(1).max(500).default(1),pageSize:z.coerce.number().int().min(1).max(50).default(20)}),'query'),ah(async(req,res)=>res.json(await community.freePredictionHistory(req.user.id,req.validatedQuery))));
+router.get('/fixtures/:id/predictions',optionalAuth,validate(fixtureIdParam,'params'),ah(async(req,res)=>{
+  res.set('Cache-Control','private, no-store');
+  const id=Number(req.params.id);const f=await predictions.predictionFixture(id);
+  const [model,picks]=await Promise.all([predictions.modelPredictionForFixture(id),community.communityPicks(id,req.user?.id)]);
+  res.json({fixture:{id:f.id,homeTeam:f.home_short||f.home_name,awayTeam:f.away_short||f.away_name,kickoffAt:f.kickoff_at,status:f.status},model,community:picks,open:!f.is_simulated&&f.provider!=='mock'&&f.status==='SCHEDULED'&&new Date(f.kickoff_at)>new Date(),serverNow:new Date()});
+}));
+const freePickLimit=rateLimit({windowMs:60000,limit:30,standardHeaders:'draft-7',legacyHeaders:false,skip:()=>process.env.NODE_ENV==='test',message:{error:{code:'PICK_RATE_LIMIT',message:'Wait a moment before changing your pick again.'}}});
+router.put('/fixtures/:id/prediction',requireAuth,freePickLimit,validate(fixtureIdParam,'params'),validate(z.object({pick:z.enum(['HOME','DRAW','AWAY'])})),ah(async(req,res)=>{
+  const saved=await community.saveFreePrediction(req.user.id,Number(req.params.id),req.body.pick);
+  res.json({...saved,community:await community.communityPicks(Number(req.params.id),req.user.id)});
 }));
 
 router.get('/fixtures/:id', optionalAuth, validate(fixtureIdParam, 'params'), validate(fixtureDetailQuery, 'query'), ah(async (req, res) => {

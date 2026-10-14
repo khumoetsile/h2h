@@ -6,6 +6,8 @@ Correspondence chess, its per-move deadlines, settlement rules and configuration
 
 Public matchup history, offline archive imports and scoring trends are documented in [Football research](docs/FOOTBALL-RESEARCH.md). Game controls and recovery improvements are documented in [Game quality](docs/GAME-QUALITY.md).
 
+Interactive comparison, validated statistical estimates, free community picks, accuracy and daily model jobs are documented in [Football predictions](docs/FOOTBALL-PREDICTIONS.md).
+
 > ⚠️ **DEMO MODE — ALL MONEY IS SIMULATED.**
 > Deposits, stakes, winnings, fees and withdrawals use **demo funds only**. No payment
 > provider (DPO, Orange Money, MyZaka, Mascom, FNB, Visa, Mastercard, PayPal, Stripe or any

@@ -1,0 +1,181 @@
+<section class="prediction-card" aria-label="Free match predictions" [attr.aria-busy]="loading()">
+  <header>
+    <div>
+      <span class="eyebrow">YOUR VIEW. NO STAKE.</span>
+      <h2>Match predictions</h2>
+    </div>
+    <span class="free-tag">Free</span>
+  </header>
+  @if (error()) {
+    <p role="alert">{{ error() }}</p>
+    <button class="btn btn-ghost" (click)="load()">Try again</button>
+  } @else if (!data()) {
+    <div class="prediction-skeleton" role="status" aria-label="Loading predictions">
+      @for (i of [1, 2, 3]; track i) {
+        <div class="skeleton"></div>
+      }
+    </div>
+  } @else {
+    @let d = data()!;
+    <p class="fixture-note">
+      {{ d.fixture.homeTeam }} vs {{ d.fixture.awayTeam }} ·
+      {{ d.fixture.kickoffAt | date: 'EEE d MMM, HH:mm' }}
+    </p>
+    <div class="model-block">
+      <h3>Statistical Model</h3>
+      @if (d.model.status === 'READY') {
+        <div class="forecast-grid">
+          @for (p of choices; track p) {
+            <div>
+              <span>{{ label(p) }}</span
+              ><strong>{{ d.model.percentages![p] }}<small>%</small></strong
+              ><i aria-hidden="true"><b [style.width.%]="d.model.percentages![p]"></b></i>
+            </div>
+          }
+        </div>
+        <p class="coverage">
+          {{ d.model.quality?.label }} · {{ d.model.quality?.homeTeamMatches }} &amp;
+          {{ d.model.quality?.awayTeamMatches }} team matches
+        </p>
+        <details class="why">
+          <summary>Why this prediction?</summary>
+          <ul>
+            @for (observation of d.model.explanations; track observation) {
+              <li>{{ observation }}</li>
+            }
+          </ul>
+        </details>
+        @if (d.model.markets?.over25 != null || d.model.markets?.btts != null) {
+          <details>
+            <summary>Goals estimates</summary>
+            <div class="goal-estimates">
+              @if (d.model.markets?.over25 != null) {
+                <span
+                  >3 or more goals
+                  <strong>{{ (d.model.markets!.over25! * 100).toFixed(1) }}%</strong></span
+                >
+                <span
+                  >2 or fewer goals
+                  <strong>{{ ((1 - d.model.markets!.over25!) * 100).toFixed(1) }}%</strong></span
+                >
+              }
+              @if (d.model.markets?.btts != null) {
+                <span
+                  >Both teams score
+                  <strong>{{ (d.model.markets!.btts! * 100).toFixed(1) }}%</strong></span
+                >
+              }
+            </div>
+          </details>
+        }
+      } @else {
+        <div class="unavailable" role="status">
+          <strong>No reliable estimate yet</strong>
+          <p>{{ d.model.reason }}</p>
+        </div>
+      }
+      <details class="model-note">
+        <summary>About the estimate</summary>
+        <p>
+          90-minute results. History filters change the analysis view, not the validated model.
+          Coverage describes the available data, not certainty.
+        </p>
+        @if (d.model.quality; as q) {
+          <p>
+            {{ q.homeVenueMatches }} home results · {{ q.awayVenueMatches }} away results ·
+            {{ q.leagueMatches }} league matches.
+          </p>
+        }
+        @if (d.model.calculatedAt) {
+          <p>
+            Calculated {{ d.model.calculatedAt | date: 'd MMM, HH:mm' }} · Data through
+            {{ d.model.dataThrough + 'T00:00:00Z' | date: 'd MMM yyyy' : 'UTC' }}.
+          </p>
+        }
+        <p>
+          {{ d.model.version }} · Statistical estimates, not guaranteed results or betting advice.
+        </p>
+        <a routerLink="/football/predictions/methodology">Method &amp; validation →</a>
+      </details>
+    </div>
+    <div class="community-block">
+      <div class="section-heading">
+        <h3>Community Picks</h3>
+        <span>{{ d.community.total }} {{ d.community.total === 1 ? 'pick' : 'picks' }}</span>
+      </div>
+      <p class="pick-prompt">
+        {{ closed() ? 'Picks are locked.' : 'Who will win after 90 minutes?' }}
+      </p>
+      <div class="pick-options" role="group" aria-label="Choose a free match prediction">
+        @for (p of choices; track p) {
+          <button
+            [disabled]="closed() || saving()"
+            [attr.aria-pressed]="selected() === p"
+            [class.selected]="selected() === p"
+            (click)="choose(p)"
+          >
+            <span>{{ label(p) }}</span>
+            @if (selected() === p) {
+              <small>✓ Your pick</small>
+            } @else {
+              <small>{{ p === 'DRAW' ? 'Level score' : 'To win' }}</small>
+            }
+          </button>
+        }
+      </div>
+      @if (!auth.isLoggedIn() && !closed()) {
+        <a
+          class="btn btn-primary save-pick"
+          routerLink="/login"
+          [queryParams]="{ next: '/football/' + fixtureId() }"
+          >Sign in to save a free pick</a
+        >
+      } @else if (auth.isLoggedIn() && !closed()) {
+        <button
+          class="btn btn-primary save-pick"
+          [disabled]="saving() || !selected() || selected() === d.community.mine?.pick"
+          (click)="save()"
+        >
+          {{
+            saving() ? 'Saving…' : d.community.mine ? 'Save changed pick' : 'Save my free pick'
+          }}</button
+        ><span class="save-state" role="status">{{
+          saved()
+            ? 'Saved. You can change it until kickoff.'
+            : d.community.mine
+              ? 'Your pick is saved.'
+              : 'No wallet funds used.'
+        }}</span>
+      }
+      @if (saveError()) {
+        <p class="save-error" role="alert">{{ saveError() }}</p>
+      }
+      @if (d.community.total) {
+        <div class="comparison-heading">
+          <span>Outcome</span><span>Model</span><span>Community</span>
+        </div>
+        @for (p of choices; track p) {
+          <div class="comparison-row">
+            <span>{{ label(p) }}</span
+            ><strong>{{
+              d.model.percentages?.[p] != null ? d.model.percentages![p] + '%' : '—'
+            }}</strong
+            ><strong>{{ d.community.percentages[p] }}%</strong
+            ><i aria-hidden="true"><b [style.width.%]="d.community.percentages[p]"></b></i>
+          </div>
+        }
+        <p class="opinion-note">Community picks are opinions, not probabilities.</p>
+      } @else {
+        <p class="opinion-note">No community picks yet.</p>
+      }
+    </div>
+    <footer>
+      <a [routerLink]="['/football', fixtureId()]" fragment="pvp-challenge"
+        >Optional: challenge a player</a
+      ><a routerLink="/football/predictions">My picks &amp; accuracy</a
+      ><a routerLink="/football/predictions" [queryParams]="{ view: 'rankings' }"
+        >Free-pick rankings →</a
+      >
+    </footer>
+  }
+</section>

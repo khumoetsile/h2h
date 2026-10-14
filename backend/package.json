@@ -14,7 +14,8 @@
     "seed": "node scripts/seed.js",
     "db:reset": "node scripts/migrate.js --fresh && node scripts/seed.js",
     "test": "node --test --test-concurrency=1 --test-reporter=spec test/*.test.js",
-    "history:api-football": "node scripts/import-api-football-history.js"
+    "history:api-football": "node scripts/import-api-football-history.js",
+    "predictions:train": "node scripts/train-football-predictions.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

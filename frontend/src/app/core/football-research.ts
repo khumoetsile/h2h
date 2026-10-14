@@ -21,9 +21,9 @@ export interface ResearchFormMatch {
   opponent:ResearchTeam; venue:'HOME'|'AWAY'; teamScore:number; opponentScore:number; outcome:'W'|'D'|'L';
   source:'PROVIDER'|'SYNCED'|'ARCHIVE'; isSimulated:boolean;date?:string;season?:string;
 }
-export interface ResearchFilters {teamA:number;teamB:number;venue:'all'|'home'|'away';competitionId?:number;dateFrom?:string;dateTo?:string;season?:string;meetings?:'5'|'10'|'all';form?:5|10;page?:number;}
+export interface ResearchFilters {teamA:number;teamB:number;venue:'all'|'home'|'away';competitionId?:number;dateFrom?:string;dateTo?:string;season?:string;meetings?:'5'|'10'|'20'|'all';form?:5|10|20;page?:number;}
 export interface FootballResearch {
-  teamA:ResearchTeam;teamB:ResearchTeam;filters:ResearchFilters;
+  teamA:ResearchTeam;teamB:ResearchTeam;filters:ResearchFilters;nextFixture?:{id:number;kickoffAt:string}|null;
   headToHead:{status:'AVAILABLE'|'EMPTY'|'PARTIAL'|'UNAVAILABLE';matches:ResearchMeeting[];summary:ResearchSummary;byVenue:{home:ResearchSummary;away:ResearchSummary};total?:number;page?:number;hasMore?:boolean;availableMatches?:number};
   form:{teamA:ResearchForm;teamB:ResearchForm};
   insights?:Array<{key:string;numerator:number;denominator:number;text:string}>;
@@ -44,7 +44,7 @@ export function researchFilters(query:{get:(key:string)=>string|null}):ResearchF
   const venue=query.get('venue');
   const date=(key:string)=>{const value=query.get(key);return value&&/^\d{4}-\d{2}-\d{2}$/.test(value)?value:undefined;};
   const meetings=query.get('meetings'), form=query.get('form'), season=query.get('season');
-  return {teamA,teamB,venue:venue==='home'||venue==='away'?venue:'all',...(id('competitionId')?{competitionId:id('competitionId')!}:{}),...(date('dateFrom')?{dateFrom:date('dateFrom')}:{}),...(date('dateTo')?{dateTo:date('dateTo')}:{}),...(meetings==='5'||meetings==='10'?{meetings}:{}),...(form==='5'?{form:5 as const}:{}),...(season&&/^\d{4}(?:-\d{2})?$/.test(season)?{season}:{} )};
+  return {teamA,teamB,venue:venue==='home'||venue==='away'?venue:'all',...(id('competitionId')?{competitionId:id('competitionId')!}:{}),...(date('dateFrom')?{dateFrom:date('dateFrom')}:{}),...(date('dateTo')?{dateTo:date('dateTo')}:{}),...(meetings==='5'||meetings==='10'||meetings==='20'?{meetings}:{}),...(['5','10','20'].includes(form||'')?{form:Number(form) as 5|10|20}:{}),...(season&&/^\d{4}(?:-\d{2})?$/.test(season)?{season}:{} )};
 }
 
 /** Short-lived display cache; simultaneous selectors/pages share one request. Failed responses are never cached. */
