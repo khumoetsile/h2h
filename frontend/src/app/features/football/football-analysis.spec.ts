@@ -13,8 +13,8 @@ describe('football analysis',()=>{
  it('date-only trend labels retain the supplied calendar day',()=>{TestBed.configureTestingModule({imports:[GoalTrendChart]});const f=TestBed.createComponent(GoalTrendChart);f.componentRef.setInput('points',[{date:'2024-01-01',goalsFor:2,goalsAgainst:1}]);f.detectChanges();expect(f.nativeElement.textContent).toContain('1 Jan');expect(f.nativeElement.textContent).not.toContain('31 Dec');});
  it('fixture history opens past meetings directly without sample filters or another research link',()=>{
   TestBed.configureTestingModule({imports:[FootballResearchResults],providers:[provideRouter([]),{provide:FootballResearchStore,useValue:{research:vi.fn()}}]});
-  const f=TestBed.createComponent(FootballResearchResults);f.componentRef.setInput('data',base);f.componentRef.setInput('inlineHistory',true);f.detectChanges();
-  expect(f.nativeElement.querySelector('.meetings')).toBeTruthy();expect(f.nativeElement.querySelector('.sample-controls')).toBeNull();expect(f.nativeElement.querySelector('.research-link')).toBeNull();expect(f.nativeElement.querySelectorAll('.result-tabs button')).toHaveLength(3);
+  const f=TestBed.createComponent(FootballResearchResults);f.componentRef.setInput('data',{...base,headToHead:{...base.headToHead,matches:[{id:'H-1',date:'2023-11-30',kickoffAt:'2023-11-30T00:00:00Z',competition:{id:1,code:'EL',name:'Europa League'},homeTeam:teamB,awayTeam:teamA,homeScore:4,awayScore:0,outcome:'L'} as any]},metadata:{...base.metadata,lastMatchDate:'2026-10-11'}});f.componentRef.setInput('inlineHistory',true);f.detectChanges();
+  expect(f.nativeElement.querySelector('.meetings')).toBeTruthy();expect(f.nativeElement.querySelector('.sample-controls')).toBeNull();expect(f.nativeElement.querySelector('.research-link')).toBeNull();expect(f.nativeElement.querySelectorAll('.result-tabs button')).toHaveLength(3);expect(f.nativeElement.querySelector('.outcome')).toBeNull();expect(f.nativeElement.textContent).toContain('Last meeting 30 Nov 2023');expect(f.nativeElement.textContent).not.toContain('Results through 11 Oct 2026');
  });
 
 });
