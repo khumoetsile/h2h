@@ -26,6 +26,7 @@ jobs:
       DB_PASSWORD: root
       DB_NAME: rivalis_dev
       DB_NAME_TEST: rivalis_test
+      DB_POOL_CONNECTION_LIMIT: 6
       JWT_SECRET: ci-only-secret
     steps:
       - uses: actions/checkout@v4

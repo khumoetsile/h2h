@@ -29,6 +29,7 @@ export const config = {
   port: num('PORT', 3000),
   corsOrigins: (process.env.CORS_ORIGINS || 'http://localhost:4200').split(',').map((s) => s.trim()).filter(Boolean),
   publicBaseUrl: process.env.PUBLIC_BASE_URL || '',
+  dbPoolConnectionLimit: positive('DB_POOL_CONNECTION_LIMIT', 15),
   supportEmail: process.env.SUPPORT_EMAIL || '',
   recovery: {
     baseUrl: process.env.PUBLIC_BASE_URL || (process.env.CORS_ORIGINS || 'http://localhost:4200').split(',')[0].trim(),

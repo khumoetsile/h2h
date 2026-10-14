@@ -4,7 +4,9 @@ import { config } from './config.js';
 export const pool = mysql.createPool({
   ...config.db,
   waitForConnections: true,
-  connectionLimit: 15,
+  connectionLimit: config.dbPoolConnectionLimit,
+  maxIdle: Math.max(1, config.dbPoolConnectionLimit - 2),
+  idleTimeout: 30000,
   decimalNumbers: true,
   timezone: 'Z',
   dateStrings: false,
