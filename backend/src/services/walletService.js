@@ -67,7 +67,7 @@ async function lockWallet(tx, userId) {
  * a transaction row (unless `type` is null) and schedules a realtime update.
  * `idempotencyKey` guarantees a given financial event is recorded once.
  */
-async function applyMovement(tx, userId, { availableDelta = 0, lockedDelta = 0, type, direction, amount, description, status = 'COMPLETED', matchId = null, idempotencyKey = null }) {
+async function applyMovement(tx, userId, { availableDelta = 0, lockedDelta = 0, type, direction, amount, description, status = 'COMPLETED', matchId = null, arenaId = null, idempotencyKey = null }) {
   const w = await lockWallet(tx, userId);
   if (idempotencyKey) {
     const existing = await tx.one('SELECT id FROM transactions WHERE idempotency_key = ?', [idempotencyKey]);
@@ -88,6 +88,7 @@ async function applyMovement(tx, userId, { availableDelta = 0, lockedDelta = 0, 
       [txReference(), userId, w.id, type, direction, amount, fromCents(newAvail), fromCents(newLocked), description, status, matchId, idempotencyKey],
     );
     txId = res.insertId;
+    if(arenaId) await tx.q('UPDATE transactions SET arena_id=? WHERE id=?',[arenaId,txId]);
   }
   const snapshot = mapWallet({ ...w, available_balance: fromCents(newAvail), locked_balance: fromCents(newLocked) });
   tx.afterCommit(() => emitToUser(userId, 'wallet:update', snapshot));
@@ -191,7 +192,7 @@ export function chargeAbandonmentFee(tx, userId, match) {
   });
 }
 
-const TX_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT', 'ABANDONMENT_FEE'];
+const TX_TYPES = ['DEPOSIT', 'WITHDRAWAL', 'GAME_ENTRY', 'GAME_WIN', 'REFUND', 'FORFEIT', 'ABANDONMENT_FEE','ARENA_ENTRY','ARENA_REWARD','ARENA_FORFEIT','ARENA_REFUND'];
 
 export async function listTransactions({ userId = null, type, from, to, search, page = 1, pageSize = 20 }) {
   const where = [];
@@ -220,3 +221,11 @@ export async function listTransactions({ userId = null, type, from, to, search, 
 }
 
 export { TX_TYPES };
+
+/** Multiplayer escrow uses the same locked demo wallet and idempotent ledger. */
+export function arenaMovement(tx,userId,arena,event,payoutCents=0){
+  const stake=Number(arena.entry_cents), refund=event==='REFUND', entry=event==='ENTRY';
+  return applyMovement(tx,userId,{availableDelta:entry?-stake:refund?stake:payoutCents,lockedDelta:entry?stake:-stake,
+    type:entry?'ARENA_ENTRY':refund?'ARENA_REFUND':payoutCents?'ARENA_REWARD':'ARENA_FORFEIT',direction:entry||(!refund&&!payoutCents)?'DEBIT':'CREDIT',amount:fromCents(entry||refund||!payoutCents?stake:payoutCents),
+    description:`Fantasy Arena: ${arena.name} · ${event.toLowerCase()} (demo funds)`,arenaId:arena.id,idempotencyKey:`arena:${arena.id}:${event}:${userId}`});
+}

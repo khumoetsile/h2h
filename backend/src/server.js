@@ -1,4 +1,5 @@
 import {reconcilePredictionResults} from './football/communityPredictionService.js';
+import {sweepArenas} from './football/fantasyArenaService.js';
 import http from 'node:http';
 import { Server } from 'socket.io';
 import { config } from './config.js';
@@ -62,6 +63,7 @@ export async function startSweeper() {
       await sweepLiveShootouts();
       await sweepChess();
       await heartbeat();
+      await sweepArenas();
       if(Date.now()>=nextPredictionSweep){nextPredictionSweep=Date.now()+60000;await reconcilePredictionResults().catch(err=>console.error('Free prediction result check',err.message));}
     } catch (err) {
       console.error('Sweeper error', err);

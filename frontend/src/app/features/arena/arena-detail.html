@@ -1,0 +1,350 @@
+<div class="page arena-page">
+  <a class="back" [routerLink]="adminMode ? '/admin/arenas' : '/arena'">← Fantasy Arena</a>
+  @if (error()) {
+    <div class="error" role="alert">
+      {{ error() }} <button class="btn btn-ghost" (click)="load(true)">Try again</button>
+    </div>
+  }
+  @if (data(); as d) {
+    @let a = d.arena;
+    <header class="arena-hero">
+      <div class="card-head">
+        <span class="eyebrow">SAME MATCHES. YOUR PREDICTIONS.</span
+        ><span class="status">{{ a.status }}</span>
+      </div>
+      <h1>{{ a.name }}</h1>
+      @if (a.description) {
+        <p>{{ a.description }}</p>
+      }
+      <p>
+        {{ a.fixtureCount }} matches · {{ a.participants }}
+        {{ a.participants === 1 ? 'player' : 'players' }} · {{ a.entryFee | money }} demo entry
+      </p>
+      <div class="pool">{{ a.prizePool | money }}</div>
+      <span class="subtle">{{
+        a.status === 'OPEN' || a.status === 'DRAFT'
+          ? 'Growing demo prize pool'
+          : 'Final demo prize pool'
+      }}</span>
+      <div class="prizes">
+        @for (p of a.prizes; track $index) {
+          <div>
+            <span>{{ $index === 0 ? '1st' : $index === 1 ? '2nd' : '3rd' }} place</span
+            ><strong>{{ p | money }}</strong>
+          </div>
+        }
+      </div>
+      <p class="subtle">
+        {{
+          a.status === 'OPEN'
+            ? 'Projected payouts grow with each confirmed entry.'
+            : 'Tied players share the affected prize positions.'
+        }}
+      </p>
+      @if (a.status === 'OPEN') {
+        <strong
+          >Entries close in <app-countdown [deadline]="a.deadline" (expired)="load()"
+        /></strong>
+      } @else {
+        <span class="subtle">Entries close {{ a.deadline | date: 'EEE d MMM, HH:mm' }}</span>
+      }
+    </header>
+    @if (a.status === 'CANCELLED') {
+      <div class="notice">
+        {{ a.cancellationReason }}
+        @if (d.myEntry) {
+          Your entry fee was refunded in full.
+        }
+        No platform fee was charged.
+      </div>
+    }
+    @if (d.myEntry) {
+      <div class="facts">
+        <div>
+          <span>Your score</span><strong>{{ d.myEntry.points }} points</strong>
+        </div>
+        <div>
+          <span>Your rank</span><strong>{{ board()?.myRank?.position ?? '—' }}</strong>
+        </div>
+        <div>
+          <span>{{ a.status === 'COMPLETED' ? 'Your reward' : 'Still to finish' }}</span
+          ><strong>
+            @if (a.status === 'COMPLETED') {
+              {{ d.myEntry.payout | money }}
+            } @else {
+              {{ board()?.myRank?.remaining ?? a.fixtureCount }} matches
+            }
+          </strong>
+        </div>
+      </div>
+    }
+    @if (adminMode) {
+      <section class="arena-panel">
+        <h2>Platform controls</h2>
+        @if (a.status === 'DRAFT') {
+          <div class="actions">
+            <a class="btn btn-ghost" routerLink="/admin/arenas" [queryParams]="{ edit: a.id }"
+              >Edit draft</a
+            ><button class="btn btn-primary" [disabled]="busy()" (click)="adminAction('publish')">
+              Publish arena
+            </button>
+          </div>
+        }
+        @if (a.status === 'DRAFT' || a.status === 'OPEN') {
+          <details>
+            <summary>Cancel and refund entries</summary>
+            <label
+              >Reason<input
+                [(ngModel)]="cancelReason"
+                name="arenaCancelReason"
+                maxlength="200" /></label
+            ><button
+              class="btn btn-ghost"
+              [disabled]="busy() || cancelReason.trim().length < 5"
+              (click)="adminAction('cancel')"
+            >
+              Cancel arena &amp; refund
+            </button>
+          </details>
+        }
+        @if (d.settlement) {
+          <details>
+            <summary>Settlement record</summary>
+            <p>
+              {{ d.settlement.kind }} · {{ d.settlement.created_at | date: 'd MMM yyyy, HH:mm' }}
+            </p>
+            <p>
+              Gross {{ d.settlement.gross_cents / 100 | money }} · Fee
+              {{ d.settlement.fee_cents / 100 | money }} · Paid
+              {{ d.settlement.paid_cents / 100 | money }}
+            </p>
+            <pre style="white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px">{{
+              d.settlement.audit | json
+            }}</pre>
+          </details>
+        }
+      </section>
+    }
+    <div class="detail-grid">
+      <section class="arena-panel">
+        <div class="card-head">
+          <h2>{{ closed() ? 'The arena slip' : 'Your prediction slip' }}</h2>
+          <span class="progress">{{ progress() }} of {{ d.fixtures.length }} picked</span>
+        </div>
+        <p>Predict the named team’s result after 90 minutes.</p>
+        @if (!auth.isLoggedIn() && !closed()) {
+          <a class="btn btn-primary" routerLink="/login" [queryParams]="{ next: '/arena/' + a.id }"
+            >Sign in to choose predictions</a
+          >
+        }
+        <div class="slip">
+          @for (f of d.fixtures; track f.id) {
+            <article class="fixture">
+              <div class="fixture-meta">
+                {{ f.competition }} · {{ f.kickoffAt | date: 'EEE d MMM, HH:mm' }}
+              </div>
+              <h3>{{ f.homeTeam }} <span class="subtle">vs</span> {{ f.awayTeam }}</h3>
+              <p class="reference">
+                Predict <strong>{{ f.referenceTeam }}</strong
+                >’s result:
+              </p>
+              <div
+                class="pick-grid"
+                role="group"
+                [attr.aria-label]="
+                  'Predict ' +
+                  f.referenceTeam +
+                  ' against ' +
+                  (f.referenceTeamId === f.homeTeamId ? f.awayTeam : f.homeTeam)
+                "
+              >
+                @for (p of choices; track p.value) {
+                  <button
+                    [disabled]="
+                      closed() || busy() || adminMode || !auth.isLoggedIn() || auth.isAdmin()
+                    "
+                    [class.selected]="picks()[f.id] === p.value"
+                    [attr.aria-pressed]="picks()[f.id] === p.value"
+                    (click)="choose(f.id, p.value)"
+                  >
+                    {{ p.label }}
+                    @if (picks()[f.id] === p.value) {
+                      <span aria-hidden="true">✓</span>
+                    }
+                  </button>
+                }
+              </div>
+              @if (f.result) {
+                <p class="subtle">
+                  {{
+                    f.result === 'VOID'
+                      ? 'Void — no points for anyone.'
+                      : 'Result: ' + pickLabel(f.result)
+                  }}
+                  @if (f.result !== 'VOID') {
+                    · {{ f.homeScore }}–{{ f.awayScore }}
+                    @if (picks()[f.id]) {
+                      · {{ picks()[f.id] === f.result ? 'Correct +1' : 'Incorrect' }}
+                    }
+                  }
+                </p>
+              } @else if (closed()) {
+                <p class="subtle">
+                  {{
+                    f.status === 'POSTPONED'
+                      ? 'Postponed — waiting for a verified result.'
+                      : 'Result pending.'
+                  }}
+                </p>
+              }
+            </article>
+          }
+        </div>
+        <details class="rules">
+          <summary>Entry fee, prizes &amp; fair-play rules</summary>
+          <p>
+            {{ a.entryFee | money }} demo entry · one entry per player. {{ a.feePercent }}% platform
+            fee. Gross pool {{ a.grossPool | money }}; fee {{ a.platformFee | money }}; net prizes
+            {{ a.prizePool | money }}.
+          </p>
+          <p>
+            Prize shares: {{ a.prizePercentages[0] }}% / {{ a.prizePercentages[1] }}% /
+            {{ a.prizePercentages[2] }}%. One correct prediction earns one point. Incorrect or void
+            picks earn zero.
+          </p>
+          <p>{{ d.rules.ties }}</p>
+          <p>
+            Everyone gets a full refund if fewer than three players join or all fixtures are void.
+          </p>
+          <p>{{ d.rules.reschedules }}</p>
+          <p>{{ d.rules.voids }}</p>
+          <p>{{ d.rules.visibility }} Demo money only.</p>
+        </details>
+        @if (!adminMode && !closed()) {
+          <div class="join-box">
+            <span class="progress"
+              >{{ progress() }} of {{ d.fixtures.length }} predictions completed</span
+            >
+            <p class="subtle">
+              Closes at the first kickoff. Ties share prizes. Minimum 3 players, otherwise a full
+              refund.
+            </p>
+            @if (!auth.isLoggedIn()) {
+              <a
+                class="btn btn-primary"
+                routerLink="/login"
+                [queryParams]="{ next: '/arena/' + a.id }"
+                >Sign in to enter</a
+              >
+            } @else if (auth.isAdmin()) {
+              <p>Administrators manage arenas. Use a player account to enter.</p>
+            } @else if (insufficient()) {
+              <p>You need {{ a.entryFee | money }} demo funds to enter.</p>
+              <a class="btn btn-primary" routerLink="/wallet/deposit">Add demo funds</a>
+            } @else {
+              <button
+                class="btn btn-primary"
+                [disabled]="busy() || !complete() || (!!d.myEntry && !dirty())"
+                (click)="confirm()"
+              >
+                {{
+                  busy()
+                    ? 'Confirming…'
+                    : d.myEntry
+                      ? 'Save changed predictions'
+                      : 'Confirm entry · ' + (a.entryFee | money) + ' demo'
+                }}</button
+              ><span role="status" class="subtle">{{
+                saved()
+                  ? 'Saved.'
+                  : d.myEntry
+                    ? 'Entry confirmed. Changes are free until closing.'
+                    : 'Your demo entry fee is held until results or a refund.'
+              }}</span>
+            }
+          </div>
+        }
+      </section>
+      <section class="arena-panel">
+        <div class="card-head">
+          <h2>Leaderboard</h2>
+          <span class="status">{{ board()?.provisional ? 'Provisional' : 'Final' }}</span>
+        </div>
+        <p class="subtle">
+          {{
+            closed()
+              ? 'Only verified finished matches earn points.'
+              : 'Players’ predictions stay private until closing.'
+          }}
+        </p>
+        @for (r of board()?.rows; track r.entryId) {
+          <div class="rank-row" [class.mine]="r.mine">
+            <span class="rank-pos">{{ r.position }}</span>
+            <div>
+              <strong>{{ r.username }}{{ r.mine ? ' · You' : '' }}</strong
+              ><small
+                >{{ r.correct }} correct · {{ r.incorrect }} incorrect ·
+                {{ r.remaining }} left</small
+              >
+              @if (r.prizeEligible && a.lockedAt && a.status !== 'CANCELLED') {
+                <small>{{
+                  a.status === 'COMPLETED'
+                    ? 'Reward ' + (r.payout | money)
+                    : 'Prize position · ties share'
+                }}</small>
+              }
+              @if (adminMode || a.lockedAt) {
+                <button (click)="reveal(r)">View predictions</button>
+              }
+            </div>
+            <div class="rank-score">
+              <strong>{{ r.points }}</strong
+              ><small>points</small>
+            </div>
+          </div>
+        } @empty {
+          <p>
+            {{
+              a.participants
+                ? 'Refreshing the latest players…'
+                : 'No confirmed entries yet. Be the first to join.'
+            }}
+          </p>
+        }
+        @if ((board()?.page || 1) > 1) {
+          <button class="more" [disabled]="loading()" (click)="more(-1)">Previous players</button>
+        }
+        @if (board()?.hasMore) {
+          <button class="more" [disabled]="loading()" (click)="more()">Next players</button>
+        }
+        @if (selectedSlip(); as s) {
+          <div class="selected-slip">
+            <div>
+              <h3>{{ s.username }}’s predictions</h3>
+              <button
+                class="btn btn-ghost"
+                (click)="selectedSlip.set(null)"
+                aria-label="Close player predictions"
+              >
+                Close
+              </button>
+            </div>
+            @for (f of d.fixtures; track f.id) {
+              <div>
+                <span
+                  >{{ f.referenceTeam }} vs
+                  {{ f.referenceTeamId === f.homeTeamId ? f.awayTeam : f.homeTeam }}</span
+                ><strong>{{ pickLabel(s.picks[f.id]) }}</strong>
+              </div>
+            }
+          </div>
+        }
+      </section>
+    </div>
+    @if (actionError()) {
+      <div class="error" role="alert">{{ actionError() }}</div>
+    }
+  } @else if (loading()) {
+    <div class="skeleton" role="status" aria-label="Loading arena"></div>
+  }
+</div>

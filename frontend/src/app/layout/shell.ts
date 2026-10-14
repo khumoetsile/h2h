@@ -25,13 +25,14 @@ interface NavItem { label: string; icon: string; link: string; exact?: boolean; 
 const PLAYER_NAV: NavItem[] = [
   { label: 'Play', icon: 'sports_esports', link: '/dashboard' },
   { label: 'Football', icon: 'sports_soccer', link: '/football' },
+  { label: 'Fantasy Arena', icon: 'groups', link: '/arena' },
   { label: 'Matches', icon: 'history', link: '/matches' },
   { label: 'Challenges', icon: 'swords', link: '/challenges' },
   { label: 'Rankings', icon: 'leaderboard', link: '/leaderboard' },
   { label: 'Me', icon: 'person', link: '/profile' },
 ];
 // Four tabs on a phone, always with a word under the icon. Challenges and Rankings live in the desktop nav and the account menu.
-const PLAYER_BOTTOM = ['/dashboard', '/football', '/challenges', '/matches', '/profile'];
+const PLAYER_BOTTOM = ['/dashboard', '/football', '/arena', '/challenges', '/profile'];
 
 const ADMIN_NAV: NavItem[] = [
   { label: 'Overview', icon: 'monitoring', link: '/admin', exact: true },
@@ -40,11 +41,12 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Transactions', icon: 'receipt_long', link: '/admin/transactions' },
   { label: 'Challenges', icon: 'swords', link: '/admin/challenges' },
   { label: 'Games', icon: 'toggle_on', link: '/admin/games' },
+  { label: 'Fantasy Arena', icon: 'groups', link: '/admin/arenas' },
   { label: 'Audit trail', icon: 'history', link: '/admin/audit' },
   { label: 'Settings', icon: 'tune', link: '/admin/settings' },
 ];
 const ADMIN_BOTTOM = ['/admin', '/admin/users', '/admin/matches', '/admin/transactions', '/admin/settings'];
-const PUBLIC_NAV: NavItem[] = [{ label: 'Chess', icon: 'grid_view', link: '/chess' }, { label: 'Football', icon: 'sports_soccer', link: '/football' }];
+const PUBLIC_NAV: NavItem[] = [{ label: 'Chess', icon: 'grid_view', link: '/chess' }, { label: 'Football', icon: 'sports_soccer', link: '/football' }, { label: 'Fantasy Arena', icon: 'groups', link: '/arena' }];
 
 @Component({
   selector: 'app-shell',
@@ -64,7 +66,7 @@ export class Shell {
   protected bottomNav = computed(() => {
     if (!this.auth.isLoggedIn()) return PUBLIC_NAV;
     const keys = this.auth.isAdmin() ? ADMIN_BOTTOM : PLAYER_BOTTOM;
-    return this.nav().filter((n) => keys.includes(n.link));
+    return this.nav().filter((n) => keys.includes(n.link)).map(n=>n.link==='/arena'?{...n,label:'Arena'}:n);
   });
   protected navIsActive(item: NavItem) {
     if (item.link === '/dashboard' && /^\/(dashboard|games|chess)(\/|\?|$)/.test(this.router.url)) return true;

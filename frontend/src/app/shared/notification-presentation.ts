@@ -10,11 +10,12 @@ const ICONS: Record<string, string> = {
   MATCH_FOUND: 'person_search', MATCH_STARTING: 'play_circle', MATCH_WON: 'emoji_events', MATCH_LOST: 'sentiment_dissatisfied',
   MATCH_DRAW: 'balance', MATCH_CANCELLED: 'cancel', MATCH_VOID: 'block', DEPOSIT: 'savings', WITHDRAWAL: 'payments',
   WELCOME: 'waving_hand', ADMIN: 'campaign',
+  ARENA_RESULT: 'emoji_events', ARENA_REFUND: 'savings',
 };
 
 export function notificationCategory(item: NotificationItem): NotificationCategory {
   if (item.category) return item.category;
-  if (item.link?.startsWith('/football') || item.type.startsWith('FOOTBALL_')) return 'football';
+  if (item.link?.startsWith('/football') || item.type.startsWith('FOOTBALL_') || item.type.startsWith('ARENA_')) return 'football';
   if (item.link?.startsWith('/wallet') || ['DEPOSIT', 'WITHDRAWAL'].includes(item.type)) return 'wallet';
   if (/^(MATCH_|CHESS_|CHALLENGE_|WAITING_PLAYER)/.test(item.type)) return 'games';
   return 'general';

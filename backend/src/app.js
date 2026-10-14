@@ -25,6 +25,7 @@ import gameRoutes from './routes/games.js';
 import matchRoutes from './routes/matches.js';
 import challengeRoutes from './routes/challenges.js';
 import footballRoutes from './routes/football.js';
+import arenaRoutes from './routes/fantasyArena.js';
 import chessRoutes from './routes/chess.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import notificationRoutes from './routes/notifications.js';
@@ -126,6 +127,7 @@ export function createApp() {
   // profile/dashboard mount. Mutating football endpoints enforce auth in
   // their own route handlers.
   app.use('/api/football', footballRoutes);
+  app.use('/api/arenas', arenaRoutes);
   app.use('/api/chess', chessRoutes);
   app.use('/api', requireAuth, meRoutes); // /api/me, /api/dashboard
   app.use('/api/push', requireAuth, pushRoutes);

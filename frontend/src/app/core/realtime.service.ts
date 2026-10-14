@@ -5,6 +5,7 @@ import { io, Socket } from 'socket.io-client';
 import { AuthService } from './auth.service';
 import { AppNotification, MatchView, Wallet } from './models';
 import type { ShootoutState } from '../games/shootout.model';
+import type {Arena} from './fantasy-arena';
 import { Toast } from './toast.service';
 import { ConfigStore } from './config.store';
 
@@ -45,6 +46,7 @@ export class RealtimeService {
   readonly notification$ = new Subject<AppNotification>();
   readonly challenge$ = new Subject<{ id: number }>();
   readonly chess$ = new Subject<{ code: string }>();
+  readonly arena$ = new Subject<{ arenaId: number;arena?:Arena|null }>();
   readonly queue$ = new Subject<Record<string, { total: number; byStake: Record<string, number> }>>();
   readonly leaderboard$ = new Subject<void>();
   readonly config$ = new Subject<void>();
@@ -121,6 +123,7 @@ export class RealtimeService {
     s.on('shootout:state', (st: ShootoutState) => this.shootout$.next(st));
     s.on('challenge:update', (c: { id: number }) => this.challenge$.next(c));
     s.on('chess:update', (c: { code: string }) => this.chess$.next(c));
+    s.on('arena:update', (a: { arenaId: number;arena?:Arena|null }) => this.arena$.next(a));
     s.on('queue:update', (q: Record<string, { total: number; byStake: Record<string, number> }>) => this.queue$.next(q));
     s.on('leaderboard:update', () => this.leaderboard$.next());
     s.on('config:update', () => { this.configStore.load(); this.config$.next(); });
