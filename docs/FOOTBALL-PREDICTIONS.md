@@ -2,6 +2,8 @@
 
 Current interface update: match pages now put player-to-player challenges directly after the fixture header, before historical analysis. The standalone Match predictions card and football-list free-pick link have been removed from these flows. Existing saved prediction records and API endpoints are retained; they are not part of the primary football experience. Research, past meetings and challenge settlement remain available.
 
+The primary challenge action is now inside the compact fixture card, visible without scrolling on small phones. It opens a focused three-step dialog (question, pick/stake, opponent) with a persistent action footer, rather than revealing a long page form. Secondary match information is collapsed. The existing final review, financial rules and server validation remain unchanged. Closing or going back preserves the current selections; changing fixtures resets the flow. Kickoff prevents progression even while the dialog is open.
+
 This extends the existing Angular football pages, Express API, MySQL fixture lifecycle and authentication. Free picks never call wallet, stake, fee or challenge settlement services. PvP navigation remains optional.
 
 ## User experience

@@ -35,7 +35,7 @@ import { FootballResearchResults } from './football-research-results';
   selector: 'app-football-fixture',
   imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet, FootballResearchResults],
   templateUrl: './football-fixture.html',
-  styleUrls: ['./football-fixture.scss', './football-fixture-insights.scss'],
+  styleUrls: ['./football-fixture.scss', './football-fixture-insights.scss', './football-challenge-flow.scss'],
 })
 export class FootballFixturePage implements OnInit,OnChanges {
   readonly fixtureId = input.required<string>();
@@ -82,6 +82,8 @@ export class FootballFixturePage implements OnInit,OnChanges {
   protected busy = signal(false);
   protected formError = signal('');
   protected reviewOpen = signal(false);
+  protected challengeOpen = signal(false);
+  protected challengeStep = signal(0);
   protected joinTarget = signal<OpenFootballChallenge | null>(null);
 
   protected available = computed(() => this.auth.wallet()?.available ?? 0);
@@ -187,7 +189,7 @@ export class FootballFixturePage implements OnInit,OnChanges {
 
   ngOnChanges(changes:SimpleChanges){
     if(!changes['fixtureId']||changes['fixtureId'].firstChange)return;
-    ++this.loadVersion;this.loading=false;this.fixture.set(null);this.openChallenges.set([]);this.type.set(null);this.pick.set(null);this.stake.set(null);this.mode.set(null);this.opponent.set(null);this.query='';this.results.set([]);++this.searchVersion;this.reviewOpen.set(false);this.joinTarget.set(null);this.formError.set('');this.researchData.set(null);this.researchOpen.set(false);this.researchLoading.set(false);this.researchError.set('');
+    this.challengeOpen.set(false);this.challengeStep.set(0);++this.loadVersion;this.loading=false;this.fixture.set(null);this.openChallenges.set([]);this.type.set(null);this.pick.set(null);this.stake.set(null);this.mode.set(null);this.opponent.set(null);this.query='';this.results.set([]);++this.searchVersion;this.reviewOpen.set(false);this.joinTarget.set(null);this.formError.set('');this.researchData.set(null);this.researchOpen.set(false);this.researchLoading.set(false);this.researchError.set('');
     void this.load();
   }
 
@@ -304,8 +306,6 @@ export class FootballFixturePage implements OnInit,OnChanges {
     this.type.set(t);
     this.pick.set(null);
     this.formError.set('');
-    // On mobile the builder sits below the question list — bring it into view.
-    setTimeout(() => document.getElementById('builder')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
   }
 
   choosePick(p: FootballPickValue) { this.pick.set(p); }
@@ -342,7 +342,14 @@ export class FootballFixturePage implements OnInit,OnChanges {
     this.results.set([]);
   }
 
-  closeReview() { if (!this.busy()) this.reviewOpen.set(false); }
+  openChallenge() { this.challengeStep.set(0); this.challengeOpen.set(true); }
+  closeChallenge() { this.challengeOpen.set(false); }
+  nextChallengeStep() {
+    if(this.closed() || (this.challengeStep() === 0 ? !this.type() : !this.pick() || !this.stake())) return;
+    this.challengeStep.update(n=>Math.min(2,n+1));
+  }
+  reviewChallenge() { if(this.readyToConfirm && !this.closed()){this.challengeOpen.set(false);this.reviewOpen.set(true);} }
+  closeReview() { if (!this.busy()) {this.reviewOpen.set(false);this.challengeOpen.set(true);} }
 
   onJoinClosed(e: { refresh: boolean }) {
     this.joinTarget.set(null);

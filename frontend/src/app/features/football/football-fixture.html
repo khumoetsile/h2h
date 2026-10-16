@@ -17,10 +17,6 @@
               <span class="chip">{{ f.status }}</span>
             }
           </div>
-          <button class="btn btn-ghost btn-sm follow-match" type="button" [disabled]="followBusy()" [attr.aria-pressed]="followed()" (click)="toggleFollow()">
-            <mat-icon>{{ followed() ? 'star' : 'star_outline' }}</mat-icon>
-            {{ followed() ? 'Following match' : 'Follow match' }}
-          </button>
           <div class="fh-teams">
             <a class="team team-link" [routerLink]="['/football/teams', f.homeTeam.id]">{{ f.homeTeam.name }}</a>
             @if (f.status === 'LIVE' || f.status === 'FINISHED') {
@@ -34,39 +30,30 @@
             }
             <a class="team team-link" [routerLink]="['/football/teams', f.awayTeam.id]">{{ f.awayTeam.name }}</a>
           </div>
+          @if (!closed()) {
+            <button id="pvp-challenge" class="btn btn-primary btn-lg btn-block challenge-launch" (click)="openChallenge()">Challenge a player <span aria-hidden="true">→</span></button>
+          } @else {
+            <a class="btn btn-primary btn-block" routerLink="/football">Find a match to challenge on →</a>
+          }
           @if (f.status === 'SCHEDULED' && !closed()) {
             <div class="kickoff-row">
               <div><span class="muted small">Kickoff</span><strong>{{ f.kickoffAt | date: 'EEE d MMM, HH:mm' }}</strong></div>
               <div class="right"><span class="muted small">Starts in</span><app-countdown [deadline]="f.kickoffAt" [urgentUnder]="600" (expired)="load()" /></div>
             </div>
-            <p class="muted tiny">Challenges on this match close at kickoff. The challenge becomes active when the match begins.</p>
+
           }
+          <details class="match-details-toggle"><summary>Match information</summary>
           @if (f.isSimulated) { <p class="muted tiny">Simulated demo fixture (for testing only).</p> }
           @if (f.lastUpdatedAt) { <p class="muted tiny">Football data last updated {{ f.lastUpdatedAt | date: 'EEE d MMM, HH:mm' }}.</p> }
           @if (f.status === 'LIVE') { <p class="muted tiny">Match data refreshes every 15 seconds while this page is open.</p> }
           @if (refreshError()) { <p class="refresh-error" role="status">{{ refreshError() }}</p> }
+          <button class="btn btn-ghost btn-sm follow-match" type="button" [disabled]="followBusy()" [attr.aria-pressed]="followed()" (click)="toggleFollow()">
+            <mat-icon>{{ followed() ? 'star' : 'star_outline' }}</mat-icon>
+            {{ followed() ? 'Following match' : 'Follow match' }}
+          </button>
+          </details>
         </div>
 
-        <div class="challenge-area">
-        <section class="challenge-panel" id="pvp-challenge" tabindex="-1" aria-labelledby="challenge-title">
-          <h2 id="challenge-title">Challenge another player</h2>
-          @if (!closed()) { <p class="muted small">Choose your side. Challenge a friend or find an opponent.</p> }
-        @if (target()) {
-          <div class="card notice rematch-notice">
-            <mat-icon>swords</mat-icon>
-            <div><strong>Challenging {{ target()!.username }}</strong><p class="text-2">Pick a question, your side and a stake. They'll get a new challenge to accept.</p></div>
-          </div>
-        }
-
-        @if (closed()) {
-          <div class="card notice">
-            <mat-icon>lock_clock</mat-icon>
-            <div>
-              <strong>Challenges are closed for this match</strong>
-              <p class="text-2">This match has already kicked off, so new challenges are no longer available for it.</p>
-            </div>
-          </div>
-        } @else {
           @if (visibleOpen().length) {
             <div class="card waiting-card">
               <h3>Players waiting on this match</h3>
@@ -78,137 +65,6 @@
             </div>
           }
 
-          @if (!auth.isLoggedIn()) {
-            <div class="card notice">
-              <mat-icon>person_outline</mat-icon>
-              <div>
-                <strong>Want to challenge someone on this match?</strong>
-                <p class="text-2">Create an account to join a 1-vs-1 challenge. This demo uses simulated funds only.</p>
-                <a class="btn btn-primary btn-sm" routerLink="/register" [queryParams]="{ next: '/football/' + f.id }">Create account</a>
-                <a class="btn btn-ghost btn-sm" routerLink="/login" [queryParams]="{ next: '/football/' + f.id }">Sign in</a>
-              </div>
-            </div>
-          } @else {
-          <div class="card how">
-            <h3>Choose a question</h3>
-            <div class="type-list">
-              @for (t of f.challengeTypes ?? []; track t.id) {
-                <button class="type-row" [class.selected]="type()?.id === t.id" (click)="chooseType(t)">
-                  <span class="grow">{{ t.question }}</span>
-                  <mat-icon class="chev">{{ type()?.id === t.id ? 'check_circle' : 'chevron_right' }}</mat-icon>
-                </button>
-              }
-            </div>
-          </div>
-          }
-        }
-
-        </section>
-      @if (!closed() && auth.isLoggedIn()) {
-        <aside class="screen entry" id="builder">
-          @if (!type()) {
-            <div class="screen-body">
-              <p class="muted small center-note">Choose a question to get started.</p>
-            </div>
-          } @else {
-            @let t = type()!;
-            <div class="screen-body">
-              <div>
-                <h2>Your pick</h2>
-                <p class="muted small q">{{ t.question }}</p>
-                <div class="tiles pick-tiles">
-                  @if (t.pickType === 'TEAM') {
-                    <button class="tile" [class.selected]="pick() === 'HOME'" (click)="choosePick('HOME')">{{ f.homeTeam.name }}</button>
-                    <button class="tile" [class.selected]="pick() === 'AWAY'" (click)="choosePick('AWAY')">{{ f.awayTeam.name }}</button>
-                  } @else {
-                    <button class="tile" [class.selected]="pick() === 'YES'" (click)="choosePick('YES')">Yes</button>
-                    <button class="tile" [class.selected]="pick() === 'NO'" (click)="choosePick('NO')">No</button>
-                  }
-                </div>
-                <p class="muted tiny rule">{{ t.settlementSummary }}</p>
-              </div>
-
-              @if (pick()) {
-                <div>
-                  <h2>Stake</h2>
-                  <div class="tiles stake-tiles">
-                    @for (s of f.stakes ?? []; track s) {
-                      <button class="tile" [class.selected]="stake() === s" [disabled]="s > available()" (click)="stake.set(s)">{{ s | money }}</button>
-                    }
-                  </div>
-                  @if (stake() && potentialPrize() !== null) {
-                    <div class="prize-box">
-                      <div class="pb-row"><span>Your stake</span><strong class="money">{{ stake() | money }}</strong></div>
-                      <div class="pb-row win-row"><span>Win the challenge and receive</span><strong class="money accent">{{ potentialPrize() | money }}</strong></div>
-                      <p class="muted tiny">Draw, void or cancelled: both players get their full stake back, platform fee {{ 0 | money }}.</p>
-                    </div>
-                  }
-                </div>
-              }
-
-              @if (pick() && stake()) {
-                <div>
-                  <h2>Who do you want to play?</h2>
-                  <div class="mode-cards" role="radiogroup" aria-label="How to find your opponent">
-                    <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'direct'" [class.selected]="mode() === 'direct'" (click)="chooseMode('direct')">
-                      <strong>Challenge someone</strong>
-                      <span>I already know who I want to play.</span>
-                    </button>
-                    <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'find'" [class.selected]="mode() === 'find'" (click)="chooseMode('find')">
-                      <strong>Find an opponent</strong>
-                      <span>Make it public: any available player can join.</span>
-                    </button>
-                  </div>
-
-                  @if (mode() === 'direct') {
-                    <div class="search-box">
-                      <mat-icon>search</mat-icon>
-                      <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" autocomplete="off" aria-label="Search for a player" />
-                      @if (searching()) { <mat-spinner diameter="18" /> }
-                    </div>
-                    @if (searchError()) { <app-load-error [message]="searchError()" (retry)="retrySearch()" /> }
-                    @else if (searching()) { <p class="muted small" role="status">Searching for players…</p> }
-                    @else if (query.trim() && !opponent() && results().length === 0) { <p class="muted small" role="status">No players found. Try another username.</p> }
-                    @if (results().length > 0) {
-                      <div class="result-list">
-                        @for (u of results(); track u.id) {
-                          <button class="result-row" (click)="pickOpponent(u)">
-                            <app-avatar [name]="u.username" [color]="u.avatarColor" [size]="36" />
-                            <span class="grow">{{ u.username }}</span>
-                            @if (u.online) { <span class="chip chip-win">online</span> }
-                          </button>
-                        }
-                      </div>
-                    }
-                    @if (opponent()) {
-                      <label class="msg-label" for="msg">Add a message (optional)</label>
-                      <textarea id="msg" class="msg-box" [(ngModel)]="message" maxlength="140" rows="2" placeholder="Think you've got this one?"></textarea>
-                    }
-                  }
-                  @if (mode() === 'find') {
-                    <p class="muted small mode-note"><mat-icon inline>public</mat-icon> Your challenge appears in <strong>Open Challenges</strong>. Another player must join within {{ acceptWindow() }} or it expires and your stake is returned.</p>
-                  }
-                </div>
-              }
-
-              @if (formError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ formError() }}</div> }
-            </div>
-
-            <div class="screen-actions">
-              @if (available() < (f.stakes?.[0] ?? 0)) {
-                <a class="btn btn-primary btn-lg btn-block" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add demo funds to play</a>
-              } @else if (pick() && stake()) {
-                <button class="btn btn-primary btn-lg btn-block" [disabled]="!readyToConfirm" (click)="reviewOpen.set(true)">
-                  <mat-icon>{{ mode() === 'direct' ? 'person_pin' : mode() === 'find' ? 'travel_explore' : 'arrow_downward' }}</mat-icon>
-                  {{ mode() === 'direct' ? (opponent() ? 'Review challenge' : 'Choose a player') : mode() === 'find' ? 'Review & find opponent' : 'Choose who to play' }}
-                </button>
-              }
-            </div>
-          }
-        </aside>
-      }
-
-        </div>
         <section class="fixture-research" aria-label="Past meetings and recent form">
           @if(researchError()){<app-load-error [message]="researchError()" (retry)="loadResearch(true)"/>}
           @else if(researchLoading()&&!researchData()){<div class="insights-skeleton" role="status" aria-label="Loading past meetings"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
@@ -346,4 +202,132 @@
 
 @if (joinTarget(); as c) {
   <app-join-sheet [challenge]="c" (closed)="onJoinClosed($event)" />
+}
+
+
+@if (challengeOpen() && fixture(); as f) {
+  <div class="flow-backdrop" (click)="closeChallenge()" (keydown.escape)="closeChallenge()">
+    <section class="flow-card" role="dialog" aria-modal="true" aria-labelledby="challenge-title" cdkTrapFocus [cdkTrapFocusAutoCapture]="true" (click)="$event.stopPropagation()">
+      <header class="flow-header">
+        <div><span class="muted small">{{ f.homeTeam.shortName || f.homeTeam.name }} vs {{ f.awayTeam.shortName || f.awayTeam.name }}</span><h2 id="challenge-title">Challenge a player</h2></div>
+        <button class="btn btn-ghost" aria-label="Close challenge" (click)="closeChallenge()">✕</button>
+      </header>
+      <div class="flow-body">
+        @if (closed()) { <p role="status">Challenges have closed for this match.</p> }
+        @else if (!auth.isLoggedIn()) {
+          <h3>Play against another person</h3><p>Sign in or create an account to start your challenge.</p>
+          <a class="btn btn-primary btn-block" routerLink="/login" [queryParams]="{next:'/football/'+f.id}">Sign in</a>
+          <a class="btn btn-ghost btn-block" routerLink="/register" [queryParams]="{next:'/football/'+f.id}">Create account</a>
+        } @else {
+          <p class="flow-progress" role="status">Step {{ challengeStep() + 1 }} of 3 · {{ challengeStep() === 0 ? 'Question' : challengeStep() === 1 ? 'Your pick & stake' : 'Your opponent' }}</p>
+          @if (challengeStep() === 0) {
+            <h3>What are you challenging on?</h3>
+            <div class="type-list">
+              @for (t of f.challengeTypes ?? []; track t.id) {
+                <button class="type-row" [class.selected]="type()?.id === t.id" (click)="chooseType(t)">
+                  <span class="grow">{{ t.question }}</span>
+                  <mat-icon class="chev">{{ type()?.id === t.id ? 'check_circle' : 'chevron_right' }}</mat-icon>
+                </button>
+              }
+            </div>
+
+          } @else if (type(); as t) {
+            <div class="screen-body">
+              @if (challengeStep() === 1) {
+              <div>
+                <h2>Your pick</h2>
+                <p class="muted small q">{{ t.question }}</p>
+                <div class="tiles pick-tiles">
+                  @if (t.pickType === 'TEAM') {
+                    <button class="tile" [class.selected]="pick() === 'HOME'" (click)="choosePick('HOME')">{{ f.homeTeam.name }}</button>
+                    <button class="tile" [class.selected]="pick() === 'AWAY'" (click)="choosePick('AWAY')">{{ f.awayTeam.name }}</button>
+                  } @else {
+                    <button class="tile" [class.selected]="pick() === 'YES'" (click)="choosePick('YES')">Yes</button>
+                    <button class="tile" [class.selected]="pick() === 'NO'" (click)="choosePick('NO')">No</button>
+                  }
+                </div>
+                <p class="muted tiny rule">{{ t.settlementSummary }}</p>
+              </div>
+
+              @if (pick()) {
+                <div>
+                  <h2>Stake</h2>
+                  <div class="tiles stake-tiles">
+                    @for (s of f.stakes ?? []; track s) {
+                      <button class="tile" [class.selected]="stake() === s" [disabled]="s > available()" (click)="stake.set(s)">{{ s | money }}</button>
+                    }
+                  </div>
+                  @if (stake() && potentialPrize() !== null) {
+                    <div class="prize-box">
+                      <div class="pb-row"><span>Your stake</span><strong class="money">{{ stake() | money }}</strong></div>
+                      <div class="pb-row win-row"><span>Win the challenge and receive</span><strong class="money accent">{{ potentialPrize() | money }}</strong></div>
+                      <p class="muted tiny">Draw, void or cancelled: both players get their full stake back, platform fee {{ 0 | money }}.</p>
+                    </div>
+                  }
+                </div>
+              }
+
+              }
+              @if (challengeStep() === 2) {
+                <div>
+                  <h2>Who do you want to play?</h2>
+                  <div class="mode-cards" role="radiogroup" aria-label="How to find your opponent">
+                    <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'direct'" [class.selected]="mode() === 'direct'" (click)="chooseMode('direct')">
+                      <strong>Challenge someone</strong>
+                      <span>I already know who I want to play.</span>
+                    </button>
+                    <button class="mode-card" role="radio" [attr.aria-checked]="mode() === 'find'" [class.selected]="mode() === 'find'" (click)="chooseMode('find')">
+                      <strong>Find an opponent</strong>
+                      <span>Make it public: any available player can join.</span>
+                    </button>
+                  </div>
+
+                  @if (mode() === 'direct') {
+                    <div class="search-box">
+                      <mat-icon>search</mat-icon>
+                      <input [(ngModel)]="query" (ngModelChange)="onQuery($event)" placeholder="Search username" autocomplete="off" aria-label="Search for a player" />
+                      @if (searching()) { <mat-spinner diameter="18" /> }
+                    </div>
+                    @if (searchError()) { <app-load-error [message]="searchError()" (retry)="retrySearch()" /> }
+                    @else if (searching()) { <p class="muted small" role="status">Searching for players…</p> }
+                    @else if (query.trim() && !opponent() && results().length === 0) { <p class="muted small" role="status">No players found. Try another username.</p> }
+                    @if (results().length > 0) {
+                      <div class="result-list">
+                        @for (u of results(); track u.id) {
+                          <button class="result-row" (click)="pickOpponent(u)">
+                            <app-avatar [name]="u.username" [color]="u.avatarColor" [size]="36" />
+                            <span class="grow">{{ u.username }}</span>
+                            @if (u.online) { <span class="chip chip-win">online</span> }
+                          </button>
+                        }
+                      </div>
+                    }
+                    @if (opponent()) {
+                      <label class="msg-label" for="msg">Add a message (optional)</label>
+                      <textarea id="msg" class="msg-box" [(ngModel)]="message" maxlength="140" rows="2" placeholder="Think you've got this one?"></textarea>
+                    }
+                  }
+                  @if (mode() === 'find') {
+                    <p class="muted small mode-note"><mat-icon inline>public</mat-icon> Your challenge appears in <strong>Open Challenges</strong>. Another player must join within {{ acceptWindow() }} or it expires and your stake is returned.</p>
+                  }
+                </div>
+              }
+
+              @if (formError()) { <div class="form-error"><mat-icon>error</mat-icon>{{ formError() }}</div> }
+            </div>
+
+
+          }
+        }
+      </div>
+      @if (auth.isLoggedIn() && !closed()) {
+        <footer class="flow-actions">
+          @if (challengeStep() > 0) { <button class="btn btn-ghost" (click)="challengeStep.set(challengeStep()-1)">Back</button> }
+          @if (available() < (f.stakes?.[0] ?? 0)) { <a class="btn btn-primary" routerLink="/wallet/deposit">Add funds to play</a> }
+          @else if (challengeStep() < 2) { <button class="btn btn-primary" [disabled]="challengeStep() === 0 ? !type() : !pick() || !stake()" (click)="nextChallengeStep()">Continue →</button> }
+          @else { <button class="btn btn-primary" [disabled]="!readyToConfirm" (click)="reviewChallenge()">Review challenge →</button> }
+        </footer>
+      }
+    </section>
+  </div>
 }

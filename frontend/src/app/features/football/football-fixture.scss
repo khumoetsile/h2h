@@ -4,17 +4,6 @@
 .page { max-width: 1440px; }
 .intro { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; }
 .intro > * { min-width: 0; }
-.challenge-area { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
-.challenge-area > * { min-width: 0; }
-.challenge-panel { scroll-margin-top: 84px; }
-.challenge-panel h2 { margin-bottom: 6px; }
-.challenge-panel > .how { border-color: var(--accent); }
-.entry { scroll-margin-top: 84px; }
-@media (min-width: 1080px) {
-  .challenge-area { grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); }
-  .challenge-area:not(:has(> .entry)) { grid-template-columns: minmax(0, 1fr); }
-  .entry { position: sticky; top: 84px; }
-}
 
 .fixture-head { padding: 18px 20px; display: flex; flex-direction: column; gap: 10px; }
 .fh-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }

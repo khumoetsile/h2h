@@ -443,3 +443,6 @@ input, textarea, select, .mat-mdc-form-field, .mat-mdc-input-element, .mat-mdc-o
   .vs { color: var(--muted); font-size: 13px; font-weight: 500; flex-shrink: 0; }
   .score { color: var(--accent); flex-shrink: 0; font-size: 22px; }
 }
+
+// Keep the underlying fixture in place while its guided challenge is open.
+body:has(.flow-backdrop) { overflow: hidden; }
