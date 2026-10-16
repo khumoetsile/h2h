@@ -1,5 +1,9 @@
 # Historical football research
 
+October 2026 reliability update: real fixture detail and `/fixtures/:id/insights` now read the same verified local archive as research, without live history, form or standings requests. Missing history no longer depends on a vendor returning HTTP 429. The old fixture insights response uses a conservative cutoff before the fixture day; the full comparison shows completed matches and supports pagination. Upcoming/default fixture lists exclude past scheduled kickoffs.
+
+Football-data polling now caches the competition catalogue for six hours, refreshes the full fixture window every ten minutes, and uses one current/recent score batch for live and final results. Cached fixture-window responses are not repeatedly written over newer live scores. HTTP 429 activates a bounded cooldown; known competitions remain available during catalogue failures. API-Football remains the budget-limited history supplement, with strict reviewed name/country aliases for additional major clubs. Missing coverage is not represented as a zero score or a claim that two clubs have never met.
+
 `/football/research` is public. Select two teams to compare, or open a fixture's preselected comparison. Team, competition, season, venue, date and sample selections survive refresh and are shareable. No registration is required.
 
 ## Dashboard

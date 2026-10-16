@@ -5,6 +5,15 @@ import {ApiFootballProvider,API_FOOTBALL_BASE,normalizeApiFootballMeeting,normal
 
 // Reviewed names, not fuzzy matching: never merge men's/women's/youth clubs.
 const reviewed={
+  'SSC Napoli':['Napoli','Italy'],'Bologna FC 1909':['Bologna','Italy'],
+  'AS Roma':['AS Roma','Italy'],'AC Milan':['AC Milan','Italy'],
+  'Borussia Dortmund':['Borussia Dortmund','Germany'],'Bayer 04 Leverkusen':['Bayer Leverkusen','Germany'],
+  '1. FC Union Berlin':['Union Berlin','Germany'],'SV Werder Bremen':['Werder Bremen','Germany'],
+  '1. FSV Mainz 05':['FSV Mainz 05','Germany'],'1. FC Köln':['1. FC Köln','Germany'],
+  'Villarreal CF':['Villarreal','Spain'],'Real Betis Balompié':['Real Betis','Spain'],
+  'RCD Espanyol de Barcelona':['Espanyol','Spain'],'Fenerbahçe SK':['Fenerbahce','Turkey'],
+  'Ipswich Town FC':['Ipswich','England'],'Hull City AFC':['Hull City','England'],
+  'Frosinone Calcio':['Frosinone','Italy'],'Le Mans FC':['Le Mans','France'],
   'Liverpool FC':['Liverpool','England'],'Chelsea FC':['Chelsea','England'],'Arsenal FC':['Arsenal','England'],
   'Manchester City FC':['Manchester City','England'],'Manchester United FC':['Manchester United','England'],
   'Brentford FC':['Brentford','England'],'LASK Linz':['Lask Linz','Austria'],

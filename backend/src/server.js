@@ -1,5 +1,6 @@
 import {reconcilePredictionResults} from './football/communityPredictionService.js';
 import {sweepArenas} from './football/fantasyArenaService.js';
+import {ensureAutomaticArenas} from './football/automaticArenaService.js';
 import http from 'node:http';
 import { Server } from 'socket.io';
 import { config } from './config.js';
@@ -48,7 +49,7 @@ export function createServer() {
 }
 
 export async function startSweeper() {
-  let running = false;let nextPredictionSweep=0;
+  let running = false;let nextPredictionSweep=0;let nextArenaCreation=0;
   // Complete downtime compensation before accepting HTTP or socket actions.
   // A chess read may settle an overdue turn, so listening first could unfairly
   // forfeit it before the stored deadline receives the platform outage back.
@@ -64,6 +65,7 @@ export async function startSweeper() {
       await sweepChess();
       await heartbeat();
       await sweepArenas();
+      if(Date.now()>=nextArenaCreation){nextArenaCreation=Date.now()+15*60000;await ensureAutomaticArenas().catch(err=>console.error('Automatic arena creation',err.message));}
       if(Date.now()>=nextPredictionSweep){nextPredictionSweep=Date.now()+60000;await reconcilePredictionResults().catch(err=>console.error('Free prediction result check',err.message));}
     } catch (err) {
       console.error('Sweeper error', err);

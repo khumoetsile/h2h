@@ -36,21 +36,38 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     this.headToHeadCache = new Map();
     this.teamMatchesCache = new Map();
     this.standingsCache = new Map();
+    this.requestCache = new Map();
+    this.retryAt = 0;
   }
 
   get name() { return 'football-data'; }
   capabilities() { return { statistics: false, events: false }; }
 
   async #get(path) {
+    if (Date.now() < this.retryAt) throw new Error('football-data.org is cooling down after a rate limit. Stored results remain available.');
     const res = await fetch(`${this.baseUrl}${path}`, {
       headers: this.apiKey ? { 'X-Auth-Token': this.apiKey } : {},
       signal: AbortSignal.timeout(10000),
     });
     if (!res.ok) {
+      if (res.status === 429) {
+        const wait = Number(res.headers.get('retry-after'));
+        this.retryAt = Date.now() + Math.min(15*60000, Math.max(60000, (Number.isFinite(wait)?wait:60)*1000));
+      }
       const body = await res.text().catch(() => '');
       throw new Error(`football-data.org ${path} -> HTTP ${res.status}: ${body.slice(0, 200)}`);
     }
     return res.json();
+  }
+
+  #cached(path, ttl) {
+    const prior=this.requestCache.get(path);
+    if(prior && prior.until>Date.now()) return prior.promise;
+    const entry={until:Date.now()+ttl,promise:null};
+    entry.promise=this.#get(path).catch(err=>{if(this.requestCache.get(path)===entry)this.requestCache.delete(path);throw err;});
+    this.requestCache.set(path,entry);
+    if(this.requestCache.size>100)this.requestCache.delete(this.requestCache.keys().next().value);
+    return entry.promise;
   }
 
   #team(t) {
@@ -84,7 +101,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
   }
 
   async listCompetitions() {
-    const data = await this.#get('/competitions');
+    const data = await this.#cached('/competitions',6*3600000);
     return (data.competitions || []).map((c) => ({
       providerId: String(c.id), code: c.code, name: c.name, country: c.area?.name || null, emblemUrl: c.emblem || null,
     }));
@@ -93,7 +110,7 @@ export class FootballDataOrgProvider extends FootballDataProvider {
   async listUpcomingFixtures(competitionCode, fromIso, toIso) {
     const dateFrom = fromIso.slice(0, 10);
     const dateTo = toIso.slice(0, 10);
-    const data = await this.#get(`/competitions/${competitionCode}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`);
+    const data = await this.#cached(`/competitions/${competitionCode}/matches?dateFrom=${dateFrom}&dateTo=${dateTo}`,10*60000);
     return (data.matches || []).map((m) => this.#fixture(m));
   }
 
@@ -101,6 +118,15 @@ export class FootballDataOrgProvider extends FootballDataProvider {
     const data = await this.#get(`/matches/${providerFixtureId}`);
     if (!data?.id) return null;
     return this.#fixture(data);
+  }
+
+  async getLiveFixtures() {
+    // One batch carries live AND recent final scores, instead of one call per game.
+    const from=new Date(Date.now()-86400000).toISOString().slice(0,10);
+    const to=new Date().toISOString().slice(0,10);
+    const data=await this.#cached(`/matches?dateFrom=${from}&dateTo=${to}`,30000);
+    if(!Array.isArray(data.matches))throw new Error('football-data.org did not return a valid score batch.');
+    return data.matches.map(m=>this.#fixture(m));
   }
 
   async getCompetitionStandings(competitionCode) {

@@ -236,10 +236,10 @@ async function lockTx(tx, a, fixtures, now) {
   });
   changed(tx, a.id);
 }
-export async function createArena(adminId, input) {
+export async function createArena(adminId, input, { automaticKey = null } = {}) {
   return withTransaction(async (tx) => {
     const r = await tx.q(
-      "INSERT INTO fantasy_arenas(name,description,entry_cents,fee_bps,first_bps,second_bps,third_bps,created_by) VALUES(?,?,?,?,?,?,?,?)",
+      "INSERT INTO fantasy_arenas(name,description,entry_cents,fee_bps,first_bps,second_bps,third_bps,created_by,automatic_key) VALUES(?,?,?,?,?,?,?,?,?)",
       [
         input.name,
         input.description || null,
@@ -247,6 +247,7 @@ export async function createArena(adminId, input) {
         Math.round(input.feePercent * 100),
         ...input.prizePercentages.map((n) => Math.round(n * 100)),
         adminId,
+        automaticKey,
       ],
     );
     await replaceFixtures(tx, r.insertId, input.fixtures);
@@ -254,8 +255,8 @@ export async function createArena(adminId, input) {
       tx,
       { id: r.insertId },
       "ARENA_CREATED",
-      { fixtureCount: input.fixtures.length },
-      adminId,
+      { fixtureCount: input.fixtures.length, automaticKey },
+      automaticKey ? null : adminId,
     );
     return { id: r.insertId };
   });
@@ -335,7 +336,7 @@ export async function updateArena(adminId, id, input) {
     return { id };
   });
 }
-export async function publishArena(adminId, id) {
+export async function publishArena(adminId, id, { automatic = false } = {}) {
   return withTransaction(async (tx) => {
     const a = await arenaRow(tx, id);
     if (a.status !== "DRAFT")
@@ -370,7 +371,7 @@ export async function publishArena(adminId, id) {
         id,
       ],
     );
-    await audit(tx, a, "ARENA_PUBLISHED", {}, adminId);
+    await audit(tx, a, "ARENA_PUBLISHED", {automatic}, automatic ? null : adminId);
     changed(tx, id);
     return { id };
   });

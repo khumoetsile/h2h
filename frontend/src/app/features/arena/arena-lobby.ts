@@ -16,7 +16,7 @@ import { Countdown } from '../../shared/countdown';
     <header class="arena-hero">
       <span class="eyebrow">ONE SLIP. EVERYONE PLAYS.</span>
       <h1>Fantasy Arena</h1>
-      <p>Predict Win, Draw or Loss. Get a point for every correct pick.</p>
+      <p>Big teams. One shared slip. New competitions selected automatically.</p>
       <span class="status">Demo money only</span>
       @if (auth.isAdmin()) {
         <a class="btn btn-ghost" routerLink="/admin/arenas">Manage arenas →</a>
@@ -125,7 +125,7 @@ import { Countdown } from '../../shared/countdown';
             <p>
               {{
                 section() === 'open'
-                  ? 'New competitions will appear when the platform publishes them.'
+                  ? 'We automatically select upcoming matches featuring major clubs. Check back when the next fixtures are available.'
                   : 'Browse open arenas to find your next competition.'
               }}
             </p>

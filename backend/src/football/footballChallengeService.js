@@ -19,6 +19,7 @@ import { recordAudit } from '../services/auditService.js';
 import { acceptanceDeadline } from '../timers.js';
 import { logSystemError } from '../services/systemErrorService.js';
 import { escapeLike, fixtureSearchTokens } from '../utils/search.js';
+import { researchTeams } from './footballResearchService.js';
 
 const PICKS_BY_TYPE = { TEAM: ['HOME', 'AWAY'], YES_NO: ['YES', 'NO'] };
 const opposite = (pickType, pick) => PICKS_BY_TYPE[pickType].find((p) => p !== pick);
@@ -270,9 +271,9 @@ export async function listFixtures({ competitionId, status, dateFrom, dateTo, te
   }
   if (competitionId) { where.push('fx.competition_id = ?'); params.push(competitionId); }
   if (status === 'live') where.push(`fx.status = 'LIVE'`);
-  else if (status === 'upcoming') where.push(`fx.status = 'SCHEDULED'`);
+  else if (status === 'upcoming') where.push(`fx.status = 'SCHEDULED' AND fx.kickoff_at > UTC_TIMESTAMP()`);
   else if (status === 'completed') where.push(`fx.status = 'FINISHED'`);
-  else if (!status) where.push(`fx.status IN ('SCHEDULED','LIVE')`);
+  else if (!status) where.push(`(fx.status = 'LIVE' OR (fx.status = 'SCHEDULED' AND fx.kickoff_at > UTC_TIMESTAMP()))`);
   if (dateFrom) { where.push('fx.kickoff_at >= ?'); params.push(`${dateFrom} 00:00:00`); }
   if (dateTo) { where.push('fx.kickoff_at < DATE_ADD(?, INTERVAL 1 DAY)'); params.push(`${dateTo} 00:00:00`); }
   if (teamId) { where.push('(fx.home_team_id = ? OR fx.away_team_id = ?)'); params.push(teamId, teamId); }
@@ -329,6 +330,26 @@ export async function getFixtureDetail(fixtureId, { includeInsights = true } = {
     events, headToHead: null, recentMeetings: [], lastUpdatedAt: row.last_synced_at, challengeTypes: types, stakes: settings.stake_amounts,
   };
   if (!includeInsights) return base;
+  // Stored, verified history is shared with the research page. Public reads
+  // must not spend provider quota or turn a vendor outage into missing history.
+  if (row.provider !== 'mock') {
+    const data = await researchTeams({ teamA: row.home_team_id, teamB: row.away_team_id,
+      dateTo: new Date(new Date(row.kickoff_at).getTime() - 86400000).toISOString().slice(0,10) });
+    const matches = data.headToHead.matches.map(m => ({
+      id:m.id, fixtureId:m.fixtureId, competition:m.competition.name, kickoffAt:m.kickoffAt,
+      homeTeam:m.homeTeam.name, awayTeam:m.awayTeam.name,
+      homeCrestUrl:m.homeTeam.crestUrl, awayCrestUrl:m.awayTeam.crestUrl,
+      homeTeamProviderId:null, awayTeamProviderId:null, homeScore:m.homeScore, awayScore:m.awayScore, venue:null,
+    }));
+    return { ...base, recentMeetings:matches, headToHead:{
+      status:matches.length?'AVAILABLE':'EMPTY',source:'STORED',matches,
+      summary:{...data.headToHead.summary,capped:data.headToHead.hasMore,
+        homeAtHome:data.headToHead.byVenue.home,awayAtHome:data.headToHead.byVenue.away},
+      standings:{status:'UNSUPPORTED',source:null,home:null,away:null},
+      recentForm:{home:{...data.form.teamA,status:data.form.teamA.matches.length?'AVAILABLE':'EMPTY',source:'STORED'},
+        away:{...data.form.teamB,status:data.form.teamB.matches.length?'AVAILABLE':'EMPTY',source:'STORED'}},
+    }};
+  }
   const meetings = await query(
     `${FIXTURE_SELECT} WHERE fx.status = 'FINISHED' AND fx.home_score IS NOT NULL AND fx.away_score IS NOT NULL
        AND comp.is_enabled = 1 AND comp.provider = ?${simulatedFilter}

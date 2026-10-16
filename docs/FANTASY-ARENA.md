@@ -21,13 +21,23 @@ Participant counts and projected prizes grow with confirmed entries. Socket.IO b
 
 ## Admin setup
 
+### Automatic Big Match arenas
+
+The platform now creates and publishes competitions automatically; an administrator does not need to prepare the normal daily slips. Every 15 minutes, it checks real, recently synced upcoming fixtures and prepares the next two eligible match days. Each slip contains up to five matches (minimum three) featuring a reviewed list of major clubs in the Premier League, Champions League, La Liga, Serie A, Bundesliga and Ligue 1. Big-club versus big-club fixtures receive priority. Calendar dates use Botswana time, with at least two hours before the first kickoff at creation.
+
+Default automatic entry is P20, fee 10%, prizes 50/30/20. Selection requires fixture data synced within six hours. A database lock and unique daily key prevent duplicate arenas across simultaneous sweepers or restarts. Empty or stale schedules do not create fictional matches. Automatic actions are audited as SYSTEM; the existing active admin remains the ownership contact. Existing manual competitions and participants are preserved.
+
+Migration **023_automatic_arenas.sql** adds the unique automatic key. Selection lives in `src/football/automaticArenaService.js`. No additional credentials or scheduler setup is required beyond the running application and existing football feed.
+
+### Optional manual competitions
+
 1. Sign in as an administrator and open `/admin/arenas`.
 2. Create a draft, name it and choose a demo entry fee. Select real upcoming fixtures from enabled competitions. Search by team or competition; “Next 5” provides a starting slip.
 3. Arrange fixture order and choose the reference team for each fixture. Check fee and prize shares.
 4. Save, review the shared slip, then Publish. Players can now join from the public lobby.
 5. Monitor counts, predictions, live ranks and completed settlement records. Cancelling an open arena requires a reason and automatically refunds all entries.
 
-No production arena, entrant or result is seeded by this feature. An admin must publish the first competition. Existing real football-provider credentials and enabled competitions must supply upcoming fixtures and verified final results. No new environment variables are required. The existing background sweeper advances active arenas; detail reads also advance the selected arena.
+No fictional entrant or result is seeded by this feature. Automatic competitions use the existing real football feed; admins can additionally publish special competitions. Existing real football-provider credentials and enabled competitions must supply upcoming fixtures and verified final results. No new environment variables are required. The existing background sweeper advances active arenas; detail reads also advance the selected arena.
 
 ## Migration and files
 

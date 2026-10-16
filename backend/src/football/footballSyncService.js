@@ -27,7 +27,7 @@ async function upsertCompetitions(provider) {
     list = await provider.listCompetitions();
   } catch (err) {
     await logSystemError('football-sync:competitions', err);
-    return [];
+    return query('SELECT * FROM football_competitions WHERE is_enabled = 1 AND provider = ?', [provider.name]);
   }
   const active = list.filter((c) => supported.has(c.code));
   for (const [i, c] of active.entries()) {
@@ -100,19 +100,24 @@ async function insertNewEvents(fixtureRow, events) {
   }
 }
 
+const upcomingRefresh = new WeakMap();
 async function syncUpcomingFixtures(provider, competitions) {
+  if (provider.name === 'football-data' && Date.now()-(upcomingRefresh.get(provider)||0)<10*60000) return;
   // Refresh the recent-results window alongside upcoming fixtures without
   // adding another provider request per competition.
   const from = new Date(Date.now() - 7 * 86400000);
   const to = new Date(Date.now() + config.football.fixtureWindowDays * 86400000);
+  let successful = false;
   for (const comp of competitions) {
     try {
       const fixtures = await provider.listUpcomingFixtures(comp.code, from.toISOString(), to.toISOString());
       for (const fx of fixtures) await upsertFixture(provider, comp, fx);
+      successful = true;
     } catch (err) {
       await logSystemError(`football-sync:fixtures:${comp.code}`, err);
     }
   }
+  if(successful) upcomingRefresh.set(provider,Date.now());
 }
 
 /** Fixtures worth an individual refresh right now: imminent, live, or recently kicked off but not yet marked final. */
@@ -160,6 +165,7 @@ async function refreshLiveSnapshot(provider, competitions) {
     String(competition.provider_competition_id),
     competition,
   ]));
+  if (provider.name === 'football-data') for (const c of competitions) byProviderCompetition.set(c.code,c);
   for (const fixture of liveFixtures) {
     const competition = byProviderCompetition.get(String(fixture.competitionProviderId));
     if (!competition) continue;

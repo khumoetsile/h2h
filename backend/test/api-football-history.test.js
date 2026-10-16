@@ -43,6 +43,10 @@ test('history import reuses local clubs, handles cross-competition meetings, cor
   const f=await query("INSERT INTO football_fixtures(provider,provider_fixture_id,competition_id,home_team_id,away_team_id,kickoff_at,status,is_simulated) VALUES('football-data','api-test',?,?,?,NOW(),'SCHEDULED',0)",[c.insertId,h.insertId,a.insertId]);
   let meetings=[raw()],calls=0;const provider={teams:async name=>{calls++;return[{team:{id:name==='Liverpool'?40:1026,name,country:name==='Liverpool'?'England':'Austria'}}];},headToHead:async()=>{calls++;return meetings;},statistics:async()=>[]};
   const initial=await importApiFootballFixture(f.insertId,{provider});assert.equal(initial.imported,1);
+  const {getFixtureDetail}=await import('../src/football/footballChallengeService.js');
+  const oldFetch=globalThis.fetch;globalThis.fetch=async()=>{throw new Error('Provider is unavailable');};
+  try { const detail=await getFixtureDetail(f.insertId);assert.equal(detail.headToHead.status,'AVAILABLE');assert.equal(detail.headToHead.matches.length,1);assert.equal(detail.headToHead.source,'STORED'); }
+  finally {globalThis.fetch=oldFetch;}
   const repeat=await importApiFootballFixture(f.insertId,{provider});assert.equal(repeat.skipped,'checked within 24 hours');assert.equal(calls,3);
   let result=await researchTeams({teamA:h.insertId,teamB:a.insertId,venue:'all'});assert.equal(result.headToHead.summary.played,1);assert.equal(result.headToHead.matches[0].competition.code,'EL');assert.equal(result.teamA.id,h.insertId);
   meetings[0].score.fulltime.home=2;await importApiFootballFixture(f.insertId,{provider,force:true});assert.equal((await queryOne("SELECT COUNT(*) AS n FROM football_history_revisions")).n,1);

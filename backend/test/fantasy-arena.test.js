@@ -49,6 +49,21 @@ before(async () => {
     );
 });
 after(() => pool.end());
+test('automatic arenas publish real major-club slips once despite concurrent sweepers, without changing manual entries',async()=>{
+  const {ensureAutomaticArenas}=await import('../src/football/automaticArenaService.js');
+  const big=(await query("INSERT INTO football_teams(provider,provider_team_id,name) VALUES('football-data','65','Manchester City FC')")).insertId;
+  for(let i=0;i<5;i++) await query(`INSERT INTO football_fixtures(provider,provider_fixture_id,competition_id,home_team_id,away_team_id,kickoff_at,status,is_simulated,last_synced_at)
+    VALUES('football-data',?,?,?, ?,DATE_ADD(DATE_ADD(UTC_DATE(),INTERVAL 3 DAY),INTERVAL 14 HOUR),'SCHEDULED',0,UTC_TIMESTAMP())`,['auto-'+i,competition,big,teams[i%4]]);
+  const outcomes=await Promise.all([ensureAutomaticArenas(),ensureAutomaticArenas()]);
+  assert.equal(outcomes.flat().length,1);assert.deepEqual(await ensureAutomaticArenas(),[]);
+  const row=await queryOne('SELECT * FROM fantasy_arenas WHERE automatic_key IS NOT NULL');
+  assert.equal(row.status,'OPEN');assert.equal(row.entry_cents,2000);assert.equal(row.participant_count,0);
+  assert.equal((await svc.arenaDetail(row.id)).fixtures.length,5);
+  const audit=await queryOne("SELECT actor_type FROM audit_events WHERE entity_type='ARENA' AND entity_id=? AND action='ARENA_PUBLISHED'",[String(row.id)]);
+  assert.equal(audit.actor_type,'SYSTEM');
+  await query('UPDATE football_fixtures SET last_synced_at=DATE_SUB(UTC_TIMESTAMP(),INTERVAL 1 DAY) WHERE provider_fixture_id LIKE ?',['auto-%']);
+  assert.deepEqual(await ensureAutomaticArenas(),[]);
+});
 test("more than 100 players join without a participant cap, leaderboard pages stay bounded and tied settlements reconcile", async () => {
   const { id, d } = await setup(1, { entryFee: 0.01 });
   const playerHash = (
