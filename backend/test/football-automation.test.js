@@ -27,7 +27,10 @@ test('rate limits stop further network calls during cooldown, and recent-score b
   let calls=0;globalThis.fetch=async()=>{calls++;return new Response('Too many requests',{status:429,headers:{'retry-after':'60'}});};
   const p=new FootballDataOrgProvider({apiKey:'test',baseUrl:'https://example.test'});
   await assert.rejects(p.listCompetitions(),/429/);await assert.rejects(p.getFixture('1'),/cooling down/);assert.equal(calls,1);
-  globalThis.fetch=async()=>new Response(JSON.stringify({matches:[{id:1,competition:{code:'PL'},utcDate:'2030-01-01T12:00:00Z',status:'FINISHED',score:{duration:'REGULAR',fullTime:{home:2,away:1}},homeTeam:{id:65},awayTeam:{id:64}}]}));
+  globalThis.fetch=async url=>{
+    assert.equal(new URL(url).searchParams.get('dateTo'),new Date(Date.now()+86400000).toISOString().slice(0,10));
+    return new Response(JSON.stringify({matches:[{id:1,competition:{code:'PL'},utcDate:'2030-01-01T12:00:00Z',status:'FINISHED',score:{duration:'REGULAR',fullTime:{home:2,away:1}},homeTeam:{id:65},awayTeam:{id:64}}]}));
+  };
   const scores=await new FootballDataOrgProvider({apiKey:'test',baseUrl:'https://example.test'}).getLiveFixtures();
   assert.equal(scores[0].status,'FINISHED');assert.equal(scores[0].competitionProviderId,'PL');assert.equal(scores[0].researchEligible,true);
 });

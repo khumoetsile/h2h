@@ -123,7 +123,8 @@ export class FootballDataOrgProvider extends FootballDataProvider {
   async getLiveFixtures() {
     // One batch carries live AND recent final scores, instead of one call per game.
     const from=new Date(Date.now()-86400000).toISOString().slice(0,10);
-    const to=new Date().toISOString().slice(0,10);
+    // v4 excludes dateTo, so tomorrow is required to include today's games.
+    const to=new Date(Date.now()+86400000).toISOString().slice(0,10);
     const data=await this.#cached(`/matches?dateFrom=${from}&dateTo=${to}`,30000);
     if(!Array.isArray(data.matches))throw new Error('football-data.org did not return a valid score batch.');
     return data.matches.map(m=>this.#fixture(m));
