@@ -2,8 +2,17 @@
 .layout { display: grid; gap: 20px; grid-template-columns: 1fr; min-width: 0; }
 .layout > * { min-width: 0; }
 .page { max-width: 1440px; }
+.intro { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; min-width: 0; }
+.intro > * { min-width: 0; }
+.challenge-area { display: grid; grid-template-columns: minmax(0, 1fr); gap: 20px; align-items: start; }
+.challenge-area > * { min-width: 0; }
+.challenge-panel { scroll-margin-top: 84px; }
+.challenge-panel h2 { margin-bottom: 6px; }
+.challenge-panel > .how { border-color: var(--accent); }
+.entry { scroll-margin-top: 84px; }
 @media (min-width: 1080px) {
-  .layout { grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); align-items: start; }
+  .challenge-area { grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); }
+  .challenge-area:not(:has(> .entry)) { grid-template-columns: minmax(0, 1fr); }
   .entry { position: sticky; top: 84px; }
 }
 
@@ -45,15 +54,6 @@
 .pb-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 14px; color: var(--text-2); }
 .win-row { border-top: 1px solid var(--border); padding-top: 8px; strong { font-size: 20px; font-family: var(--font-display); } }
 
-// .btn (global) sets white-space: nowrap, which — combined with flex:1 — refused to
-// shrink "Challenge someone" below its full-text width and pushed the whole page
-// into horizontal overflow on narrow screens. These two buttons are the entire
-// point of this screen (choose how to find your opponent), so they must never
-// be allowed to overflow off-screen.
-.mode-tabs {
-  display: flex; gap: 8px; margin-top: 18px; flex-wrap: wrap;
-  button { flex: 1 1 140px; min-width: 0; white-space: normal; line-height: 1.2; text-align: center; }
-}
 .search-box {
   display: flex; align-items: center; gap: 8px; padding: 10px 14px; border: 1px solid var(--border-strong); border-radius: var(--radius-sm);
   background: var(--surface-2); margin-top: 12px;

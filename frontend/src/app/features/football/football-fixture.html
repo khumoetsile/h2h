@@ -47,102 +47,10 @@
           @if (refreshError()) { <p class="refresh-error" role="status">{{ refreshError() }}</p> }
         </div>
 
-        <app-football-predictions [fixtureId]="f.id"/>
-        <section class="fixture-research" aria-label="Past meetings and recent form">
-          @if(researchError()){<app-load-error [message]="researchError()" (retry)="loadResearch(true)"/>}
-          @else if(researchLoading()&&!researchData()){<div class="insights-skeleton" role="status" aria-label="Loading past meetings"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
-          @else if(researchData();as data){<app-football-research-results [data]="data" [inlineHistory]="true" [busy]="researchLoading()" (sampleChange)="changeResearchSample($event)"/>}
-        </section>
-        @if (f.status === 'LIVE' || f.status === 'FINISHED') {
-          <section class="card pulse-card" aria-labelledby="pulse-title">
-            <div class="pulse-heading">
-              <div><span class="muted tiny eyebrow">MATCH CENTRE</span><h3 id="pulse-title">Match pulse</h3></div>
-              <span class="chip" [class.chip-win]="f.status === 'LIVE'">{{ f.status === 'LIVE' ? 'LIVE DATA' : 'FULL TIME' }}</span>
-            </div>
-            @if (pulseRows().length) {
-              @if (pulseInsight()) { <p class="pulse-insight">{{ pulseInsight() }}</p> }
-              <div class="pulse-stats">
-                @for (row of pulseRows(); track row.label) {
-                  <div class="pulse-stat">
-                    <div class="pulse-stat-label"><span>{{ row.label }}</span><strong>{{ row.home }}{{ row.suffix }} – {{ row.away }}{{ row.suffix }}</strong></div>
-                    <div class="pulse-bar" aria-hidden="true">
-                      <span class="home-bar" [style.width.%]="row.homeWidth"></span>
-                      <span class="away-bar" [style.width.%]="row.awayWidth"></span>
-                    </div>
-                  </div>
-                }
-              </div>
-            } @else {
-              <p class="muted small">This match feed does not provide live statistics. The score and any recorded events still refresh automatically.</p>
-            }
-            <div class="pitch-placeholder">
-              <svg class="pitch-illustration" viewBox="0 0 320 150" role="img" [attr.aria-label]="latestBallCoordinate() ? 'Football pitch with provider-reported latest ball location' : 'Football pitch illustration; live player and ball positions are not available'">
-                <rect x="1" y="1" width="318" height="148" rx="8"></rect>
-                <line x1="160" y1="1" x2="160" y2="149"></line>
-                <circle cx="160" cy="75" r="23"></circle>
-                <rect x="1" y="40" width="36" height="70"></rect><rect x="283" y="40" width="36" height="70"></rect>
-                <circle cx="160" cy="75" r="2" class="pitch-dot"></circle>
-                @if (latestBallCoordinate(); as ball) {
-                  <circle class="tracked-ball" [attr.cx]="8 + ball.x * 304" [attr.cy]="8 + ball.y * 134" r="5"></circle>
-                }
-              </svg>
-              <div class="pitch-message">
-                @if (latestBallCoordinate(); as ball) {
-                  <strong>Provider ball tracking · {{ ball.timer }}</strong>
-                  <span>Latest reported ball location. Positions are provider supplied and may be delayed; players and formations are not tracked.</span>
-                } @else {
-                  <strong>Live pitch positions unavailable</strong>
-                  <span>This provider has not supplied ball-tracking coordinates for this match. No live position is being guessed.</span>
-                }
-              </div>
-            </div>
-          </section>
-        }
-
-        @if (f.events?.length) {
-          <section class="card how timeline-card" aria-labelledby="timeline-title">
-            <div class="pulse-heading"><h3 id="timeline-title">Match timeline</h3><span class="muted tiny">Match feed events</span></div>
-            <ol class="timeline">
-              @for (event of f.events; track event.id) {
-                <li>
-                  <button class="timeline-event" [class.active]="activeEventId() === event.id" [attr.aria-pressed]="activeEventId() === event.id" (click)="activeEventId.set(event.id)">
-                    <span class="event-minute">{{ event.minute ?? '—' }}'</span>
-                    <span class="event-copy">
-                      <strong>{{ event.type.replaceAll('_', ' ') }}</strong>
-                      <span>{{ event.team === 'HOME' ? f.homeTeam.name : f.awayTeam.name }}@if (event.playerName) { · {{ event.playerName }} }@if (event.detail) { · {{ event.detail }} }</span>
-                    </span>
-                    @if (activeEventId() === event.id) { <span class="event-selected">Selected</span> }
-                  </button>
-                </li>
-              }
-            </ol>
-          </section>
-        } @else if (f.status === 'LIVE' || f.status === 'FINISHED') {
-          <div class="card notice">
-            <mat-icon>event</mat-icon>
-            <div><strong>No event timeline available</strong><p class="text-2">The match-data provider has not supplied goal or match events for this fixture.</p></div>
-          </div>
-        }
-
-        <section class="card how reactions-card" aria-labelledby="reactions-title">
-          <div class="pulse-heading"><div><h3 id="reactions-title">Match reactions</h3><p class="muted small">React to the match with the community.</p></div></div>
-          <div class="reaction-list">
-            @for (reaction of reactionOptions; track reaction.code) {
-              @if (auth.isLoggedIn()) {
-                <button class="reaction-button" [class.selected]="f.reactions?.mine === reaction.code" [disabled]="reactionBusy()" [attr.aria-pressed]="f.reactions?.mine === reaction.code" [attr.aria-label]="reaction.label + ', ' + (f.reactions?.counts?.[reaction.code] ?? 0) + ' reactions'" (click)="react(reaction.code)">
-                  <span aria-hidden="true">{{ reaction.emoji }}</span><span>{{ f.reactions?.counts?.[reaction.code] ?? 0 }}</span>
-                </button>
-              } @else {
-                <a class="reaction-button" [routerLink]="'/register'" [queryParams]="{ next: '/football/' + f.id }" [attr.aria-label]="'Sign in to react with ' + reaction.label + '. ' + (f.reactions?.counts?.[reaction.code] ?? 0) + ' reactions'">
-                  <span aria-hidden="true">{{ reaction.emoji }}</span><span>{{ f.reactions?.counts?.[reaction.code] ?? 0 }}</span>
-                </a>
-              }
-            }
-          </div>
-          @if (!auth.isLoggedIn()) { <p class="muted tiny">Create an account to add your reaction.</p> }
-          @if (f.isSimulated) { <p class="muted tiny">Reactions on simulated demo matches are for testing only.</p> }
-        </section>
-
+        <div class="challenge-area">
+        <section class="challenge-panel" id="pvp-challenge" tabindex="-1" aria-labelledby="challenge-title">
+          <h2 id="challenge-title">Challenge another player</h2>
+          @if (!closed()) { <p class="muted small">Choose your side. Challenge a friend or find an opponent.</p> }
         @if (target()) {
           <div class="card notice rematch-notice">
             <mat-icon>swords</mat-icon>
@@ -171,7 +79,7 @@
           }
 
           @if (!auth.isLoggedIn()) {
-            <div class="card notice" id="pvp-challenge" tabindex="-1">
+            <div class="card notice">
               <mat-icon>person_outline</mat-icon>
               <div>
                 <strong>Want to challenge someone on this match?</strong>
@@ -182,7 +90,7 @@
             </div>
           } @else {
           <div class="card how">
-            <h3 id="pvp-challenge" tabindex="-1">Choose a question</h3>
+            <h3>Choose a question</h3>
             <div class="type-list">
               @for (t of f.challengeTypes ?? []; track t.id) {
                 <button class="type-row" [class.selected]="type()?.id === t.id" (click)="chooseType(t)">
@@ -194,8 +102,8 @@
           </div>
           }
         }
-      </section>
 
+        </section>
       @if (!closed() && auth.isLoggedIn()) {
         <aside class="screen entry" id="builder">
           @if (!type()) {
@@ -299,6 +207,105 @@
           }
         </aside>
       }
+
+        </div>
+        <section class="fixture-research" aria-label="Past meetings and recent form">
+          @if(researchError()){<app-load-error [message]="researchError()" (retry)="loadResearch(true)"/>}
+          @else if(researchLoading()&&!researchData()){<div class="insights-skeleton" role="status" aria-label="Loading past meetings"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
+          @else if(researchData();as data){<app-football-research-results [data]="data" [inlineHistory]="true" [busy]="researchLoading()" (sampleChange)="changeResearchSample($event)"/>}
+        </section>
+        @if (f.status === 'LIVE' || f.status === 'FINISHED') {
+          <section class="card pulse-card" aria-labelledby="pulse-title">
+            <div class="pulse-heading">
+              <div><span class="muted tiny eyebrow">MATCH CENTRE</span><h3 id="pulse-title">Match pulse</h3></div>
+              <span class="chip" [class.chip-win]="f.status === 'LIVE'">{{ f.status === 'LIVE' ? 'LIVE DATA' : 'FULL TIME' }}</span>
+            </div>
+            @if (pulseRows().length) {
+              @if (pulseInsight()) { <p class="pulse-insight">{{ pulseInsight() }}</p> }
+              <div class="pulse-stats">
+                @for (row of pulseRows(); track row.label) {
+                  <div class="pulse-stat">
+                    <div class="pulse-stat-label"><span>{{ row.label }}</span><strong>{{ row.home }}{{ row.suffix }} – {{ row.away }}{{ row.suffix }}</strong></div>
+                    <div class="pulse-bar" aria-hidden="true">
+                      <span class="home-bar" [style.width.%]="row.homeWidth"></span>
+                      <span class="away-bar" [style.width.%]="row.awayWidth"></span>
+                    </div>
+                  </div>
+                }
+              </div>
+            } @else {
+              <p class="muted small">This match feed does not provide live statistics. The score and any recorded events still refresh automatically.</p>
+            }
+            <div class="pitch-placeholder">
+              <svg class="pitch-illustration" viewBox="0 0 320 150" role="img" [attr.aria-label]="latestBallCoordinate() ? 'Football pitch with provider-reported latest ball location' : 'Football pitch illustration; live player and ball positions are not available'">
+                <rect x="1" y="1" width="318" height="148" rx="8"></rect>
+                <line x1="160" y1="1" x2="160" y2="149"></line>
+                <circle cx="160" cy="75" r="23"></circle>
+                <rect x="1" y="40" width="36" height="70"></rect><rect x="283" y="40" width="36" height="70"></rect>
+                <circle cx="160" cy="75" r="2" class="pitch-dot"></circle>
+                @if (latestBallCoordinate(); as ball) {
+                  <circle class="tracked-ball" [attr.cx]="8 + ball.x * 304" [attr.cy]="8 + ball.y * 134" r="5"></circle>
+                }
+              </svg>
+              <div class="pitch-message">
+                @if (latestBallCoordinate(); as ball) {
+                  <strong>Provider ball tracking · {{ ball.timer }}</strong>
+                  <span>Latest reported ball location. Positions are provider supplied and may be delayed; players and formations are not tracked.</span>
+                } @else {
+                  <strong>Live pitch positions unavailable</strong>
+                  <span>This provider has not supplied ball-tracking coordinates for this match. No live position is being guessed.</span>
+                }
+              </div>
+            </div>
+          </section>
+        }
+
+        @if (f.events?.length) {
+          <section class="card how timeline-card" aria-labelledby="timeline-title">
+            <div class="pulse-heading"><h3 id="timeline-title">Match timeline</h3><span class="muted tiny">Match feed events</span></div>
+            <ol class="timeline">
+              @for (event of f.events; track event.id) {
+                <li>
+                  <button class="timeline-event" [class.active]="activeEventId() === event.id" [attr.aria-pressed]="activeEventId() === event.id" (click)="activeEventId.set(event.id)">
+                    <span class="event-minute">{{ event.minute ?? '—' }}'</span>
+                    <span class="event-copy">
+                      <strong>{{ event.type.replaceAll('_', ' ') }}</strong>
+                      <span>{{ event.team === 'HOME' ? f.homeTeam.name : f.awayTeam.name }}@if (event.playerName) { · {{ event.playerName }} }@if (event.detail) { · {{ event.detail }} }</span>
+                    </span>
+                    @if (activeEventId() === event.id) { <span class="event-selected">Selected</span> }
+                  </button>
+                </li>
+              }
+            </ol>
+          </section>
+        } @else if (f.status === 'LIVE' || f.status === 'FINISHED') {
+          <div class="card notice">
+            <mat-icon>event</mat-icon>
+            <div><strong>No event timeline available</strong><p class="text-2">The match-data provider has not supplied goal or match events for this fixture.</p></div>
+          </div>
+        }
+
+        <section class="card how reactions-card" aria-labelledby="reactions-title">
+          <div class="pulse-heading"><div><h3 id="reactions-title">Match reactions</h3><p class="muted small">React to the match with the community.</p></div></div>
+          <div class="reaction-list">
+            @for (reaction of reactionOptions; track reaction.code) {
+              @if (auth.isLoggedIn()) {
+                <button class="reaction-button" [class.selected]="f.reactions?.mine === reaction.code" [disabled]="reactionBusy()" [attr.aria-pressed]="f.reactions?.mine === reaction.code" [attr.aria-label]="reaction.label + ', ' + (f.reactions?.counts?.[reaction.code] ?? 0) + ' reactions'" (click)="react(reaction.code)">
+                  <span aria-hidden="true">{{ reaction.emoji }}</span><span>{{ f.reactions?.counts?.[reaction.code] ?? 0 }}</span>
+                </button>
+              } @else {
+                <a class="reaction-button" [routerLink]="'/register'" [queryParams]="{ next: '/football/' + f.id }" [attr.aria-label]="'Sign in to react with ' + reaction.label + '. ' + (f.reactions?.counts?.[reaction.code] ?? 0) + ' reactions'">
+                  <span aria-hidden="true">{{ reaction.emoji }}</span><span>{{ f.reactions?.counts?.[reaction.code] ?? 0 }}</span>
+                </a>
+              }
+            }
+          </div>
+          @if (!auth.isLoggedIn()) { <p class="muted tiny">Create an account to add your reaction.</p> }
+          @if (f.isSimulated) { <p class="muted tiny">Reactions on simulated demo matches are for testing only.</p> }
+        </section>
+
+      </section>
+
     </div>
   }
 </div>

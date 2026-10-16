@@ -1,5 +1,7 @@
 # Football analysis and free predictions
 
+Current interface update: match pages now put player-to-player challenges directly after the fixture header, before historical analysis. The standalone Match predictions card and football-list free-pick link have been removed from these flows. Existing saved prediction records and API endpoints are retained; they are not part of the primary football experience. Research, past meetings and challenge settlement remain available.
+
 This extends the existing Angular football pages, Express API, MySQL fixture lifecycle and authentication. Free picks never call wallet, stake, fee or challenge settlement services. PvP navigation remains optional.
 
 ## User experience

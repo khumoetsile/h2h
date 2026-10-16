@@ -1,4 +1,3 @@
-import { FootballPredictions } from './football-predictions';
 import { Component, DestroyRef, computed, inject, input, OnChanges, OnInit, SimpleChanges, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -34,7 +33,7 @@ import { FootballResearchResults } from './football-research-results';
  */
 @Component({
   selector: 'app-football-fixture',
-  imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet, FootballResearchResults, FootballPredictions],
+  imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet, FootballResearchResults],
   templateUrl: './football-fixture.html',
   styleUrls: ['./football-fixture.scss', './football-fixture-insights.scss'],
 })

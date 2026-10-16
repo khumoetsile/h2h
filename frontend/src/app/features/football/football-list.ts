@@ -39,11 +39,10 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
         <button class="active" aria-pressed="true"><mat-icon inline>sports_soccer</mat-icon> Football</button>
       </div>
 
-      <div class="football-pick-nav"><a routerLink="/football/predictions">My free picks &amp; accuracy →</a></div>
       <header class="hero">
         <div class="grow">
           <h1>Football</h1>
-          <p class="sub">Find a match. See past scores.</p>
+          <p class="sub">Choose a match. Challenge another player.</p>
         </div>
         <button class="btn btn-ghost btn-lg" (click)="scrollToResults()"><mat-icon>history</mat-icon>Past results</button>
         <button class="btn btn-primary btn-lg create" (click)="scrollToFixtures()"><mat-icon>{{ auth.isLoggedIn() ? 'swords' : 'sports_soccer' }}</mat-icon> {{ auth.isLoggedIn() ? 'Create challenge' : 'Browse fixtures' }}</button>
@@ -176,7 +175,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
                 <div class="fx-foot">
                   @if (f.status === 'SCHEDULED') {
                     @if(clock.remainingMs(f.kickoffAt)>0){<span class="small muted">Starts in <app-countdown [deadline]="f.kickoffAt" [icon]="false" /></span>}@else{<span class="small muted">Awaiting match update</span>}
-                    <span class="btn btn-sm btn-primary">Past meetings<mat-icon>chevron_right</mat-icon></span>
+                    <span class="btn btn-sm btn-primary">Challenge a player<mat-icon>chevron_right</mat-icon></span>
                   } @else {
                     <span class="small muted">View score &amp; past meetings →</span>
                   }
