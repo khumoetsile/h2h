@@ -54,6 +54,7 @@ export function roomPhase(m: MatchView): RoomPhase {
             <p class="elapsed" role="timer">Waiting {{ elapsedText() }}</p>
           } @else {
             <h2>Looking for an opponent</h2>
+            <app-invite-share [code]="m.code" [game]="m.game.name" />
             <p class="elapsed" role="timer">{{ elapsedText() }}</p>
             <p class="text-2">Keep this room open. You can choose a bot below or leave for free. We will never switch you to a bot automatically.</p>
             <p class="muted small">Time to find an opponent: <app-countdown [deadline]="m.timers.acceptanceDeadline" [icon]="false" (expired)="expired.emit()" /></p>

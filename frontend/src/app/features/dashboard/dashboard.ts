@@ -1,3 +1,5 @@
+import { ChallengeEntry } from '../../shared/challenge-entry';
+import { PersonalizedFeed } from '../../shared/personalized-feed';
 import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
@@ -38,7 +40,7 @@ interface Dashboard {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [RouterLink, MatIconModule, MatProgressSpinnerModule, AdSlot, GetApp, PitchArt, ChessDiscovery, ChessActivity, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
+  imports: [ChallengeEntry, PersonalizedFeed, RouterLink, MatIconModule, MatProgressSpinnerModule, AdSlot, GetApp, PitchArt, ChessDiscovery, ChessActivity, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })

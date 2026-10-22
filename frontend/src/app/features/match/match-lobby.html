@@ -54,6 +54,7 @@
             <p class="text-2 small">We'll pair you with someone playing <strong>{{ m.game.name }}</strong> for <strong class="money">{{ m.stake | money }}</strong>.</p>
           }
           <p class="muted tiny">Your {{ m.stake | money }} is set aside. If nobody joins in time it's returned in full, with no fee.</p>
+          <app-invite-share [code]="m.code" [game]="m.football ? m.football.homeTeam + ' vs ' + m.football.awayTeam : m.game.name" />
           <div class="actions">
             <button class="btn btn-danger" [disabled]="!!busy()" (click)="openLeave()"><mat-icon>close</mat-icon> Cancel challenge</button>
             @if (!isFootball() && config.config()?.demoBotsEnabled) {

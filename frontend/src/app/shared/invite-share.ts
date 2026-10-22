@@ -8,6 +8,8 @@ import { Toast } from '../core/toast.service';
   imports: [MatIconModule],
   template: `
     <div class="box">
+      <p><strong>Challenge code: {{ code() }}</strong></p>
+      <button class="btn" type="button" (click)="copyCode()">Copy code</button>
       <p class="lead">Send this link to a friend. They can join as a guest, review the entry and get ready to play you.</p>
       <a class="btn btn-primary btn-play btn-block" [href]="whatsapp()" target="_blank" rel="noopener">
         <mat-icon>send</mat-icon> Send on WhatsApp
@@ -37,13 +39,17 @@ export class InviteShare {
   protected copied = signal(false);
   protected canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
   protected link = computed(() => `${location.origin}/join/${this.code()}`);
-  private text = computed(() => `I challenge you to ${this.game()} on Head2Head. Tap to play me:`);
+  private text = computed(() => `I challenge you to ${this.game()} on Head2Head. Demo funds only. Enter code ${this.code()} or tap to review:`);
   protected whatsapp = computed(() => `https://wa.me/?text=${encodeURIComponent(`${this.text()} ${this.link()}`)}`);
 
   protected async share() {
     try { await navigator.share({ title: 'Head2Head challenge', text: this.text(), url: this.link() }); } catch { /* closed the sheet */ }
   }
 
+  protected async copyCode() {
+    try { await navigator.clipboard.writeText(this.code()); this.toast.info('Challenge code copied.'); }
+    catch { this.toast.info('Challenge code: ' + this.code()); }
+  }
   protected async copy() {
     try {
       await navigator.clipboard.writeText(this.link());

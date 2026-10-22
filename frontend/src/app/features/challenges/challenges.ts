@@ -1,3 +1,5 @@
+import { OpponentLobby } from '../../shared/opponent-lobby';
+import { ChallengeEntry } from '../../shared/challenge-entry';
 import { Component, computed, DestroyRef, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { A11yModule } from '@angular/cdk/a11y';
@@ -25,7 +27,7 @@ type Tab = 'incoming' | 'outgoing' | 'history';
  */
 @Component({
   selector: 'app-challenges',
-  imports: [A11yModule, RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, SkeletonList, Countdown, ChessActivity],
+  imports: [OpponentLobby, ChallengeEntry, A11yModule, RouterLink, MatIconModule, MatProgressSpinnerModule, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, SkeletonList, Countdown, ChessActivity],
   templateUrl: './challenges.html',
   styleUrl: './challenges.scss',
 })

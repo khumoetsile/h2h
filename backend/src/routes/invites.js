@@ -19,21 +19,25 @@ const limiter = rateLimit({
  */
 router.get('/:code', limiter, ah(async (req, res) => {
   const m = await queryOne(
-    `SELECT m.code, m.stake, m.prize, m.status, m.source, m.acceptance_deadline,
+    `SELECT m.code, m.category, m.stake, m.prize, m.status, m.source, m.acceptance_deadline,
+            fc.fixture_id, fc.cutoff_at,
             g.slug AS game_slug, g.name AS game_name, g.accent_color, g.tagline,
             u.username, u.avatar_color
        FROM matches m
        JOIN games g ON g.id = m.game_id
-       JOIN users u ON u.id = m.created_by AND u.is_bot = 0
-      WHERE m.code = ? AND m.category = 'SKILL_GAME' AND m.source IN ('DIRECT', 'MATCHMAKING')`,
-    [String(req.params.code).slice(0, 40)],
+       JOIN users u ON u.id = m.created_by AND u.is_bot = 0 AND u.status = 'ACTIVE'
+       LEFT JOIN football_challenges fc ON fc.match_id = m.id
+      WHERE m.code = ? AND m.category IN ('SKILL_GAME', 'FOOTBALL') AND m.source IN ('DIRECT', 'MATCHMAKING')`,
+    [String(req.params.code).trim().toUpperCase().slice(0, 40)],
   );
   if (!m) throw notFound('This invite link is not valid.');
-  const expired = m.acceptance_deadline && new Date(m.acceptance_deadline).getTime() <= Date.now();
+  const expired = (m.acceptance_deadline && new Date(m.acceptance_deadline).getTime() <= Date.now())
+    || (m.cutoff_at && new Date(m.cutoff_at).getTime() <= Date.now());
   const state = m.status === 'WAITING' ? (expired ? 'EXPIRED' : 'OPEN') : (m.status === 'CANCELLED' ? 'EXPIRED' : 'TAKEN');
   res.json({
     invite: {
       code: m.code,
+      fixtureId: m.fixture_id ?? null,
       state,
       stake: Number(m.stake),
       prize: Number(m.prize),

@@ -1,9 +1,10 @@
+import { FavouriteButton } from '../../shared/favourite-button';
 import { Component, DestroyRef, computed, inject, input, OnChanges, OnInit, SimpleChanges, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { A11yModule } from '@angular/cdk/a11y';
 import { DatePipe } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { interval, Subject, debounceTime } from 'rxjs';
@@ -33,12 +34,14 @@ import { FootballResearchResults } from './football-research-results';
  */
 @Component({
   selector: 'app-football-fixture',
-  imports: [A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet, FootballResearchResults],
+  imports: [FavouriteButton, A11yModule, FormsModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, LoadError, Spinner, Countdown, OpenChallengeCard, JoinSheet, FootballResearchResults],
   templateUrl: './football-fixture.html',
   styleUrls: ['./football-fixture.scss', './football-fixture-insights.scss', './football-challenge-flow.scss'],
 })
 export class FootballFixturePage implements OnInit,OnChanges {
   readonly fixtureId = input.required<string>();
+  private inviteRoute = inject(ActivatedRoute);
+  private inviteReviewed = false;
   private api = inject(Api);
   private seo = inject(SeoService);
   protected auth = inject(AuthService);
@@ -234,6 +237,11 @@ export class FootballFixturePage implements OnInit,OnChanges {
         !res.fixture.isSimulated,
       );
       this.openChallenges.set(res.openChallenges ?? []);
+      const invitedCode = this.inviteRoute.snapshot.queryParamMap.get('challenge');
+      if (invitedCode && !this.inviteReviewed) {
+        const invited = (res.openChallenges ?? []).find(c => c.code === invitedCode);
+        if (invited) { this.inviteReviewed = true; this.joinTarget.set(invited); }
+      }
       if (first) this.applyDefaults(res.fixture);
       if (!silent && this.auth.isLoggedIn()) this.auth.refreshMe().catch(() => {});
     } catch (err) {

@@ -7,6 +7,8 @@
       <a class="welcome-help" routerLink="/help" aria-label="How to play">How to play <span aria-hidden="true">↗</span></a>
     </div>
 
+    <app-challenge-entry />
+    <app-personalized-feed />
     <app-chess-discovery class="chess-discovery" [gamePool]="data()?.games ?? null" [loadFromApi]="false" />
     <app-chess-activity class="chess-activity" [limit]="3" [activeOnly]="true" [compact]="true" />
 

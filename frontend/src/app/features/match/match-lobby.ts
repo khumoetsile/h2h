@@ -19,6 +19,7 @@ import { Countdown } from '../../shared/countdown';
 import { MoneyPipe } from '../../shared/pipes';
 import { Avatar, GameIcon, LoadError, Spinner } from '../../shared/ui';
 import { SkillRoom } from './skill-room';
+import { InviteShare } from '../../shared/invite-share';
 
 /**
  * The live state of one 1v1 challenge. Every timer shown here is a deadline
@@ -28,7 +29,7 @@ import { SkillRoom } from './skill-room';
 
 @Component({
   selector: 'app-match-lobby',
-  imports: [A11yModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, Spinner, Countdown, SkillRoom],
+  imports: [InviteShare, A11yModule, RouterLink, DatePipe, MatIconModule, MatProgressSpinnerModule, MoneyPipe, Avatar, GameIcon, LoadError, Spinner, Countdown, SkillRoom],
   templateUrl: './match-lobby.html',
   styleUrl: './match-lobby.scss',
 })

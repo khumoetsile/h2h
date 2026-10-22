@@ -28,6 +28,27 @@ async function host() {
 }
 
 describe('invite links', () => {
+  test('lobby lists public seats but hides private, expired and own matches', async () => {
+    const h = await host();
+    const viewer = await host();
+    const game = await queryOne("SELECT id FROM games WHERE slug = 'penalty-shootout'");
+    const privateMatch = await api().post('/api/matches').set(auth(h.token)).send({ gameId: game.id, stake: 10 });
+    const publicMatch = await api().post('/api/matches').set(auth(h.token)).send({ gameId: game.id, stake: 10 });
+    assert.equal(publicMatch.status, 201, JSON.stringify(publicMatch.body));
+    // Seed a public queue seat without depending on the matchmaking selector.
+    await query("UPDATE matches SET source = 'MATCHMAKING' WHERE code = ?", [publicMatch.body.match.code]);
+    assert.match(publicMatch.body.match.code, /^H2H-[A-HJ-NP-Z2-9]{8}$/);
+    const lobby = await api().get('/api/matches/lobby').set(auth(viewer.token));
+    assert.equal(lobby.status, 200);
+    assert.ok(lobby.body.matches.some(m => m.code === publicMatch.body.match.code));
+    assert.ok(!lobby.body.matches.some(m => m.code === privateMatch.body.match.code));
+    const own = await api().get('/api/matches/lobby').set(auth(h.token));
+    assert.ok(!own.body.matches.some(m => m.code === publicMatch.body.match.code));
+    await query('UPDATE matches SET acceptance_deadline = ? WHERE code = ?', [new Date(Date.now()-1000), publicMatch.body.match.code]);
+    const expired = await api().get('/api/matches/lobby').set(auth(viewer.token));
+    assert.ok(!expired.body.matches.some(m => m.code === publicMatch.body.match.code));
+    assert.equal((await api().get('/api/matches/lobby')).status, 401);
+  });
   test('preview is public, then a new player signs up with two fields, joins and both are in the match', async () => {
     const h = await host();
     const game = await queryOne("SELECT id FROM games WHERE slug = 'penalty-shootout'");

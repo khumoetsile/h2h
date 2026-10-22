@@ -1,3 +1,4 @@
+import { FavouriteButton } from '../../shared/favourite-button';
 import { Component, inject, input, OnChanges, OnInit, SimpleChanges, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
@@ -17,7 +18,7 @@ interface TeamPageData {
 
 @Component({
   selector: 'app-football-team',
-  imports: [DatePipe, RouterLink, MatIconModule, LoadError, Spinner],
+  imports: [FavouriteButton, DatePipe, RouterLink, MatIconModule, LoadError, Spinner],
   template: `
     <div class="page">
       <a class="back muted small" routerLink="/football"><mat-icon>arrow_back</mat-icon>Football</a>
@@ -31,6 +32,7 @@ interface TeamPageData {
           <div><h1>{{ data()!.team.name }}</h1><p class="muted small">Team fixtures and recent results</p></div>
           <a class="btn btn-primary btn-sm" routerLink="/football/research" [queryParams]="{teamA:data()!.team.id}">Compare a rival →</a>
         </header>
+        <app-favourite-button [id]="data()!.team.id" [name]="data()!.team.name" />
         <section>
           <div class="section-title"><div><h2>Upcoming fixtures</h2><p class="sub">Matches found in synced football data</p></div></div>
           @if (!data()!.upcoming.length) { <p class="muted">No upcoming fixtures are currently available.</p> }

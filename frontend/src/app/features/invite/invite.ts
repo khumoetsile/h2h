@@ -11,6 +11,7 @@ import { Avatar, GameIcon, Spinner, LoadError } from '../../shared/ui';
 
 interface Invite {
   code: string;
+  fixtureId?: number | null;
   state: 'OPEN' | 'TAKEN' | 'EXPIRED';
   stake: number;
   prize: number;
@@ -52,6 +53,9 @@ interface Invite {
           } @else if (mine()) {
             <p class="text-2">This is your own challenge. Send the link to a friend.</p>
             <a class="btn btn-primary btn-block btn-play" [routerLink]="['/match', i.code]">Back to my match</a>
+          } @else if (i.fixtureId) {
+            <p class="muted small">Stake {{ money(i.stake) }}, winner receives {{ money(i.prize) }}. Demo funds only.</p>
+            <a class="btn btn-primary btn-block" [routerLink]="['/football', i.fixtureId]" [queryParams]="{challenge:i.code}">Review football picks and join</a>
           } @else if (auth.isLoggedIn()) {
             <button class="btn btn-primary btn-block btn-play" [disabled]="busy()" (click)="accept()">
               @if (busy()) { <mat-spinner diameter="22" /> } @else { Play {{ i.from.username }} }

@@ -6,6 +6,11 @@
     <app-spinner />
   } @else {
     @let f = fixture()!;
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      <app-favourite-button [id]="f.homeTeam.id" [name]="f.homeTeam.name" />
+      <app-favourite-button [id]="f.awayTeam.id" [name]="f.awayTeam.name" />
+      <app-favourite-button kind="competition" [id]="f.competition.id" [name]="f.competition.name" />
+    </div>
     <div class="layout fade-in">
       <section class="intro">
         <div class="fixture-head card">

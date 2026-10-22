@@ -9,6 +9,6 @@ export function randomCode(length) {
   return out;
 }
 
-export const matchCode = () => `M-${randomCode(8)}`;
+export const matchCode = () => `H2H-${randomCode(8)}`;
 export const txReference = () => `TX-${randomCode(12)}`;
 export const randomSeed = () => crypto.randomBytes(4).readUInt32BE(0);

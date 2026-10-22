@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { query } from '../db.js';
 import { ah } from '../utils/errors.js';
 import { validate } from '../middleware/validate.js';
 import { requirePlayer } from '../middleware/auth.js';
@@ -42,6 +43,18 @@ router.post('/practice', requirePlayer, validate(createMatchSchema), ah(async (r
 }));
 
 router.get('/queue', ah(async (_req, res) => res.json({ queue: await svc.queueCounts() })));
+
+// Discover only public matchmaking seats, never private friend invitations.
+router.get('/lobby', ah(async (req, res) => {
+  const rows = await query(
+    `SELECT m.code, m.stake, u.username, g.name AS game
+       FROM matches m JOIN users u ON u.id = m.created_by JOIN games g ON g.id = m.game_id
+      WHERE m.status = 'WAITING' AND m.source = 'MATCHMAKING' AND m.category = 'SKILL_GAME'
+        AND m.created_by <> ? AND u.status = 'ACTIVE' AND u.is_bot = 0
+        AND (m.acceptance_deadline IS NULL OR m.acceptance_deadline > UTC_TIMESTAMP())
+      ORDER BY m.created_at ASC, m.id ASC LIMIT 30`, [req.user.id]);
+  res.json({ matches: rows.map(r => ({ ...r, stake: Number(r.stake) })) });
+}));
 
 router.get('/:id', ah(async (req, res) => res.json({ match: await view(req, req.params.id) })));
 

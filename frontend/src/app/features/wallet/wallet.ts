@@ -22,7 +22,7 @@ import { TxTable } from './tx-table';
         <div class="card bal main">
           <div class="row-between"><span class="lbl">Available balance</span><app-demo-badge label="Demo funds" /></div>
           <div class="amt money">{{ auth.wallet()?.available | money }}<span class="suffix">DEMO</span></div>
-          <p class="muted small">Ready to stake or withdraw.</p>
+          <p class="muted small">Ready for a demo challenge or simulated withdrawal.</p>
           <div class="acts">
             <a class="btn btn-primary" routerLink="/wallet/deposit"><mat-icon>add</mat-icon>Add demo funds</a>
             <a class="btn" routerLink="/wallet/withdraw"><mat-icon>north_east</mat-icon>Withdraw (demo)</a>
@@ -40,6 +40,7 @@ import { TxTable } from './tx-table';
         </div>
       </section>
 
+      <section class="card" style="margin-top:16px"><h2>Botswana payment methods</h2><p class="muted small">Orange Money, MyZaka and Smega are not connected. Add demo funds to try challenges; deposits and withdrawals cannot move real money.</p></section>
       <div class="section-title" style="margin-top:24px"><h2>Recent transactions</h2><a routerLink="/wallet/transactions">View all & filter</a></div>
       <div class="card card-flush">
         @if (error()) { <app-load-error [message]="error()" (retry)="load()" /> }
