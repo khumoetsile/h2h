@@ -1,13 +1,13 @@
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
 import { Api } from '../../core/api.service';
 import { ACTIVE_STATES, DISPLAY_STATE } from '../../core/challenge-state';
 import { ConfigStore } from '../../core/config.store';
 import { formatMoney } from '../../core/format';
-import { MatchSummary, Paged } from '../../core/models';
+import { MatchSummary, Paged, UserStats } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { Countdown } from '../../shared/countdown';
 import { Avatar, EmptyState, GameIcon, LoadError, SkeletonList } from '../../shared/ui';
@@ -23,10 +23,13 @@ type Filter = 'all' | 'active' | 'wins' | 'losses' | 'draws' | 'void' | 'timed_o
   selector: 'app-match-history',
   imports: [RouterLink, DatePipe, MatIconModule, Avatar, EmptyState, GameIcon, LoadError, SkeletonList, Countdown],
   template: `
-    <div class="page page-narrow">
+    <div class="page">
       <div class="page-head">
         <div><h1>My matches</h1><p class="sub">Your active matches and past results.</p></div>
       </div>
+      @if(summary();as s){<nav class="performance-summary" aria-label="Your verified performance"><div class="card"><strong>{{s.played}}</strong><span>Completed</span></div><div class="card"><strong>{{s.wins}}W · {{s.losses}}L · {{s.draws}}D</strong><span>Verified results</span></div><div class="card"><strong>{{s.winRate}}%</strong><span>Decisive win rate</span></div><a class="card" routerLink="/matches" [queryParams]="{filter:'active'}"><strong>{{activeCount() ?? '—'}}</strong><span>Active matches</span></a></nav>}
+      <nav class="journey-links" aria-label="Your competitions"><a class="btn btn-sm" routerLink="/arena" [queryParams]="{view:'mine'}">My arenas</a><a class="btn btn-sm" routerLink="/daily-predictions">Prediction history</a><a class="btn btn-sm" routerLink="/profile">Progress & achievements</a></nav>
+      @if(summaryError()){<p class="muted small" role="status">{{summaryError()}}</p>}
       <div class="segmented filters">
         @for (f of filters; track f.key) {
           <button [class.active]="filter() === f.key" [attr.aria-pressed]="filter() === f.key" (click)="setFilter(f.key)">{{ f.label }}</button>
@@ -39,8 +42,8 @@ type Filter = 'all' | 'active' | 'wins' | 'losses' | 'draws' | 'void' | 'timed_o
         } @else if (!data()) {
           <app-skeleton-list [rows]="6" />
         } @else if (data()!.items.length === 0) {
-          <app-empty icon="swords" title="Nothing here yet" text="Challenge another player to start building your record.">
-            <a class="btn btn-primary btn-sm" routerLink="/football">Find a challenge</a>
+          <app-empty icon="swords" title="No matches in this view" text="Completed matches will appear here. Try a different filter or start a game with a friend.">
+            <a class="btn btn-primary btn-sm" routerLink="/games">Explore games</a><a class="btn btn-sm" routerLink="/challenges">Invite a friend</a>
           </app-empty>
         } @else {
           <div class="list">
@@ -74,11 +77,13 @@ type Filter = 'all' | 'active' | 'wins' | 'losses' | 'draws' | 'void' | 'timed_o
           @if (data()!.items.length < data()!.total) {
             <div class="more"><button class="btn btn-sm" [disabled]="loadingMore()" (click)="more()">Load more</button></div>
           }
+          @if (moreError()) { <p class="form-error" role="alert">{{ moreError() }}</p> }
         }
       </div>
     </div>
   `,
   styles: [`
+    .performance-summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.performance-summary .card{display:flex;flex-direction:column;gap:6px;padding:16px;min-width:0}.performance-summary strong{font:700 24px var(--font-display)}.performance-summary span{font-size:13px;color:var(--text-2)}.journey-links{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:16px}@media(max-width:700px){.performance-summary{grid-template-columns:repeat(2,minmax(0,1fr))}}
     .filters { margin-bottom: 16px; flex-wrap:wrap; overflow:visible; }
     .filters button {flex:1 0 auto;}
     .row-item { align-items: flex-start; }
@@ -101,17 +106,32 @@ export class MatchHistoryPage implements OnInit {
     { key: 'all', label: 'All' }, { key: 'active', label: 'Active' }, { key: 'wins', label: 'Won' }, { key: 'losses', label: 'Lost' },
     { key: 'draws', label: 'Draw' }, { key: 'void', label: 'Void' }, { key: 'timed_out', label: 'Timed out' }, { key: 'cancelled', label: 'Cancelled' },
   ];
+  private route = inject(ActivatedRoute);
+  protected summary = signal<UserStats | null>(null);
+  protected activeCount = signal<number | null>(null);
+  protected summaryError = signal('');
+  private version = 0;
   protected filter = signal<Filter>('all');
   protected data = signal<Paged<MatchSummary> | null>(null);
   protected error = signal('');
   protected loadingMore = signal(false);
+  protected moreError = signal('');
 
   ngOnInit() {
-    this.load();
-    this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
+    this.route.queryParamMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(params => {
+      const value = params.get('filter'); this.filter.set(this.filters.some(f=>f.key===value) ? value as Filter : 'all'); this.data.set(null); void this.load();
+    });
+    void this.loadSummary();
+    this.realtime.match$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => { void this.load(true); void this.loadSummary(); });
   }
 
-  setFilter(f: Filter) { this.filter.set(f); this.data.set(null); this.load(); }
+  setFilter(f: Filter) { void this.router.navigate([], {relativeTo:this.route, queryParams:{filter:f}, queryParamsHandling:'merge', replaceUrl:true}); }
+  async loadSummary() {
+    try {
+      const [s,a] = await Promise.all([this.api.get<{stats:UserStats}>('/me/stats'),this.api.get<Paged<MatchSummary>>('/matches',{status:'active',pageSize:1})]);
+      this.summary.set(s.stats); this.activeCount.set(a.total); this.summaryError.set('');
+    } catch { this.summaryError.set('Performance summary could not be refreshed. Your match list is still available.'); }
+  }
 
   private params(page = 1) {
     const f = this.filter();
@@ -119,21 +139,26 @@ export class MatchHistoryPage implements OnInit {
   }
 
   async load(silent = false) {
+    const version = ++this.version;
     if (!silent) this.error.set('');
     try {
-      this.data.set(await this.api.get<Paged<MatchSummary>>('/matches', this.params()));
+      const data = await this.api.get<Paged<MatchSummary>>('/matches', this.params());
+      if(version === this.version) { this.data.set(data); this.error.set(''); }
     } catch {
-      if (!silent) this.error.set('Could not load your challenges.');
+      if (version === this.version) this.error.set('Could not load your matches.');
     }
   }
 
   async more() {
     const d = this.data();
-    if (!d) return;
+    const version = this.version;
+    if (!d || this.loadingMore()) return;
+    this.moreError.set('');
     this.loadingMore.set(true);
     try {
       const next = await this.api.get<Paged<MatchSummary>>('/matches', this.params(d.page + 1));
-      this.data.set({ ...next, items: [...d.items, ...next.items] });
+      if(version===this.version) this.data.set({ ...next, items: [...d.items, ...next.items] });
+    } catch { if(version===this.version) this.moreError.set('Could not load more matches. Your loaded matches are still shown; please retry.');
     } finally { this.loadingMore.set(false); }
   }
 

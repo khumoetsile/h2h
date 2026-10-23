@@ -1,3 +1,4 @@
+import { ExperienceMeasurement } from '../core/experience-measurement';
 import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink, RouterOutlet } from '@angular/router';
@@ -23,15 +24,16 @@ interface NavItem { label: string; icon: string; link: string; exact?: boolean; 
 // Simple destinations — a player never needs to know these map to
 // "matchmaking", "wallet ledger" or any other technical concept underneath.
 const PLAYER_NAV: NavItem[] = [
-  { label: 'Play', icon: 'sports_esports', link: '/dashboard' },
+  { label: 'Home', icon: 'sports_esports', link: '/dashboard' },
   { label: 'Football', icon: 'sports_soccer', link: '/football' },
+  { label: 'Daily Predictions', icon: 'sports_soccer', link: '/daily-predictions' },
   { label: 'Fantasy Arena', icon: 'groups', link: '/arena' },
-  { label: 'Matches', icon: 'history', link: '/matches' },
+  { label: 'My Activity', icon: 'history', link: '/matches' },
   { label: 'Challenges', icon: 'swords', link: '/challenges' },
   { label: 'Rankings', icon: 'leaderboard', link: '/leaderboard' },
   { label: 'Me', icon: 'person', link: '/profile' },
 ];
-// Four tabs on a phone, always with a word under the icon. Challenges and Rankings live in the desktop nav and the account menu.
+// Five tabs on a phone, always with a word under the icon. Challenges and Rankings live in the desktop nav and the account menu.
 const PLAYER_BOTTOM = ['/dashboard', '/football', '/arena', '/challenges', '/profile'];
 
 const ADMIN_NAV: NavItem[] = [
@@ -41,12 +43,13 @@ const ADMIN_NAV: NavItem[] = [
   { label: 'Transactions', icon: 'receipt_long', link: '/admin/transactions' },
   { label: 'Challenges', icon: 'swords', link: '/admin/challenges' },
   { label: 'Games', icon: 'toggle_on', link: '/admin/games' },
+  { label: 'Daily Predictions', icon: 'sports_soccer', link: '/admin/daily-predictions' },
   { label: 'Fantasy Arena', icon: 'groups', link: '/admin/arenas' },
   { label: 'Audit trail', icon: 'history', link: '/admin/audit' },
   { label: 'Settings', icon: 'tune', link: '/admin/settings' },
 ];
 const ADMIN_BOTTOM = ['/admin', '/admin/users', '/admin/matches', '/admin/transactions', '/admin/settings'];
-const PUBLIC_NAV: NavItem[] = [{ label: 'Chess', icon: 'grid_view', link: '/chess' }, { label: 'Football', icon: 'sports_soccer', link: '/football' }, { label: 'Fantasy Arena', icon: 'groups', link: '/arena' }];
+const PUBLIC_NAV: NavItem[] = [{label:'Rankings',icon:'leaderboard',link:'/leaderboard'}, { label: 'Daily Predictions', icon: 'sports_soccer', link: '/daily-predictions' }, { label: 'Chess', icon: 'grid_view', link: '/chess' }, { label: 'Football', icon: 'sports_soccer', link: '/football' }, { label: 'Fantasy Arena', icon: 'groups', link: '/arena' }];
 
 @Component({
   selector: 'app-shell',
@@ -56,6 +59,7 @@ const PUBLIC_NAV: NavItem[] = [{ label: 'Chess', icon: 'grid_view', link: '/ches
 })
 export class Shell {
   protected auth = inject(AuthService);
+  protected measurement = inject(ExperienceMeasurement);
   protected realtime = inject(RealtimeService);
   protected pwa = inject(PwaService);
   private api = inject(Api);
@@ -63,8 +67,9 @@ export class Shell {
   protected brand = BRAND;
 
   protected nav = computed(() => !this.auth.isLoggedIn() ? PUBLIC_NAV : (this.auth.isAdmin() ? ADMIN_NAV : PLAYER_NAV));
+  protected desktopNav = computed(() => this.nav().filter(n => !this.auth.isLoggedIn() || this.auth.isAdmin() || !['/daily-predictions','/profile'].includes(n.link)));
   protected bottomNav = computed(() => {
-    if (!this.auth.isLoggedIn()) return PUBLIC_NAV;
+    if (!this.auth.isLoggedIn()) return PUBLIC_NAV.map(n=>n.link==='/daily-predictions'?{...n,label:'Picks'}:n.link==='/arena'?{...n,label:'Arena'}:n);
     const keys = this.auth.isAdmin() ? ADMIN_BOTTOM : PLAYER_BOTTOM;
     return this.nav().filter((n) => keys.includes(n.link)).map(n=>n.link==='/arena'?{...n,label:'Arena'}:n);
   });

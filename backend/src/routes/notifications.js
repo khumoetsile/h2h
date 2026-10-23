@@ -10,7 +10,7 @@ const router = Router();
 
 const listQuery = z.object({ unread: z.enum(['true', 'false']).optional(), category: z.enum(['all', 'games', 'football', 'wallet']).default('all'), search: z.string().trim().max(100).default(''), page: z.coerce.number().int().min(1).default(1), pageSize: z.coerce.number().int().min(1).max(50).default(50) });
 const categorySql = `CASE
-  WHEN n.link LIKE '/football%' OR ((n.link LIKE '/match/%' OR n.link LIKE '/matches/%') AND EXISTS (SELECT 1 FROM matches fm WHERE fm.category = 'FOOTBALL' AND fm.code = SUBSTRING_INDEX(n.link, '/', -1)))
+  WHEN n.type = 'DAILY_PREDICTION' OR n.link LIKE '/football%' OR ((n.link LIKE '/match/%' OR n.link LIKE '/matches/%') AND EXISTS (SELECT 1 FROM matches fm WHERE fm.category = 'FOOTBALL' AND fm.code = SUBSTRING_INDEX(n.link, '/', -1)))
     OR (n.type LIKE 'CHALLENGE!_%' ESCAPE '!' AND n.link = '/challenges' AND n.message LIKE '%football%') THEN 'football'
   WHEN n.link LIKE '/wallet%' OR n.type IN ('DEPOSIT','WITHDRAWAL') THEN 'wallet'
   WHEN n.type LIKE 'MATCH!_%' ESCAPE '!' OR n.type LIKE 'CHESS!_%' ESCAPE '!' OR n.type LIKE 'CHALLENGE!_%' ESCAPE '!' OR n.type = 'WAITING_PLAYER' THEN 'games'

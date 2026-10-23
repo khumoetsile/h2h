@@ -114,11 +114,13 @@
     }
 
     @if (isPlayer()) {
+      @if(m.status === 'COMPLETED'){<app-result-share [game]="m.game.name" [result]="me()?.outcome === 'WIN' ? 'I won' : me()?.outcome === 'LOSS' ? 'My opponent won' : 'Draw'"/>}
       <div class="actions">
         <button class="btn btn-primary" (click)="playAgain()"><mat-icon>replay</mat-icon>Play again</button>
-        @if (right() && !right()!.isBot) {
+        @if (m.status === 'COMPLETED' && right() && !right()!.isBot) {
           <button class="btn" [disabled]="rematching()" (click)="rematch()"><mat-icon>swords</mat-icon>Challenge {{ right()!.username }} to a rematch</button>
         }
+        @if(right() && !right()!.isBot){<a class="btn" [routerLink]="['/players',right()!.username]">Opponent profile & rivalry →</a>}
         <a class="btn btn-ghost" routerLink="/wallet/transactions"><mat-icon>receipt_long</mat-icon>View transactions</a>
       </div>
     }

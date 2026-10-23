@@ -64,6 +64,7 @@ router.get('/dashboard', ah(async (req, res) => {
     stats,
     leaderboard: position,
     activeMatches: active.items,
+    activeMatchCount: active.total,
     recentMatches: recent.items,
     activeChallenges: challenges,
     games: games.map((g) => ({ ...g, waiting: queue[g.id]?.total || 0 })),

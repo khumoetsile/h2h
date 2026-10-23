@@ -8,7 +8,7 @@
     </a>
 
     <nav class="desktop-nav hide-mobile" aria-label="Main">
-      @for (item of nav(); track item.link) {
+      @for (item of desktopNav(); track item.link) {
         <a [routerLink]="item.link" [class.active]="navIsActive(item)" [attr.aria-current]="navIsActive(item) ? 'page' : null">{{ item.label }}</a>
       }
     </nav>
@@ -73,6 +73,7 @@
       <span class="muted small">&#64;{{ u.username }}</span>
     </div>
   }
+  <button mat-menu-item routerLink="/daily-predictions"><mat-icon>sports_soccer</mat-icon>Daily Predictions</button>
   <button mat-menu-item routerLink="/profile"><mat-icon>person</mat-icon>Profile</button>
   @if (!auth.isAdmin()) {
     <button mat-menu-item routerLink="/wallet"><mat-icon>account_balance_wallet</mat-icon>Balance</button>

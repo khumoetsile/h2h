@@ -1,0 +1,332 @@
+<div class="page daily">
+  <header class="daily-head">
+    <div>
+      <p class="eyebrow">FOOTBALL · FREE TO PLAY</p>
+      <h1>Daily Predictions</h1>
+      <p class="muted">One result. Your next streak.</p>
+    </div>
+    <button class="btn btn-ghost" (click)="refresh()" [disabled]="loading()">Refresh</button>
+  </header>
+  @if (error()) {
+    <div class="card error" role="alert">{{ error() }}</div>
+  }
+  @if (feedback()) {
+    <p class="card success" role="status">{{ feedback() }}</p>
+  }
+  @if (!auth.isLoggedIn()) {
+    <div class="card join">
+      <strong>Start your winning streak.</strong>
+      <p>Choose a result before kickoff. No entry fee or wallet required.</p>
+      <a class="btn btn-primary" routerLink="/login" [queryParams]="{ next: '/daily-predictions' }"
+        >Sign in to predict</a
+      >
+    </div>
+  }
+  @if (loading() && !data()) {
+    <div class="skeleton" role="status" aria-label="Loading daily predictions">
+      <div></div>
+      <div></div>
+      <div></div>
+    </div>
+  }
+  @if (data(); as d) {
+    @if (auth.isLoggedIn()) {
+      <section class="metrics" aria-label="Your prediction statistics">
+        <div class="card streak">
+          <span>Winning Streak</span
+          ><strong
+            >{{ d.stats.winningStreak }}
+            <small>{{ d.stats.winningStreak === 1 ? 'day' : 'days' }}</small></strong
+          ><span>Best {{ d.stats.bestWinningStreak }}</span>
+        </div>
+        <div class="card">
+          <span>Participation Streak</span
+          ><strong
+            >{{ d.stats.participationStreak }}
+            <small>{{ d.stats.participationStreak === 1 ? 'day' : 'days' }}</small></strong
+          ><span>Best {{ d.stats.bestParticipationStreak }}</span>
+        </div>
+        <div class="card">
+          <span>Accuracy</span
+          ><strong>{{ d.stats.accuracy === null ? '—' : d.stats.accuracy + '%' }}</strong
+          ><span>{{ d.stats.eligible }} resolved predictions</span>
+        </div>
+        <div class="card">
+          <span>Weekly Ranking</span><strong>{{ d.weeklyRank ? '#' + d.weeklyRank : '—' }}</strong
+          ><span>{{ d.stats.correct }} correct · {{ d.stats.incorrect }} incorrect</span>
+        </div>
+      </section>
+    }
+    <div class="content-grid">
+      <section class="today" aria-labelledby="today-title">
+        <h2 id="today-title">Today’s Match</h2>
+        <p class="muted small">{{ d.today }} · {{ d.timezone }}</p>
+        @for (c of d.challenges; track c.id) {
+          <article class="card match">
+            <div class="match-top">
+              <span class="chip">{{ open(c) ? 'OPEN' : 'LOCKED' }}</span
+              ><time
+                >{{ c.kickoffAt | date: 'EEE d MMM, HH:mm' }}
+                <span class="muted">local time</span></time
+              >
+            </div>
+            @if (c.cutoffAt && c.cutoffAt !== c.kickoffAt) {
+              <p class="muted small">
+                Predictions close {{ c.cutoffAt | date: 'EEE d MMM, HH:mm' }} local time. The
+                original deadline remains in place.
+              </p>
+            }
+            <h3 class="teams">{{ c.homeTeam }} <span>vs</span> {{ c.awayTeam }}</h3>
+            <p class="reference">
+              Predict <strong>{{ c.referenceTeam }}</strong
+              >’s result.
+            </p>
+            @if (c.providerUnavailable && !c.actual_result) {
+              <p class="provider" role="status">
+                Provider temporarily unavailable. We’ll wait for a verified result; your streak
+                won’t reset while it’s pending.
+              </p>
+            }
+            @if (c.actual_result && c.actual_result !== 'VOID') {
+              <p>
+                Verified result: <strong>{{ c.referenceTeam }} {{ label(c.actual_result) }}</strong>
+              </p>
+            }
+            @if (auth.isLoggedIn() && open(c)) {
+              <div
+                class="choices"
+                role="group"
+                [attr.aria-label]="'Predict ' + c.referenceTeam + ' result'"
+              >
+                @for (pick of picks; track pick) {
+                  <button
+                    type="button"
+                    [class.selected]="selections()[c.id] === pick"
+                    [attr.aria-pressed]="selections()[c.id] === pick"
+                    (click)="select(c.id, pick)"
+                    [disabled]="saving() !== null"
+                  >
+                    {{ label(pick) }}
+                  </button>
+                }
+              </div>
+              <p class="help">
+                Win = {{ c.referenceTeam }} wins · Draw = tied · Loss = {{ c.referenceTeam }} loses
+              </p>
+              <button
+                class="btn btn-primary submit"
+                (click)="submit(c)"
+                [disabled]="!selections()[c.id] || saving() !== null"
+              >
+                {{
+                  saving() === c.id ? 'Saving…' : c.pick ? 'Update Prediction' : 'Submit Prediction'
+                }}
+              </button>
+            }
+            @if (c.pick) {
+              <p class="saved">
+                Your prediction: <strong>{{ c.referenceTeam }} {{ label(c.pick) }}</strong>
+              </p>
+            }
+            <p class="status" role="status" [class.success]="c.pick && c.pick === c.actual_result">
+              {{ status(c) }}
+            </p>
+            @if (c.community; as community) {
+              <section class="community">
+                <h4>
+                  Community selections
+                  <span class="muted">· {{ community.total }} participants</span>
+                </h4>
+                <div class="community-grid">
+                  @for (s of community.selections; track s.pick) {
+                    <div>
+                      <span>{{ label(s.pick) }}</span
+                      ><strong>{{ s.percentage === null ? '—' : s.percentage + '%' }}</strong
+                      ><meter
+                        min="0"
+                        max="100"
+                        [value]="s.percentage || 0"
+                        [attr.aria-label]="label(s.pick) + ' community percentage'"
+                      ></meter>
+                    </div>
+                  }
+                </div>
+                <p class="muted small">Community opinion, not a prediction model.</p>
+              </section>
+            }
+          </article>
+        } @empty {
+          <div class="card empty">
+            <h3>No challenge available yet</h3>
+            <p>
+              We’re waiting for a real upcoming fixture with reliable coverage. Your streak is
+              protected on days without a challenge.
+            </p>
+          </div>
+        }
+        @if (auth.isLoggedIn()) {
+          <div class="card accuracy">
+            <h3>Your accuracy</h3>
+            <p class="muted">
+              Last 7 eligible:
+              {{ d.stats.last7Accuracy === null ? 'No results yet' : d.stats.last7Accuracy + '%' }}
+              · Last 30:
+              {{
+                d.stats.last30Accuracy === null ? 'No results yet' : d.stats.last30Accuracy + '%'
+              }}
+            </p>
+            <p class="small muted">
+              Pending and void matches are excluded. Winning streaks need correct results on
+              consecutive eligible days. Participation streaks track days played.
+            </p>
+          </div>
+          <label class="card notification-preference"
+            ><input type="checkbox" [ngModel]="d.reminders" (ngModelChange)="reminders($event)" />
+            Optional in-app reminders and result notifications</label
+          >
+          <section class="card achievements">
+            <h3>Your achievements</h3>
+            <div class="badges">
+              @for (a of d.achievements; track a.code) {
+                <div class="achievement">
+                  <strong>{{ a.title }}</strong
+                  ><span>{{ a.description }}</span>
+                </div>
+              } @empty {
+                <p class="muted">Submit your first prediction to earn your first achievement.</p>
+              }
+            </div>
+          </section>
+        }
+      </section>
+      <aside class="card rankings" id="rankings">
+        <div class="section-heading">
+          <h2>Leaderboard</h2>
+          <label
+            ><span class="sr-only">Ranking period</span
+            ><select [(ngModel)]="period" (ngModelChange)="loadBoard()">
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="all">All time</option>
+            </select></label
+          >
+        </div>
+        @if (boardError()) {
+          <p role="alert">
+            {{ boardError() }} <button class="btn" (click)="loadBoard()">Retry</button>
+          </p>
+        }
+        @if (boardLoading()) {
+          <p role="status">Loading rankings…</p>
+        }
+        @if (board(); as b) {
+          @for (r of b.rankings; track r.userId) {
+            <div class="ranking" [class.mine]="r.userId === auth.user()?.id">
+              <strong>#{{ r.rank }}</strong>
+              <div>
+                <b>{{ r.username }}</b>
+                <p>{{ r.correct }} correct · {{ r.accuracy }}%</p>
+                <p>Winning {{ r.winningStreak }} · Participation {{ r.participationStreak }}</p>
+              </div>
+              <strong>{{ r.points }}<small>pts</small></strong>
+            </div>
+          } @empty {
+            <p class="muted empty">Rankings appear after the first verified results.</p>
+          }
+          @if (b.mine; as me) {
+            <p class="my-rank">
+              Your position: <strong>#{{ me.rank }}</strong> · {{ me.points }} points
+            </p>
+          }
+          <div class="paging">
+            <button
+              class="btn"
+              [disabled]="boardPage === 1 || boardLoading()"
+              (click)="loadBoard(boardPage - 1)"
+            >
+              Previous</button
+            ><span>{{ boardPage }}</span
+            ><button
+              class="btn"
+              [disabled]="!b.hasMore || boardLoading()"
+              (click)="loadBoard(boardPage + 1)"
+            >
+              Next
+            </button>
+          </div>
+          <p class="small muted">{{ b.tiePolicy }}</p>
+        }
+      </aside>
+    </div>
+    @if (auth.isLoggedIn()) {
+      <section class="card history" id="history">
+        <div class="section-heading">
+          <h2>Prediction History</h2>
+          <label
+            ><span class="sr-only">Filter history</span
+            ><select [(ngModel)]="filter" (ngModelChange)="loadHistory()">
+              <option value="all">All predictions</option>
+              <option value="correct">Correct</option>
+              <option value="incorrect">Incorrect</option>
+              <option value="pending">Pending</option>
+              <option value="void">Voided</option>
+            </select></label
+          >
+        </div>
+        @if (historyError()) {
+          <p role="alert">
+            {{ historyError() }} <button class="btn" (click)="loadHistory()">Retry</button>
+          </p>
+        }
+        @if (historyLoading()) {
+          <p role="status">Loading history…</p>
+        }
+        @if (history(); as h) {
+          @for (p of h.predictions; track p.id) {
+            <article class="history-row">
+              <div>
+                <time>{{ p.challengeDate }}</time>
+                <h3>{{ p.homeTeam }} vs {{ p.awayTeam }}</h3>
+                <p>
+                  Predicting {{ p.referenceTeam }} · Your pick: <strong>{{ label(p.pick) }}</strong>
+                </p>
+              </div>
+              <div>
+                <strong>{{
+                  p.actualResult === 'VOID'
+                    ? 'Void'
+                    : !p.actualResult
+                      ? 'Pending'
+                      : p.actualResult === p.pick
+                        ? 'Correct'
+                        : 'Incorrect'
+                }}</strong>
+                <p>Result: {{ label(p.actualResult) }} · {{ p.points }} points</p>
+                <p class="muted small">{{ impact(p) }}</p>
+              </div>
+            </article>
+          } @empty {
+            <p class="muted empty">No predictions in this filter yet.</p>
+          }
+          <div class="paging">
+            <button
+              class="btn"
+              [disabled]="historyPage === 1 || historyLoading()"
+              (click)="loadHistory(historyPage - 1)"
+            >
+              Previous</button
+            ><span>{{ historyPage }}</span
+            ><button
+              class="btn"
+              [disabled]="!h.hasMore || historyLoading()"
+              (click)="loadHistory(historyPage + 1)"
+            >
+              Next
+            </button>
+          </div>
+        }
+      </section>
+    }
+  }
+</div>

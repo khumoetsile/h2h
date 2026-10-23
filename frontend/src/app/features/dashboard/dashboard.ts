@@ -1,5 +1,15 @@
+import { ServerClock } from '../../core/server-clock';
+import { Favourites } from '../../core/favourites';
+import { ExperienceMeasurement } from '../../core/experience-measurement';
+import { DailyExperience } from '../../core/daily-experience';
+import { ExperiencePreferences } from '../../core/experience-preferences';
+import { dashboardNextAction } from '../../core/next-action';
+import { Arena } from '../../core/fantasy-arena';
+import { DailyOverview } from '../../core/daily-predictions';
+import { ExperienceSetup } from '../../shared/experience-setup';
 import { ChallengeEntry } from '../../shared/challenge-entry';
 import { PersonalizedFeed } from '../../shared/personalized-feed';
+import { DailyPreview } from '../daily-predictions/daily-preview';
 import { Component, DestroyRef, computed, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router, RouterLink } from '@angular/router';
@@ -10,24 +20,20 @@ import { AuthService } from '../../core/auth.service';
 import { Challenge, FootballFixture, Game, MatchSummary, UserStats, Wallet } from '../../core/models';
 import { RealtimeService } from '../../core/realtime.service';
 import { Toast } from '../../core/toast.service';
-import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { apiError } from '../../core/api-error';
 import { isLiveGame } from '../../core/featured';
 import { MAIN_GAME, QuickPlay } from '../../core/quick-play';
-import { AdSlot } from '../../shared/ad-slot';
-import { GetApp } from '../../shared/get-app';
-import { PitchArt } from '../../shared/pitch-art';
 import { ChessDiscovery } from '../../shared/chess-discovery';
-import { ChessActivity } from '../chess/chess-activity';
 import { SaveAccount } from '../../shared/save-account';
 import { AgoPipe, MoneyPipe } from '../../shared/pipes';
-import { Avatar, EmptyState, GameIcon, LoadError, OutcomeChip } from '../../shared/ui';
+import { EmptyState, GameIcon, LoadError, OutcomeChip } from '../../shared/ui';
 
 interface Dashboard {
   wallet: Wallet;
   stats: UserStats;
   leaderboard: { rank: number | null; of: number };
   activeMatches: MatchSummary[];
+  activeMatchCount?: number;
   recentMatches: MatchSummary[];
   activeChallenges: Challenge[];
   games: Game[];
@@ -40,12 +46,13 @@ interface Dashboard {
  */
 @Component({
   selector: 'app-dashboard',
-  imports: [ChallengeEntry, PersonalizedFeed, RouterLink, MatIconModule, MatProgressSpinnerModule, AdSlot, GetApp, PitchArt, ChessDiscovery, ChessActivity, SaveAccount, MoneyPipe, AgoPipe, Avatar, EmptyState, GameIcon, LoadError, OutcomeChip],
+  imports: [ExperienceSetup, ChallengeEntry, PersonalizedFeed, DailyPreview, RouterLink, ChessDiscovery, SaveAccount, MoneyPipe, AgoPipe, EmptyState, GameIcon, LoadError, OutcomeChip],
   templateUrl: './dashboard.html',
   styleUrl: './dashboard.scss',
 })
 export class DashboardPage implements OnInit {
   private api = inject(Api);
+  protected measurement = inject(ExperienceMeasurement);
   protected auth = inject(AuthService);
   private realtime = inject(RealtimeService);
   private toast = inject(Toast);
@@ -53,6 +60,22 @@ export class DashboardPage implements OnInit {
   private destroyRef = inject(DestroyRef);
 
   private quick = inject(QuickPlay);
+  private clock = inject(ServerClock);
+  private favourites = inject(Favourites);
+  private dailyExperience = inject(DailyExperience);
+  protected preferences = inject(ExperiencePreferences);
+  protected footballFirst = computed(() => { const interests = this.preferences.settings()?.interests ?? []; return interests.includes('football') && !interests.includes('games'); });
+  protected daily = signal<DailyOverview | null>(null);
+  protected dailyError = signal(false);
+  protected arenas = signal<Arena[] | null>(null);
+  protected arenaError = signal(false);
+  protected myArenas = signal<Arena[]>([]);
+  protected myArenaError = signal(false);
+  protected nextAction = computed(() => dashboardNextAction(this.data()?.activeMatches ?? [], this.incomingChallenges(), this.daily(), this.myArenas(), this.clock.now()));
+  private loading = false;
+  private alive = true;
+  constructor() { this.destroyRef.onDestroy(() => this.alive = false); }
+
 
   protected data = signal<Dashboard | null>(null);
   protected main = computed(() => this.data()?.games.find((g) => g.slug === MAIN_GAME) ?? null);
@@ -69,8 +92,9 @@ export class DashboardPage implements OnInit {
 
   /** Live matches first, then the soonest kickoffs that can still be challenged. */
   protected upcoming = computed(() => {
-    const now = Date.now();
+    const now = this.clock.now();
     return (this.fixtures() ?? [])
+      .filter(f => !this.favourites.has('team',f.homeTeam.id) && !this.favourites.has('team',f.awayTeam.id) && !this.favourites.has('competition',f.competition.id))
       .filter((f) => f.status === 'LIVE' || (f.status === 'SCHEDULED' && new Date(f.kickoffAt).getTime() > now))
       .sort((a, b) => (a.status === 'LIVE' ? 0 : 1) - (b.status === 'LIVE' ? 0 : 1) || new Date(a.kickoffAt).getTime() - new Date(b.kickoffAt).getTime())
       .slice(0, 6);
@@ -78,7 +102,7 @@ export class DashboardPage implements OnInit {
   protected anySimulated = computed(() => this.upcoming().some((f) => f.isSimulated));
 
   protected incomingChallenges() {
-    return (this.data()?.activeChallenges ?? []).filter((c) => c.direction === 'INCOMING');
+    return (this.data()?.activeChallenges ?? []).filter((c) => c.direction === 'INCOMING' && c.status === 'PENDING' && Date.parse(c.expiresAt) > this.clock.now());
   }
 
   ngOnInit() {
@@ -89,19 +113,22 @@ export class DashboardPage implements OnInit {
   }
 
   async load(silent = false) {
-    if (!silent) this.error.set('');
-    try {
-      const d = await this.api.get<Dashboard>('/dashboard');
-      this.api.get<{ challenges: unknown[] }>('/football/open-challenges').then((r) => this.openCount.set(r.challenges.length)).catch(() => {});
-      this.api.get<{ fixtures: FootballFixture[] }>('/football/fixtures')
-        .then((r) => { this.fixtures.set(r.fixtures); this.fixturesError.set(false); })
-        .catch(() => { if (!this.fixtures()) this.fixturesError.set(true); });
-      this.data.set(d);
-      this.auth.wallet.set(d.wallet);
-    } catch (err) {
-      if (!silent || !this.data()) this.error.set("We couldn't load your home screen. Please try again.");
-      void err;
-    }
+    if (this.loading || !this.alive || (silent && document.hidden)) return;
+    this.loading = true;
+    const update = (fn: () => void) => { if (this.alive) fn(); };
+    await Promise.allSettled([
+      this.api.get<Dashboard>('/dashboard').then(d => update(() => { this.data.set(d); this.auth.wallet.set(d.wallet); this.error.set(''); }))
+        .catch(() => update(() => this.error.set("We couldn't refresh your activity. Please try again."))),
+      this.api.get<{fixtures:FootballFixture[]}>('/football/fixtures').then(r => update(() => { this.fixtures.set(r.fixtures); this.fixturesError.set(false); }))
+        .catch(() => update(() => this.fixturesError.set(true))),
+      this.dailyExperience.load().then(d => update(() => { this.daily.set(d); this.dailyError.set(false); }))
+        .catch(() => update(() => this.dailyError.set(true))),
+      this.api.get<{arenas:Arena[]}>('/arenas', {section:'open', pageSize:3}).then(r => update(() => { this.arenas.set(r.arenas); this.arenaError.set(false); }))
+        .catch(() => update(() => this.arenaError.set(true))),
+      this.api.get<{arenas:Arena[]}>('/arenas', {section:'mine', pageSize:4}).then(r => update(() => { this.myArenas.set(r.arenas); this.myArenaError.set(false); }))
+        .catch(() => update(() => this.myArenaError.set(true))),
+    ]);
+    this.loading = false;
   }
 
   protected async playNow() { await this.hero('play', () => this.quick.playNow()); }

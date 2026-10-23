@@ -1,7 +1,7 @@
 import { A11yModule } from '@angular/cdk/a11y';
 import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { Api } from '../../core/api.service';
 import { apiError } from '../../core/api-error';
 import { AuthService } from '../../core/auth.service';
@@ -28,7 +28,7 @@ export class ChessHomePage {
   protected error = signal('');
   protected review = signal(false);
   protected stake = signal<number | null>(null);
-  protected opponent = '';
+  protected opponent = (inject(ActivatedRoute).snapshot.queryParamMap.get('opponent') ?? '').replace(/^@/,'').slice(0,20);
   protected money = formatMoney;
   protected Math = Math;
   protected option = computed(() => this.config()?.stakeBreakdown.find((s) => s.stake === this.stake()));

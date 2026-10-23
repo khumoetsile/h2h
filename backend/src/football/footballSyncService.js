@@ -83,7 +83,19 @@ async function upsertFixture(provider, competitionRow, fx) {
       Array.isArray(fx.ballCoordinates) ? JSON.stringify(fx.ballCoordinates) : null, isSimulated, fx.researchEligible === false ? 0 : 1, fx.scoreDuration || null,
     ],
   );
+  await syncDailyPredictionDeadline(provider.name, fx.providerId);
   return queryOne('SELECT * FROM football_fixtures WHERE provider = ? AND provider_fixture_id = ?', [provider.name, fx.providerId]);
+}
+
+/** Preserve observed kickoff transitions for the free daily feature. */
+export async function syncDailyPredictionDeadline(providerName, providerFixtureId) {
+  // A published daily deadline may move earlier, never later. Persist observed
+  // kickoff/live transitions so a later provider reschedule cannot reopen picks.
+  await query(`UPDATE daily_prediction_challenges c JOIN football_fixtures f ON f.id=c.fixture_id
+    SET c.cutoff_at=LEAST(c.cutoff_at,f.kickoff_at),
+      c.locked_at=IF(f.status<>'SCHEDULED' OR LEAST(c.cutoff_at,f.kickoff_at)<=UTC_TIMESTAMP(3),COALESCE(c.locked_at,UTC_TIMESTAMP(3)),c.locked_at),
+      c.status=IF(f.status<>'SCHEDULED' OR LEAST(c.cutoff_at,f.kickoff_at)<=UTC_TIMESTAMP(3),'LOCKED','OPEN')
+    WHERE f.provider=? AND f.provider_fixture_id=? AND c.status='OPEN'`,[providerName,providerFixtureId]);
 }
 
 async function insertNewEvents(fixtureRow, events) {

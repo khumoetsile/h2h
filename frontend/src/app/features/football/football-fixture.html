@@ -35,6 +35,7 @@
             }
             <a class="team team-link" [routerLink]="['/football/teams', f.awayTeam.id]">{{ f.awayTeam.name }}</a>
           </div>
+          <div class="match-links"><a class="btn btn-sm" href="#match-analysis">Past meetings & form</a><a class="btn btn-sm" routerLink="/football/research" [queryParams]="{teamA:f.homeTeam.id,teamB:f.awayTeam.id}">Full team comparison →</a></div>
           @if (!closed()) {
             <button id="pvp-challenge" class="btn btn-primary btn-lg btn-block challenge-launch" (click)="openChallenge()">Challenge a player <span aria-hidden="true">→</span></button>
           } @else {
@@ -47,15 +48,13 @@
             </div>
 
           }
-          <details class="match-details-toggle"><summary>Match information</summary>
+          @if (f.status !== 'SCHEDULED') { <p class="muted small">{{ f.competition.name }} · {{ f.kickoffAt | date: 'EEE d MMM, HH:mm' }}</p> }
+          <button class="btn btn-ghost btn-sm" [disabled]="followBusy()" [attr.aria-pressed]="followed()" (click)="toggleFollow()">{{followed() ? '★ Saved fixture' : '☆ Save fixture'}}</button>
+          <details class="match-details-toggle"><summary>Data freshness & match information</summary>
           @if (f.isSimulated) { <p class="muted tiny">Simulated demo fixture (for testing only).</p> }
           @if (f.lastUpdatedAt) { <p class="muted tiny">Football data last updated {{ f.lastUpdatedAt | date: 'EEE d MMM, HH:mm' }}.</p> }
           @if (f.status === 'LIVE') { <p class="muted tiny">Match data refreshes every 15 seconds while this page is open.</p> }
           @if (refreshError()) { <p class="refresh-error" role="status">{{ refreshError() }}</p> }
-          <button class="btn btn-ghost btn-sm follow-match" type="button" [disabled]="followBusy()" [attr.aria-pressed]="followed()" (click)="toggleFollow()">
-            <mat-icon>{{ followed() ? 'star' : 'star_outline' }}</mat-icon>
-            {{ followed() ? 'Following match' : 'Follow match' }}
-          </button>
           </details>
         </div>
 
@@ -70,7 +69,8 @@
             </div>
           }
 
-        <section class="fixture-research" aria-label="Past meetings and recent form">
+        @if (dailyForFixture();as prediction) { <aside class="card"><h3>This match is in Daily Predictions</h3><p class="muted small">{{prediction.canSubmit ? 'Predict the named team’s result for free before kickoff.' : 'View your prediction and verified result status.'}}</p><a class="btn btn-sm" routerLink="/daily-predictions">{{prediction.canSubmit ? 'Open free prediction' : 'View prediction progress'}} →</a></aside> }
+        <section id="match-analysis" class="fixture-research" aria-label="Past meetings and recent form">
           @if(researchError()){<app-load-error [message]="researchError()" (retry)="loadResearch(true)"/>}
           @else if(researchLoading()&&!researchData()){<div class="insights-skeleton" role="status" aria-label="Loading past meetings"><div class="skeleton"></div><div class="skeleton"></div><div class="skeleton"></div></div>}
           @else if(researchData();as data){<app-football-research-results [data]="data" [inlineHistory]="true" [busy]="researchLoading()" (sampleChange)="changeResearchSample($event)"/>}

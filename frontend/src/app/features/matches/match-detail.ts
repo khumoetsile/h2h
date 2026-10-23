@@ -1,3 +1,5 @@
+import { ResultShare } from '../../shared/result-share';
+import { RematchService } from '../../core/rematch.service';
 import { Component, computed, inject, input, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { Router, RouterLink } from '@angular/router';
@@ -19,13 +21,14 @@ const SUMMARY_LABELS: Record<string, string> = {
 
 @Component({
   selector: 'app-match-detail',
-  imports: [RouterLink, DatePipe, MatIconModule, MoneyPipe, Avatar, DemoBadge, GameIcon, LoadError, MatchStatusChip, Spinner],
+  imports: [ResultShare, RouterLink, DatePipe, MatIconModule, MoneyPipe, Avatar, DemoBadge, GameIcon, LoadError, MatchStatusChip, Spinner],
   templateUrl: './match-detail.html',
   styleUrl: './match-detail.scss',
 })
 export class MatchDetailPage implements OnInit {
   readonly code = input.required<string>();
   private api = inject(Api);
+  private rematchIntent = inject(RematchService);
   protected auth = inject(AuthService);
   private router = inject(Router);
   private toast = inject(Toast);
@@ -95,6 +98,7 @@ export class MatchDetailPage implements OnInit {
 
   playAgain() {
     const m = this.match();
+    if (m?.category === 'FOOTBALL') { this.router.navigate(['/football']); return; }
     if (m?.category === 'CHESS') { this.router.navigate(['/chess']); return; }
     if (m) this.router.navigate(['/games', m.game.slug]);
   }
@@ -102,8 +106,9 @@ export class MatchDetailPage implements OnInit {
   async rematch() {
     const m = this.match();
     const opp = this.right();
-    if (!m || !opp) return;
-    if (m.category === 'CHESS') { this.router.navigate(['/chess'], {queryParams:{opponent:opp.username}}); return; }
+    if (!m || !opp || m.status !== 'COMPLETED') return;
+    if (m.category === 'FOOTBALL') { this.rematchIntent.setPending({username:opp.username,avatarColor:opp.avatarColor}); void this.router.navigate(['/football']); return; }
+    if (m.category === 'CHESS') { void this.router.navigate(['/chess'],{queryParams:{opponent:opp.username}}); return; }
     if (opp.isBot) { this.playAgain(); return; }
     this.rematching.set(true);
     try {

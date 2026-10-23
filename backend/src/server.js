@@ -1,3 +1,4 @@
+import {sweepDailyPredictions} from './football/dailyPredictionService.js';
 import {reconcilePredictionResults} from './football/communityPredictionService.js';
 import {sweepArenas} from './football/fantasyArenaService.js';
 import {ensureAutomaticArenas} from './football/automaticArenaService.js';
@@ -66,7 +67,7 @@ export async function startSweeper() {
       await heartbeat();
       await sweepArenas();
       if(Date.now()>=nextArenaCreation){nextArenaCreation=Date.now()+15*60000;await ensureAutomaticArenas().catch(err=>console.error('Automatic arena creation',err.message));}
-      if(Date.now()>=nextPredictionSweep){nextPredictionSweep=Date.now()+60000;await reconcilePredictionResults().catch(err=>console.error('Free prediction result check',err.message));}
+      if(Date.now()>=nextPredictionSweep){nextPredictionSweep=Date.now()+60000;await reconcilePredictionResults().catch(err=>console.error('Free prediction result check',err.message));await sweepDailyPredictions().catch(err=>console.error('Daily predictions sweep',err.message));}
     } catch (err) {
       console.error('Sweeper error', err);
     } finally {

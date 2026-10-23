@@ -1,3 +1,5 @@
+import { DailyExperience } from '../../core/daily-experience';
+import { DailyOverview } from '../../core/daily-predictions';
 import { FavouriteButton } from '../../shared/favourite-button';
 import { Component, DestroyRef, computed, inject, input, OnChanges, OnInit, SimpleChanges, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
@@ -40,6 +42,9 @@ import { FootballResearchResults } from './football-research-results';
 })
 export class FootballFixturePage implements OnInit,OnChanges {
   readonly fixtureId = input.required<string>();
+  private dailyExperience = inject(DailyExperience);
+  protected daily = signal<DailyOverview | null>(null);
+  protected dailyForFixture = computed(() => this.daily()?.challenges.find(c => c.fixtureId === this.fixture()?.id) ?? null);
   private inviteRoute = inject(ActivatedRoute);
   private inviteReviewed = false;
   private api = inject(Api);

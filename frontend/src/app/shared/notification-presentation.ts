@@ -15,7 +15,7 @@ const ICONS: Record<string, string> = {
 
 export function notificationCategory(item: NotificationItem): NotificationCategory {
   if (item.category) return item.category;
-  if (item.link?.startsWith('/football') || item.type.startsWith('FOOTBALL_') || item.type.startsWith('ARENA_')) return 'football';
+  if (item.type === 'DAILY_PREDICTION' || item.link?.startsWith('/football') || item.type.startsWith('FOOTBALL_') || item.type.startsWith('ARENA_')) return 'football';
   if (item.link?.startsWith('/wallet') || ['DEPOSIT', 'WITHDRAWAL'].includes(item.type)) return 'wallet';
   if (/^(MATCH_|CHESS_|CHALLENGE_|WAITING_PLAYER)/.test(item.type)) return 'games';
   return 'general';

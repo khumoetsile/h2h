@@ -26,11 +26,13 @@ import matchRoutes from './routes/matches.js';
 import challengeRoutes from './routes/challenges.js';
 import footballRoutes from './routes/football.js';
 import arenaRoutes from './routes/fantasyArena.js';
+import dailyPredictionRoutes from './routes/dailyPredictions.js';
 import chessRoutes from './routes/chess.js';
 import leaderboardRoutes from './routes/leaderboard.js';
 import notificationRoutes from './routes/notifications.js';
 import userRoutes from './routes/users.js';
 import adminRoutes from './routes/admin.js';
+import experienceRoutes from './routes/experience.js';
 
 /** Built frontend, if present: WEB_ROOT, ./public (deployed) or ../frontend/dist/frontend/browser (local build). */
 function resolveWebRoot() {
@@ -128,14 +130,16 @@ export function createApp() {
   // their own route handlers.
   app.use('/api/football', footballRoutes);
   app.use('/api/arenas', arenaRoutes);
+  app.use('/api/daily-predictions', dailyPredictionRoutes);
   app.use('/api/chess', chessRoutes);
+  app.use('/api/leaderboard', leaderboardRoutes);
   app.use('/api', requireAuth, meRoutes); // /api/me, /api/dashboard
+  app.use('/api/experience', experienceRoutes);
   app.use('/api/push', requireAuth, pushRoutes);
   app.use('/api/wallet', requireAuth, walletRoutes);
   app.use('/api/games', requireAuth, gameRoutes);
   app.use('/api/matches', requireAuth, matchRoutes);
   app.use('/api/challenges', requireAuth, challengeRoutes);
-  app.use('/api/leaderboard', requireAuth, leaderboardRoutes);
   app.use('/api/notifications', requireAuth, notificationRoutes);
   app.use('/api/users', requireAuth, userRoutes);
   app.use('/api/admin', requireAuth, requireAdmin, adminRoutes);

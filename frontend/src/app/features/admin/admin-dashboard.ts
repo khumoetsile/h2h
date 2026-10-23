@@ -1,3 +1,4 @@
+import { ExperienceMetrics } from '../../shared/experience-metrics';
 import { Component, computed, inject, OnInit, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { MatIconModule } from '@angular/material/icon';
@@ -21,13 +22,14 @@ interface Stats {
 
 @Component({
   selector: 'app-admin-dashboard',
-  imports: [RouterLink, MatIconModule, MatTooltipModule, MoneyPipe, DemoBadge, LoadError, Spinner],
+  imports: [ExperienceMetrics, RouterLink, MatIconModule, MatTooltipModule, MoneyPipe, DemoBadge, LoadError, Spinner],
   template: `
     <div class="page">
       <div class="page-head">
         <div><h1>Platform overview</h1><p class="sub">Live figures from the database.</p></div>
         <button class="btn btn-sm" (click)="load()"><mat-icon>refresh</mat-icon>Refresh</button>
       </div>
+      <app-experience-metrics />
       <div class="demo-strip" style="margin-bottom:16px">All financial figures are DEMO: simulated funds, no real money</div>
       @if (error()) { <app-load-error [message]="error()" (retry)="load()" /> }
       @else if (!s()) { <app-spinner /> }

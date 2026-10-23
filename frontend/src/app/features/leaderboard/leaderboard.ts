@@ -46,7 +46,7 @@ type Period = 'daily' | 'weekly' | 'all';
           <app-skeleton-list [rows]="8" />
         } @else if (entries()!.length === 0) {
           <app-empty icon="leaderboard" title="No ranked players yet" [text]="period() === 'daily' ? 'No matches completed today. Be the first!' : 'No completed matches in this period.'">
-            @if (!auth.isAdmin()) { <a class="btn btn-sm btn-primary" routerLink="/games">Play now</a> }
+            @if (auth.isLoggedIn() && !auth.isAdmin()) { <a class="btn btn-sm btn-primary" routerLink="/games">Play now</a> }
           </app-empty>
         } @else {
           <div class="table-wrap">
@@ -97,7 +97,7 @@ export class LeaderboardPage implements OnInit {
 
   ngOnInit() {
     this.load();
-    this.api.get<{ games: Game[] }>('/games').then((r) => this.games.set(r.games)).catch(() => {});
+    this.api.get<{ games: Game[] }>(this.auth.isLoggedIn() ? '/games' : '/game-catalogue').then((r) => this.games.set(r.games)).catch(() => {});
     this.realtime.leaderboard$.pipe(takeUntilDestroyed(this.destroyRef)).subscribe(() => this.load(true));
   }
 

@@ -65,6 +65,7 @@ interface PublicUser { id: number; username: string; displayName: string; avatar
                 <div><strong>{{ r.draws }}</strong><span class="muted tiny">Draws</span></div>
                 <div><strong class="loss">{{ r.theirWins }}</strong><span class="muted tiny">{{ u.username }}</span></div>
               </div>
+              <div class="rivalry-history">@for(meeting of r.recent;track meeting.code){<a class="btn btn-ghost btn-sm" [routerLink]="meeting.category === 'CHESS' ? ['/chess',meeting.code] : ['/matches',meeting.code]">{{meeting.label}} · {{meeting.myOutcome === 'WIN' ? 'Won' : meeting.myOutcome === 'LOSS' ? 'Lost' : 'Draw'}} · {{meeting.completedAt | date:'d MMM'}} →</a>}</div>
               @if (canChallenge()) { <button class="btn btn-primary btn-block" (click)="challengeFootball()"><mat-icon>replay</mat-icon>Challenge again</button> }
             </section>
           }
@@ -85,6 +86,7 @@ interface PublicUser { id: number; username: string; displayName: string; avatar
     .cta { display: flex; flex-direction: column; gap: 10px; margin-bottom: 14px; }
     .rivalry { padding: 18px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 8px; text-align: center; align-items: stretch;
       &.hot { border-color: var(--demo); } .eyebrow { font-weight: 800; } h2 { overflow-wrap: anywhere; } }
+    .rivalry-history {display:flex;flex-direction:column;gap:4px}.rivalry-history a {white-space:normal;}
     .rv-bar { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 6px 0;
       div { display: flex; flex-direction: column; gap: 2px; min-width: 0; } strong { font-family: var(--font-display); font-size: 26px; }
       span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } }

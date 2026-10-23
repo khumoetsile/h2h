@@ -165,3 +165,5 @@
   .form-opponent { font-size: 11px; }
 }
 @media (prefers-reduced-motion: reduce) { .pulse-bar span { transition: none; } }
+
+.match-links{display:flex;flex-wrap:wrap;gap:8px}.match-links .btn{white-space:normal}#match-analysis{scroll-margin-top:80px}

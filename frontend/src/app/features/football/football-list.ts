@@ -1,3 +1,4 @@
+import { DailyPreview } from '../daily-predictions/daily-preview';
 import { Component, DestroyRef, computed, inject, input, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { DatePipe } from '@angular/common';
@@ -31,7 +32,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
  */
 @Component({
   selector: 'app-football-list',
-  imports: [RouterLink, FormsModule, DatePipe, MatIconModule, MoneyPipe, EmptyState, LoadError, Countdown, OpenChallengeCard, JoinSheet],
+  imports: [DailyPreview, RouterLink, FormsModule, DatePipe, MatIconModule, MoneyPipe, EmptyState, LoadError, Countdown, OpenChallengeCard, JoinSheet],
   template: `
     <div class="page">
       <div class="segmented tabs play-tabs">
@@ -42,17 +43,19 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
       <header class="hero">
         <div class="grow">
           <h1>Football</h1>
-          <p class="sub">Choose a match. Challenge another player.</p>
+          <p class="sub">Fixtures, live scores and analysis. Follow football your way.</p>
         </div>
         <button class="btn btn-ghost btn-lg" (click)="scrollToResults()"><mat-icon>history</mat-icon>Past results</button>
-        <button class="btn btn-primary btn-lg create" (click)="scrollToFixtures()"><mat-icon>{{ auth.isLoggedIn() ? 'swords' : 'sports_soccer' }}</mat-icon> {{ auth.isLoggedIn() ? 'Create challenge' : 'Browse fixtures' }}</button>
+        <button class="btn btn-primary btn-lg create" (click)="scrollToFixtures()"><mat-icon>{{ auth.isLoggedIn() ? 'swords' : 'sports_soccer' }}</mat-icon> Browse fixtures & analysis</button>
       </header>
 
+      <nav class="football-jumps" aria-label="Football discovery"><button class="btn btn-sm" (click)="selectDay('today'); scrollToFixtures()">Today</button><button class="btn btn-sm" (click)="selectDay('live'); scrollToFixtures()">Live</button><button class="btn btn-sm" (click)="selectDay('all'); scrollToFixtures()">Upcoming</button><button class="btn btn-sm" (click)="scrollToResults()">Results</button><a class="btn btn-sm" href="#following">Following</a></nav>
+      <app-daily-preview [compact]="true" />
       <div class="football-search-row"><label class="fixture-search"><mat-icon aria-hidden="true">search</mat-icon><input type="search" [ngModel]="searchText" (ngModelChange)="onSearch($event)" maxlength="80" aria-label="Search available fixtures and results by team or competition" placeholder="Search a team, e.g. Liverpool"/>@if(searchText){<button type="button" (click)="onSearch('')" aria-label="Clear fixture search">×</button>}</label><a class="research-entry" routerLink="/football/research">Compare teams <span aria-hidden="true">↗</span></a></div>
 
       @if (!auth.isLoggedIn()) {
         <div class="card public-join">
-          <div class="grow"><strong>Follow the fixtures. Challenge a player when you're ready.</strong><p class="muted small">Browse football without an account. Joining a 1v1 challenge requires an account; all funds in this demo are simulated.</p></div>
+          <div class="grow"><strong>Explore football without an account.</strong><p class="muted small">Read team form and past meetings freely. Sign in when you want to submit a prediction or join a demo challenge.</p></div>
           <a class="btn btn-primary btn-sm" routerLink="/register">Create account</a>
         </div>
       }
@@ -65,6 +68,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
         </div>
       }
 
+      <div id="following" tabindex="-1"></div>
       @if (followedFixtures().length) {
         <section aria-labelledby="followed-title">
           <div class="section-title">
@@ -74,7 +78,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
             @for (f of followedFixtures(); track f.id) {
               <div class="card followed-row">
                 <a [routerLink]="['/football', f.id]" class="grow">
-                  <strong>{{ f.homeTeam.shortName || f.homeTeam.name }} <span class="muted">{{ f.status === 'LIVE' || f.status === 'FINISHED' ? f.homeScore + '–' + f.awayScore : 'vs' }}</span> {{ f.awayTeam.shortName || f.awayTeam.name }}</strong>
+                  <strong>{{ f.homeTeam.shortName || f.homeTeam.name }} <span class="muted">{{ (f.status === 'LIVE' || f.status === 'FINISHED') && f.homeScore !== null && f.awayScore !== null ? f.homeScore + '–' + f.awayScore : 'vs' }}</span> {{ f.awayTeam.shortName || f.awayTeam.name }}</strong>
                   <span class="muted tiny">{{ f.competition.name }} · {{ f.status === 'LIVE' && f.minute ? 'LIVE ' + f.minute + '′' : (f.kickoffAt | date: 'EEE d MMM, HH:mm') }}</span>
                 </a>
                 <button class="btn btn-ghost btn-sm" type="button" (click)="unfollow(f.id)" [attr.aria-label]="'Stop following ' + f.homeTeam.name + ' versus ' + f.awayTeam.name"><mat-icon>star</mat-icon><span class="unfollow-label">Following</span></button>
@@ -262,6 +266,7 @@ type DayTab = 'all' | 'live' | 'today' | 'tomorrow' | 'later';
     }
   `,
   styles: [`
+    .football-jumps{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px}.following-empty{margin:16px 0}.following-empty summary{min-height:44px;cursor:pointer}
     #fixtures > .card-grid{display:grid;grid-template-columns:1fr;gap:1px;border:1px solid var(--border);border-radius:12px;overflow:hidden}
     #fixtures .fixture{border:0;border-radius:0;padding:14px 18px;gap:8px}
     #fixtures .fx-foot{border:0;padding-top:0}

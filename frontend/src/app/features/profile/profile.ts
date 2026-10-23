@@ -1,3 +1,6 @@
+import { MeasurementSettings } from '../../shared/measurement-settings';
+import { ExperienceSetup } from '../../shared/experience-setup';
+import { DailyPreview } from '../daily-predictions/daily-preview';
 import { Component, inject, OnInit, signal } from '@angular/core';
 import { DatePipe } from '@angular/common';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
@@ -19,7 +22,7 @@ const COLORS = ['#3B82F6', '#22D3EE', '#A855F7', '#F97316', '#10B981', '#EF4444'
 
 @Component({
   selector: 'app-profile',
-  imports: [SaveAccount, ReactiveFormsModule, RouterLink, DatePipe, MatFormFieldModule, MatInputModule, MatIconModule, MatProgressSpinnerModule, Avatar, LoadError, Spinner, StatsPanel],
+  imports: [MeasurementSettings, ExperienceSetup, DailyPreview, SaveAccount, ReactiveFormsModule, RouterLink, DatePipe, MatFormFieldModule, MatInputModule, MatIconModule, MatProgressSpinnerModule, Avatar, LoadError, Spinner, StatsPanel],
   template: `
     <div class="page">
       @if (auth.user(); as u) {
@@ -36,6 +39,7 @@ const COLORS = ['#3B82F6', '#22D3EE', '#A855F7', '#F97316', '#10B981', '#EF4444'
           </div>
         </section>
 
+        <app-daily-preview [profile]="true" />
         <app-save-account style="display:block;margin-top:16px" />
         @if (editing()) {
           <section class="edit-grid fade-in">
@@ -80,11 +84,13 @@ const COLORS = ['#3B82F6', '#22D3EE', '#A855F7', '#F97316', '#10B981', '#EF4444'
         } @else {
           <div class="card"><p class="text-2">Administrator accounts don't take part in matches. Use the <a class="link" routerLink="/admin">admin panel</a> to manage the platform.</p></div>
         }
+        <details class="card profile-preferences"><summary>Preferences & privacy</summary><app-experience-setup [settingsMode]="true" /><app-measurement-settings /></details>
       }
     </div>
   `,
   styles: [`
     .head { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; margin-bottom: 20px; padding: 22px; .grow { flex: 1; min-width: 200px; } }
+    .head .row {flex-wrap:wrap;gap:8px;min-width:0}.head .row .btn{white-space:normal}.profile-preferences{margin-top:20px}.profile-preferences>summary{min-height:48px;cursor:pointer;display:flex;align-items:center}.head .grow{overflow-wrap:anywhere}@media(max-width:560px){.head{padding:18px}.head .grow{min-width:0;flex:1 1 160px}.head .row{width:100%}.head .row .btn{flex:1 1 auto}}
     .bio { margin-top: 6px; }
     .edit-grid { display: grid; gap: 16px; grid-template-columns: 1fr; margin-bottom: 20px; }
     @media (min-width: 900px) { .edit-grid { grid-template-columns: 1.3fr 1fr; align-items: start; } }

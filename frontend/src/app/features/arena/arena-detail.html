@@ -49,6 +49,8 @@
         <span class="subtle">Entries close {{ a.deadline | date: 'EEE d MMM, HH:mm' }}</span>
       }
     </header>
+    @if (!a.participants && a.status === 'OPEN') { <p class="notice">No entries yet. Each confirmed {{ a.entryFee | money }} entry grows the demo pool, less the published {{ a.feePercent }}% fee. Prizes are projected, not guaranteed. At least three players are needed; otherwise entries are refunded.</p> }
+    @if (a.status === 'COMPLETED') { <div class="notice"><strong>Final results</strong><p>Rewards shown are the actual settled demo amounts. Tied players share the affected prize positions.</p><a class="btn" routerLink="/arena">Find your next arena →</a><a class="btn" routerLink="/daily-predictions">Free daily predictions →</a></div> }
     @if (a.status === 'CANCELLED') {
       <div class="notice">
         {{ a.cancellationReason }}

@@ -1,5 +1,5 @@
-import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
-import { RouterLink } from '@angular/router';
+import { Component, DestroyRef, computed, effect, inject, signal, untracked } from '@angular/core';
+import { ActivatedRoute, RouterLink } from '@angular/router';
 import { DatePipe } from '@angular/common';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Api } from '../../core/api.service';
@@ -16,7 +16,7 @@ import { Countdown } from '../../shared/countdown';
     <header class="arena-hero">
       <span class="eyebrow">ONE SLIP. EVERYONE PLAYS.</span>
       <h1>Fantasy Arena</h1>
-      <p>Big teams. One shared slip. New competitions selected automatically.</p>
+      <p>One shared fixture slip. Choose Win, Draw or Loss for each named team.</p>
       <span class="status">Demo money only</span>
       @if (auth.isAdmin()) {
         <a class="btn btn-ghost" routerLink="/admin/arenas">Manage arenas →</a>
@@ -41,7 +41,7 @@ import { Countdown } from '../../shared/countdown';
     @if (section() === 'mine' && !auth.isLoggedIn()) {
       <section class="arena-panel empty">
         <h2>Your competitions live here.</h2>
-        <a class="btn btn-primary" routerLink="/login" [queryParams]="{ next: '/arena' }"
+        <a class="btn btn-primary" routerLink="/login" [queryParams]="{ next: '/arena?view=mine' }"
           >Sign in to see your arenas</a
         >
       </section>
@@ -70,9 +70,10 @@ import { Countdown } from '../../shared/countdown';
               {{ a.fixtureCount }} matches · {{ a.participants }}
               {{ a.participants === 1 ? 'player' : 'players' }}
             </p>
+            @if (!a.participants && a.status === 'OPEN') { <p class="subtle">No entries yet. The prize pool grows with every confirmed player.</p> }
             <div class="pool">{{ a.prizePool | money }}</div>
             <span class="subtle"
-              >{{ a.status === 'OPEN' ? 'Growing prize pool' : 'Final prize pool' }} · Demo
+              >{{ a.status === 'OPEN' ? 'Growing prize pool' : a.status === 'CANCELLED' ? 'Refunded pool' : 'Locked prize pool' }} · Demo
               BWP</span
             >
             <div class="prizes">
@@ -83,6 +84,7 @@ import { Countdown } from '../../shared/countdown';
                 </div>
               }
             </div>
+            <p class="subtle">Each {{ a.entryFee | money }} confirmed entry grows the demo pool, less the published {{ a.feePercent }}% platform fee.</p>
             <p class="subtle">
               {{
                 a.status === 'OPEN'
@@ -129,6 +131,7 @@ import { Countdown } from '../../shared/countdown';
                   : 'Browse open arenas to find your next competition.'
               }}
             </p>
+            <a class="btn" routerLink="/daily-predictions">Try a free prediction</a><a class="btn" routerLink="/football">Explore football analysis</a>
             @if (section() !== 'open') {
               <button class="btn btn-primary" (click)="change('open')">See open arenas</button>
             }
@@ -165,7 +168,8 @@ export class ArenaLobbyPage {
   private page = 1;
   private identity = computed(() => this.auth.user()?.id ?? null);
   protected arenas = signal<Arena[] | null>(null);
-  protected section = signal('open');
+  private route = inject(ActivatedRoute);
+  protected section = signal(['open','live','completed','mine'].includes(this.route.snapshot.queryParamMap.get('view') ?? '') ? this.route.snapshot.queryParamMap.get('view')! : 'open');
   protected loading = signal(false);
   protected error = signal('');
   protected hasMore = signal(false);
@@ -178,9 +182,7 @@ export class ArenaLobbyPage {
   constructor() {
     effect(() => {
       this.identity();
-      this.arenas.set(null);
-      this.page = 1;
-      void this.load(true);
+      untracked(() => { this.arenas.set(null); this.page = 1; void this.load(true); });
     });
     this.realtime.arena$.pipe(takeUntilDestroyed(this.destroy)).subscribe((e) => {
       if (e.arena && this.arenas()?.some((a) => a.id === e.arenaId)) {
